@@ -6,7 +6,7 @@
     <title>NAFDAC Internal Audit System</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css"> <!-- Link to your NEW styles.css -->
     <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase SDK -->
@@ -16,184 +16,213 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage-compat.js"></script>
 </head>
 <body>
-    <div class="container">
-        <!-- Login Screen (shown by default) -->
-        <div id="login-screen" class="auth-screen">
-            <div class="auth-container">
-                <h1>NAFDAC Audit System</h1>
-                <div class="auth-form">
-                    <input type="email" id="login-email" placeholder="Email" required>
-                    <input type="password" id="login-password" placeholder="Password" required>
-                    <button id="login-btn">Login</button>
-                    <button id="google-login-btn" class="google-btn">
-                        <i class="fab fa-google"></i> Sign in with Google
-                    </button>
-                    <p id="login-error" class="error-message"></p>
-                </div>
+    <!-- Login Screen -->
+    <div id="login-screen" class="auth-screen">
+        <div class="auth-container">
+             <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo"> <!-- Optional: Add logo -->
+            <h1>NAFDAC Internal Audit System</h1>
+            <div class="auth-form">
+                <input type="email" id="login-email" placeholder="Email Address" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button id="login-btn" class="btn btn-primary">Login</button>
+                <button id="google-login-btn" class="btn btn-google">
+                    <i class="fab fa-google"></i> Sign in with Google
+                </button>
+                <p id="login-error" class="error-message"></p>
             </div>
         </div>
+    </div>
 
-        <!-- Main App (hidden until login) -->
-        <div id="app-container" class="hidden">
-            <!-- Header -->
-            <header>
+    <!-- Main App -->
+    <div id="app-container" class="hidden">
+        <!-- Header -->
+        <header class="app-header">
+            <!-- Optional Wrapper:
+            <div class="header-content container"> -->
                 <div class="header-left">
+                     <!-- Optional: <img src="nafdac-logo-small.png" alt="NAFDAC Logo" class="header-logo"> -->
                     <h1>NAFDAC Internal Audit</h1>
                 </div>
                 <div class="header-right">
-                    <span id="user-email"></span>
-                    <button id="logout-btn">Logout</button>
+                    <span id="user-email" class="user-info"></span>
+                    <button id="logout-btn" class="btn btn-danger btn-sm">Logout</button>
                 </div>
-            </header>
+            <!-- </div> -->
+        </header>
 
-            <!-- Navigation -->
-            <nav>
+        <!-- Navigation -->
+        <nav class="app-nav">
+             <div class="container"> <!-- Wrap nav ul in container -->
                 <ul>
                     <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
                     <li data-section="new-audit"><i class="fas fa-plus-circle"></i> New Audit</li>
                     <li data-section="audit-history"><i class="fas fa-history"></i> Audit History</li>
                     <li data-section="reports"><i class="fas fa-chart-bar"></i> Reports</li>
                 </ul>
-            </nav>
+             </div>
+        </nav>
 
-            <!-- Main Content -->
-            <main>
-                <!-- Dashboard Section -->
-                <section id="dashboard-section" class="content-section">
-                    <h2>Compliance Dashboard</h2>
-                    <div class="dashboard-grid">
-                        <div class="dashboard-card">
-                            <h3>Overall Compliance</h3>
-                            <canvas id="compliance-chart"></canvas>
-                        </div>
-                        <div class="dashboard-card">
-                            <h3>Recent Audits</h3>
-                            <div id="recent-audits-list" class="audit-list"></div>
-                        </div>
-                        <div class="dashboard-card">
-                            <h3>Non-Conformance Areas</h3>
-                            <canvas id="nc-chart"></canvas>
-                        </div>
-                        <div class="dashboard-card">
-                            <h3>Quick Actions</h3>
-                            <div class="quick-actions">
-                                <button id="quick-new-audit" class="action-btn">
-                                    <i class="fas fa-plus"></i> New Audit
-                                </button>
-                                <button id="quick-export" class="action-btn">
-                                    <i class="fas fa-file-export"></i> Export Data
-                                </button>
-                            </div>
+        <!-- Main Content -->
+        <main class="container app-main">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section">
+                <h2>Compliance Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="dashboard-card">
+                        <h3>Overall Compliance</h3>
+                        <div class="chart-container">
+                           <canvas id="compliance-chart"></canvas>
                         </div>
                     </div>
-                </section>
+                    <div class="dashboard-card">
+                        <h3>Recent Audits</h3>
+                        <div id="recent-audits-list" class="audit-list styled-list">
+                            <!-- Content dynamically populated -->
+                            <p>Loading recent audits...</p>
+                        </div>
+                    </div>
+                     <div class="dashboard-card">
+                        <h3>Non-Conformance Areas</h3>
+                         <div class="chart-container">
+                            <canvas id="nc-chart"></canvas>
+                         </div>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3>Quick Actions</h3>
+                        <div class="quick-actions">
+                            <button id="quick-new-audit" class="btn btn-secondary action-btn">
+                                <i class="fas fa-plus"></i> New Audit
+                            </button>
+                            <button id="quick-export" class="btn btn-outline action-btn">
+                                <i class="fas fa-file-export"></i> Export All Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <!-- New Audit Section -->
-                <section id="new-audit-section" class="content-section hidden">
-                    <h2>New Internal Audit</h2>
-                    <form id="audit-form">
+            <!-- New Audit Section -->
+            <section id="new-audit-section" class="content-section hidden">
+                <h2>New Internal Audit</h2>
+                <form id="audit-form">
+                    <div class="form-row">
                         <div class="form-group">
-                            <label for="audit-date">Date:</label>
+                            <label for="audit-date">Audit Date:</label>
                             <input type="date" id="audit-date" required>
                         </div>
                         <div class="form-group">
-                            <label for="audited-area">Audited Area:</label>
-                            <input type="text" id="audited-area" required>
+                            <label for="audited-area">Audited Area / Directorate:</label>
+                            <input type="text" id="audited-area" required placeholder="e.g., Laboratory Services">
                         </div>
-                        
-                        <h3>Audit Checklist</h3>
-                        <div id="checklist-container"></div>
-                        
-                        <div class="form-actions">
-                            <button type="button" id="save-draft-btn">Save Draft</button>
-                            <button type="button" id="submit-audit-btn">Submit Audit</button>
-                        </div>
-                    </form>
-                </section>
+                    </div>
 
-                <!-- Audit History Section -->
-                <section id="audit-history-section" class="content-section hidden">
-                    <h2>Audit History</h2>
-                    <div class="filter-controls">
-                        <div class="form-group">
-                            <label for="date-from">From:</label>
-                            <input type="date" id="date-from">
-                        </div>
-                        <div class="form-group">
-                            <label for="date-to">To:</label>
-                            <input type="date" id="date-to">
-                        </div>
-                        <div class="form-group">
-                            <label for="audit-area-filter">Area:</label>
-                            <select id="audit-area-filter">
-                                <option value="">All Areas</option>
-                                <!-- Dynamically populated -->
-                            </select>
-                        </div>
-                        <button id="filter-btn">Filter</button>
+                    <h3>Audit Checklist (ISO 9001:2015 Alignment)</h3>
+                    <div id="checklist-container">
+                        <!-- Dynamically populated -->
                     </div>
-                    <div id="audit-history-list" class="audit-list"></div>
-                </section>
 
-                <!-- Reports Section -->
-                <section id="reports-section" class="content-section hidden">
-                    <h2>Reports</h2>
-                    <div class="report-controls">
-                        <div class="form-group">
-                            <label for="report-type">Report Type:</label>
-                            <select id="report-type">
-                                <option value="compliance">Compliance Summary</option>
-                                <option value="non-conformance">Non-Conformance Details</option>
-                                <option value="trend">Trend Analysis</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="report-period">Period:</label>
-                            <select id="report-period">
-                                <option value="last-month">Last Month</option>
-                                <option value="last-quarter">Last Quarter</option>
-                                <option value="last-year">Last Year</option>
-                                <option value="custom">Custom</option>
-                            </select>
-                        </div>
-                        <div id="custom-date-range" class="hidden">
-                            <div class="form-group">
-                                <label for="report-from">From:</label>
-                                <input type="date" id="report-from">
-                            </div>
-                            <div class="form-group">
-                                <label for="report-to">To:</label>
-                                <input type="date" id="report-to">
-                            </div>
-                        </div>
-                        <button id="generate-report-btn">Generate Report</button>
-                        <button id="export-csv-btn">Export to CSV</button>
+                    <div class="form-actions">
+                        <button type="button" id="save-draft-btn" class="btn btn-warning">Save Draft</button>
+                        <button type="button" id="submit-audit-btn" class="btn btn-success">Submit Audit</button>
                     </div>
-                    <div id="report-results">
-                        <div class="report-chart-container">
-                            <canvas id="report-chart"></canvas>
-                        </div>
-                        <div id="report-table-container" class="report-table-container"></div>
+                </form>
+            </section>
+
+            <!-- Audit History Section -->
+            <section id="audit-history-section" class="content-section hidden">
+                <h2>Audit History</h2>
+                <div class="filter-controls">
+                    <div class="form-group">
+                        <label for="date-from">From:</label>
+                        <input type="date" id="date-from">
                     </div>
-                </section>
-            </main>
-        </div>
-    </div>
+                    <div class="form-group">
+                        <label for="date-to">To:</label>
+                        <input type="date" id="date-to">
+                    </div>
+                    <div class="form-group">
+                        <label for="audit-area-filter">Area:</label>
+                        <select id="audit-area-filter">
+                            <option value="">All Areas</option>
+                            <!-- Dynamically populated -->
+                        </select>
+                    </div>
+                    <button id="filter-btn" class="btn btn-primary">Filter</button>
+                </div>
+                <div id="audit-history-list" class="audit-list styled-list">
+                    <!-- Dynamically populated -->
+                     <p>Loading audit history...</p>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="reports-section" class="content-section hidden">
+                <h2>Reports & Analysis</h2>
+                <div class="report-controls">
+                    <div class="form-group">
+                        <label for="report-type">Report Type:</label>
+                        <select id="report-type">
+                            <option value="compliance">Compliance Summary</option>
+                            <option value="non-conformance">Non-Conformance Analysis</option>
+                            <option value="trend">Compliance Trend Analysis</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="report-period">Period:</label>
+                        <select id="report-period">
+                            <option value="last-month">Last Month</option>
+                            <option value="last-quarter">Last Quarter</option>
+                            <option value="last-year">Last Year</option>
+                            <option value="custom">Custom Range</option>
+                        </select>
+                    </div>
+                    <div id="custom-date-range" class="hidden form-row">
+                         <div class="form-group">
+                            <label for="report-from">From:</label>
+                            <input type="date" id="report-from">
+                        </div>
+                        <div class="form-group">
+                            <label for="report-to">To:</label>
+                            <input type="date" id="report-to">
+                        </div>
+                    </div>
+                    <div class="report-actions">
+                        <button id="generate-report-btn" class="btn btn-primary">Generate Report</button>
+                        <button id="export-csv-btn" class="btn btn-success">
+                            <i class="fas fa-file-csv"></i> Export to CSV
+                        </button>
+                    </div>
+                </div>
+                <div id="report-results">
+                    <div class="report-chart-container">
+                        <canvas id="report-chart"></canvas>
+                    </div>
+                    <div id="report-table-container" class="report-table-container">
+                         <p>Select report criteria and click "Generate Report".</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div> <!-- /#app-container -->
 
     <!-- Audit Detail Modal -->
     <div id="audit-detail-modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2 id="modal-title">Audit Details</h2>
-            <div id="modal-content"></div>
-            <div class="modal-actions">
-                <button id="edit-audit-btn">Edit</button>
-                <button id="export-audit-btn">Export</button>
-                <button id="close-modal-btn">Close</button>
+        <div class="modal-content-wrapper">
+             <div class="modal-content">
+                <button class="close-modal" aria-label="Close modal">×</button>
+                <h2 id="modal-title">Audit Details</h2>
+                <div id="modal-body"> <!-- Changed ID for clarity -->
+                    <!-- Dynamic Content -->
+                </div>
+                <div class="modal-actions">
+                    <button id="edit-audit-btn" class="btn btn-secondary"> <i class="fas fa-edit"></i> Edit</button>
+                    <button id="export-audit-btn" class="btn btn-success"> <i class="fas fa-file-export"></i> Export</button>
+                    <button id="close-modal-btn" class="btn btn-outline">Close</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js"></script> <!-- Your existing JS -->
 </body>
 </html>
