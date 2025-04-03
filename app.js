@@ -294,20 +294,22 @@ function switchSection(sectionId) {
 function initNewAuditForm() {
     const checklistContainer = document.getElementById('checklist-container');
     checklistContainer.innerHTML = '';
-    
+
     // Set default date to today
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('audit-date').value = today;
-    
+    document.getElementById('audited-area').value = ''; // Also clear area on init
+
     // Create checklist items
     auditChecklist.forEach(item => {
         const checklistItem = document.createElement('div');
         checklistItem.className = 'checklist-item';
+        // ***** ADD type="button" to the buttons *****
         checklistItem.innerHTML = `
             <h4>${item.requirement} ${item.clause ? `(Clause ${item.clause})` : ''}</h4>
             <div class="compliance-toggle">
-                <button class="compliance-btn" data-compliance="yes">Compliant</button>
-                <button class="compliance-btn" data-compliance="no">Non-Compliant</button>
+                <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button> 
+                <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
             </div>
             <div class="form-group">
                 <label>Objective Evidence:</label>
@@ -319,21 +321,29 @@ function initNewAuditForm() {
             </div>
         `;
         checklistContainer.appendChild(checklistItem);
-        
+
         // Add event listeners to compliance buttons
         const complianceBtns = checklistItem.querySelectorAll('.compliance-btn');
         complianceBtns.forEach(btn => {
-            btn.addEventListener('click', function() {
-                complianceBtns.forEach(b => b.classList.remove('active'));
+            btn.addEventListener('click', function(event) { // Add event parameter
+                // Optional: event.preventDefault(); // Usually not needed with type="button" but good practice if issues persist
+                complianceBtns.forEach(b => b.classList.remove('active', 'compliance-yes', 'compliance-no')); // Ensure all style classes removed
                 this.classList.add('active');
+                // Add back the specific compliance class for styling
+                if (this.dataset.compliance === 'yes') {
+                    this.classList.add('compliance-yes');
+                } else {
+                     this.classList.add('compliance-no');
+                }
+                console.log(`Compliance set to: ${this.dataset.compliance} for item ${item.id}`); // Debugging log
             });
         });
     });
-    
+
     // Reset current audit
     currentAudit = null;
+    console.log("New audit form initialized."); // Debugging log
 }
-
 // Save audit as draft
 function saveAuditAsDraft() {
     const auditData = collectAuditFormData();
