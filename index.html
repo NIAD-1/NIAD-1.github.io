@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAFDAC Internal Audit System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Login Screen (shown by default) -->
+        <div id="login-screen" class="auth-screen">
+            <div class="auth-container">
+                <h1>NAFDAC Audit System</h1>
+                <div class="auth-form">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button id="login-btn">Login</button>
+                    <button id="google-login-btn" class="google-btn">
+                        <i class="fab fa-google"></i> Sign in with Google
+                    </button>
+                    <p id="login-error" class="error-message"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App (hidden until login) -->
+        <div id="app-container" class="hidden">
+            <!-- Header -->
+            <header>
+                <div class="header-left">
+                    <h1>NAFDAC Internal Audit</h1>
+                </div>
+                <div class="header-right">
+                    <span id="user-email"></span>
+                    <button id="logout-btn">Logout</button>
+                </div>
+            </header>
+
+            <!-- Navigation -->
+            <nav>
+                <ul>
+                    <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
+                    <li data-section="new-audit"><i class="fas fa-plus-circle"></i> New Audit</li>
+                    <li data-section="audit-history"><i class="fas fa-history"></i> Audit History</li>
+                    <li data-section="reports"><i class="fas fa-chart-bar"></i> Reports</li>
+                </ul>
+            </nav>
+
+            <!-- Main Content -->
+            <main>
+                <!-- Dashboard Section -->
+                <section id="dashboard-section" class="content-section">
+                    <h2>Compliance Dashboard</h2>
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3>Overall Compliance</h3>
+                            <canvas id="compliance-chart"></canvas>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3>Recent Audits</h3>
+                            <div id="recent-audits-list" class="audit-list"></div>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3>Non-Conformance Areas</h3>
+                            <canvas id="nc-chart"></canvas>
+                        </div>
+                        <div class="dashboard-card">
+                            <h3>Quick Actions</h3>
+                            <div class="quick-actions">
+                                <button id="quick-new-audit" class="action-btn">
+                                    <i class="fas fa-plus"></i> New Audit
+                                </button>
+                                <button id="quick-export" class="action-btn">
+                                    <i class="fas fa-file-export"></i> Export Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- New Audit Section -->
+                <section id="new-audit-section" class="content-section hidden">
+                    <h2>New Internal Audit</h2>
+                    <form id="audit-form">
+                        <div class="form-group">
+                            <label for="audit-date">Date:</label>
+                            <input type="date" id="audit-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="audited-area">Audited Area:</label>
+                            <input type="text" id="audited-area" required>
+                        </div>
+                        
+                        <h3>Audit Checklist</h3>
+                        <div id="checklist-container"></div>
+                        
+                        <div class="form-actions">
+                            <button type="button" id="save-draft-btn">Save Draft</button>
+                            <button type="button" id="submit-audit-btn">Submit Audit</button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- Audit History Section -->
+                <section id="audit-history-section" class="content-section hidden">
+                    <h2>Audit History</h2>
+                    <div class="filter-controls">
+                        <div class="form-group">
+                            <label for="date-from">From:</label>
+                            <input type="date" id="date-from">
+                        </div>
+                        <div class="form-group">
+                            <label for="date-to">To:</label>
+                            <input type="date" id="date-to">
+                        </div>
+                        <div class="form-group">
+                            <label for="audit-area-filter">Area:</label>
+                            <select id="audit-area-filter">
+                                <option value="">All Areas</option>
+                                <!-- Dynamically populated -->
+                            </select>
+                        </div>
+                        <button id="filter-btn">Filter</button>
+                    </div>
+                    <div id="audit-history-list" class="audit-list"></div>
+                </section>
+
+                <!-- Reports Section -->
+                <section id="reports-section" class="content-section hidden">
+                    <h2>Reports</h2>
+                    <div class="report-controls">
+                        <div class="form-group">
+                            <label for="report-type">Report Type:</label>
+                            <select id="report-type">
+                                <option value="compliance">Compliance Summary</option>
+                                <option value="non-conformance">Non-Conformance Details</option>
+                                <option value="trend">Trend Analysis</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="report-period">Period:</label>
+                            <select id="report-period">
+                                <option value="last-month">Last Month</option>
+                                <option value="last-quarter">Last Quarter</option>
+                                <option value="last-year">Last Year</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div id="custom-date-range" class="hidden">
+                            <div class="form-group">
+                                <label for="report-from">From:</label>
+                                <input type="date" id="report-from">
+                            </div>
+                            <div class="form-group">
+                                <label for="report-to">To:</label>
+                                <input type="date" id="report-to">
+                            </div>
+                        </div>
+                        <button id="generate-report-btn">Generate Report</button>
+                        <button id="export-csv-btn">Export to CSV</button>
+                    </div>
+                    <div id="report-results">
+                        <div class="report-chart-container">
+                            <canvas id="report-chart"></canvas>
+                        </div>
+                        <div id="report-table-container" class="report-table-container"></div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Audit Detail Modal -->
+    <div id="audit-detail-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modal-title">Audit Details</h2>
+            <div id="modal-content"></div>
+            <div class="modal-actions">
+                <button id="edit-audit-btn">Edit</button>
+                <button id="export-audit-btn">Export</button>
+                <button id="close-modal-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
