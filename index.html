@@ -104,32 +104,56 @@
             </section>
 
             <!-- New Audit Section -->
-            <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
+  <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
                     <div class="form-row">
+                        <!-- 1. Renamed Field -->
                         <div class="form-group">
-                            <label for="audit-date">Audit Date:</label>
-                            <input type="date" id="audit-date" required>
+                            <label for="directorate-unit">Directorate / Unit:</label>
+                            <input type="text" id="directorate-unit" required placeholder="e.g., Laboratory Services / Microbiology Unit">
                         </div>
+                        <!-- 4. New Ref No Field -->
                         <div class="form-group">
-                            <label for="audited-area">Audited Area / Directorate:</label>
-                            <input type="text" id="audited-area" required placeholder="e.g., Laboratory Services">
+                             <label for="ref-no">Ref No.:</label>
+                             <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
                         </div>
                     </div>
 
-                    <h3>Audit Checklist (ISO 9001:2015 Alignment)</h3>
+                    <!-- 2. New Lead Auditors / Auditors Fields -->
+                    <div class="form-row">
+                         <div class="form-group">
+                             <label for="lead-auditors-select">Lead Auditor(s):</label>
+                             <select id="lead-auditors-select" multiple required>
+                                 <!-- Options populated by JS -->
+                                 <option value="" disabled>Loading...</option>
+                             </select>
+                             <small>Hold Ctrl/Cmd to select multiple.</small>
+                         </div>
+                         <div class="form-group">
+                             <label for="auditors-select">Auditor(s):</label>
+                             <select id="auditors-select" multiple required>
+                                 <!-- Options populated by JS -->
+                                 <option value="" disabled>Loading...</option>
+                              </select>
+                              <small>Hold Ctrl/Cmd to select multiple.</small>
+                         </div>
+                    </div>
+
+                    <!-- 5. Renamed Checklist Section Title -->
+                    <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
                     <div id="checklist-container">
-                        <!-- Dynamically populated -->
+                        <!-- Dynamically populated by JS with NEW structure -->
+                        <p>Loading checklist...</p>
                     </div>
 
                     <div class="form-actions">
-                         <!-- Buttons hidden/shown via JS permission checks -->
                         <button type="button" id="save-draft-btn" class="btn btn-warning permission-hidden" data-permission="create_audit">Save Draft</button>
                         <button type="button" id="submit-audit-btn" class="btn btn-success permission-hidden" data-permission="submit_audit">Submit Audit</button>
                     </div>
                 </form>
             </section>
+
 
             <!-- Audit History Section -->
             <section id="audit-history-section" class="content-section hidden" data-permission="view_all_audits">
