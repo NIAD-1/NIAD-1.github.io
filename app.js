@@ -1,3 +1,7 @@
+// app.js
+
+// --- Firebase Configuration ---
+// IMPORTANT: Replace with your actual Firebase project config
 const firebaseConfig = {
     apiKey: "AIzaSyCLp8nKO2rb7yMyaL0mM6sJOzoFRmm0BdI",
     authDomain: "internalaudit-2cd8c.firebaseapp.com",
@@ -307,8 +311,9 @@ function updateUIForRole() {
 
 function updateModalEditButtonVisibility() {
      if (editAuditBtn) {
-         editAuditBtn.classList.toggle('permission-hidden', !canEditAudit(currentAudit));
-         editAuditBtn.disabled = !canEditAudit(currentAudit); // Also disable
+         const canUserEdit = canEditAudit(currentAudit);
+         editAuditBtn.classList.toggle('permission-hidden', !canUserEdit);
+         editAuditBtn.disabled = !canUserEdit; // Also disable
      }
      if (exportAuditBtn){
         const canExport = hasPermission('export_data');
@@ -381,10 +386,12 @@ function initializeSection(sectionId) {
     }
 }
 
-// --- NEW: Fetch Users by Role ---
+// --- Fetch Users by Role ---
 async function getUsersByRole(role) {
     const users = [];
     try {
+        // Ensure db is initialized before calling collection()
+        if (!db) throw new Error("Firestore database is not initialized.");
         const q = db.collection('users').where('role', '==', role).orderBy('email');
         const querySnapshot = await q.get();
         querySnapshot.forEach((doc) => {
@@ -532,11 +539,15 @@ function collectAuditFormData() {
     if (leadAuditorsSelect?.selectedOptions.length === 0) { alert('Select Lead Auditor(s).'); leadAuditorsSelect?.focus(); return null; }
     if (auditorsSelect?.selectedOptions.length === 0) { alert('Select Auditor(s).'); auditorsSelect?.focus(); return null; }
 
-    const getSelectedAuditorData = (selectElement) => Array.from(selectElement.selectedOptions).map(opt => ({
-        uid: opt.value,
-        displayName: opt.dataset.displayName || opt.textContent.split(' (')[0],
-        email: opt.dataset.email || ''
-    }));
+    const getSelectedAuditorData = (selectElement) => {
+        // Handle cases where selectElement might be null
+        if (!selectElement) return [];
+        return Array.from(selectElement.selectedOptions).map(opt => ({
+            uid: opt.value,
+            displayName: opt.dataset.displayName || opt.textContent.split(' (')[0],
+            email: opt.dataset.email || ''
+        }));
+    }
     const selectedLeadAuditors = getSelectedAuditorData(leadAuditorsSelect);
     const selectedAuditors = getSelectedAuditorData(auditorsSelect);
 
@@ -566,13 +577,26 @@ function collectAuditFormData() {
             const howManySelect = itemElement.querySelector(`#how-many-needed-${itemId}`);
             correctiveActionsCount = howManySelect ? parseInt(howManySelect.value, 10) : null;
             // A count is implicitly required if Yes is selected for full completion
-            if (!correctiveActionsCount) isComplete = false;
+            if (!correctiveActionsCount || isNaN(correctiveActionsCount)) { // Also check if parsing failed
+                 isComplete = false;
+                 // Ensure the select element itself exists before trying to style it
+                 if (howManySelect) {
+                    howManySelect.style.border = '2px solid red'; // Highlight the count dropdown
+                 }
+            } else {
+                 // Reset border if valid count is selected
+                 if (howManySelect) {
+                    howManySelect.style.border = '';
+                 }
+            }
         }
         const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
 
+        // Highlight the whole item if compliance is missing or count is missing when needed
         if (!compliance || (correctiveActionYes && !correctiveActionsCount)) {
             itemElement.style.border = '2px solid red'; // Highlight incomplete item
         }
+
 
         checklistData.push({
             id: itemId, requirement: originalItem.requirement, clause: originalItem.clause,
@@ -793,8 +817,14 @@ function updateAreaFilter() {
         option.value = area; option.textContent = escapeHtml(area);
         areaFilterHistory.appendChild(option);
     });
-    areaFilterHistory.value = currentFilterValue;
+    // Only restore if the value still exists in the options
+    if (areaFilterHistory.querySelector(`option[value="${currentFilterValue}"]`)) {
+        areaFilterHistory.value = currentFilterValue;
+    } else {
+        areaFilterHistory.value = ""; // Default to "All Areas" if previous selection is gone
+    }
 }
+
 
 // --- Modal Functionality ---
 
@@ -933,15 +963,19 @@ function exportCurrentAudit() {
 }
 
 // --- Reporting ---
-// (Keep initReportControls, toggleCustomDateRange, generateReport, generateComplianceReport, generateNonConformanceReport, generateTrendReport, exportReportToCSV, exportDashboardData)
-// Note: Report generation functions will use the audit data structure including the new fields where relevant (e.g., directorateUnit).
 
 function initReportControls() {
      const today = new Date(); const lastMonth = new Date(today); lastMonth.setMonth(lastMonth.getMonth() - 1);
-     document.getElementById('report-from').value = lastMonth.toISOString().split('T')[0];
-     document.getElementById('report-to').value = today.toISOString().split('T')[0];
-     document.getElementById('custom-date-range').classList.add('hidden');
-     document.getElementById('report-period').value = 'last-month';
+     const reportFromInput = document.getElementById('report-from');
+     const reportToInput = document.getElementById('report-to');
+     const customDateRangeDiv = document.getElementById('custom-date-range');
+     const reportPeriodSelect = document.getElementById('report-period');
+
+     if(reportFromInput) reportFromInput.value = lastMonth.toISOString().split('T')[0];
+     if(reportToInput) reportToInput.value = today.toISOString().split('T')[0];
+     if(customDateRangeDiv) customDateRangeDiv.classList.add('hidden');
+     if(reportPeriodSelect) reportPeriodSelect.value = 'last-month';
+
      if(reportChartInstance) reportChartInstance.destroy();
      if(reportTableContainer) reportTableContainer.innerHTML = '<p>Select criteria & generate.</p>';
      if(reportChartContainer) reportChartContainer.style.display = 'none';
@@ -949,22 +983,31 @@ function initReportControls() {
 }
 
 function toggleCustomDateRange() {
-    const period = document.getElementById('report-period').value;
-    document.getElementById('custom-date-range').classList.toggle('hidden', period !== 'custom');
+    const reportPeriodSelect = document.getElementById('report-period');
+    const customDateRangeDiv = document.getElementById('custom-date-range');
+    if (reportPeriodSelect && customDateRangeDiv) {
+        customDateRangeDiv.classList.toggle('hidden', reportPeriodSelect.value !== 'custom');
+    }
 }
+
 
 function generateReport() {
     if (!hasPermission('generate_reports')) { alert("Permission Denied."); return; }
      const reportType = document.getElementById('report-type').value;
      const period = document.getElementById('report-period').value;
      if (reportChartInstance) reportChartInstance.destroy();
-     reportTableContainer.innerHTML = '<p>Generating report...</p>';
-     reportChartContainer.style.display = 'none';
+     if(reportTableContainer) reportTableContainer.innerHTML = '<p>Generating report...</p>';
+     if(reportChartContainer) reportChartContainer.style.display = 'none';
 
      let fromDate, toDate; const today = new Date();
      if (period === 'custom') {
-         fromDate = document.getElementById('report-from').value; toDate = document.getElementById('report-to').value;
-         if (!fromDate || !toDate) { alert("Select custom date range."); reportTableContainer.innerHTML = '<p class="error">Date range needed.</p>'; return; }
+         fromDate = document.getElementById('report-from').value;
+         toDate = document.getElementById('report-to').value;
+         if (!fromDate || !toDate) {
+             alert("Select custom date range.");
+             if(reportTableContainer) reportTableContainer.innerHTML = '<p class="error-message">Custom date range incomplete.</p>'; // Use error class
+             return;
+         }
      } else {
          const toDateObj = new Date(today); toDate = toDateObj.toISOString().split('T')[0];
          const fromDateObj = new Date(today);
@@ -975,20 +1018,28 @@ function generateReport() {
      }
      console.log(`Generating report: ${reportType} from ${fromDate} to ${toDate}`);
      const reportAudits = audits.filter(a => a.date >= fromDate && a.date <= toDate && a.status === 'submitted');
-     if (reportAudits.length === 0) { reportTableContainer.innerHTML = '<p>No submitted audits found for period.</p>'; return; }
+     if (reportAudits.length === 0) {
+         if(reportTableContainer) reportTableContainer.innerHTML = '<p>No submitted audits found for period.</p>';
+         return;
+      }
      console.log(`Using ${reportAudits.length} audits.`);
 
      try {
-         reportChartContainer.style.display = 'block';
+         if(reportChartContainer) reportChartContainer.style.display = 'block';
          if (reportType === 'compliance') generateComplianceReport(reportAudits, fromDate, toDate);
          else if (reportType === 'non-conformance') generateNonConformanceReport(reportAudits, fromDate, toDate);
          else if (reportType === 'trend') generateTrendReport(reportAudits, fromDate, toDate);
          else throw new Error(`Unknown type: ${reportType}`);
-     } catch (e) { console.error("Report gen error:", e); reportTableContainer.innerHTML = `<p class="error">Error: ${e.message}</p>`; reportChartContainer.style.display = 'none'; }
+     } catch (e) {
+         console.error("Report gen error:", e);
+         if(reportTableContainer) reportTableContainer.innerHTML = `<p class="error-message">Error: ${e.message}</p>`; // Use error class
+         if(reportChartContainer) reportChartContainer.style.display = 'none';
+        }
 }
 
 function generateComplianceReport(reportAudits, from, to) {
     console.log("Generating Compliance Report");
+    if (!reportChartCanvas || !reportTableContainer) return;
     const ctx = reportChartCanvas.getContext('2d');
     const compByArea = {}; let totalAudits = 0;
     reportAudits.forEach(a => {
@@ -1002,8 +1053,9 @@ function generateComplianceReport(reportAudits, from, to) {
         }
     });
     const areas = Object.keys(compByArea).sort();
-    if (areas.length === 0) { reportTableContainer.innerHTML = '<p>No compliance data.</p>'; reportChartContainer.style.display = 'none'; return; }
+    if (areas.length === 0) { reportTableContainer.innerHTML = '<p>No compliance data.</p>'; if(reportChartContainer) reportChartContainer.style.display = 'none'; return; }
     const avgRates = areas.map(a => Math.round(compByArea[a].totalRate / compByArea[a].count));
+    if (reportChartInstance) reportChartInstance.destroy(); // Destroy previous before creating new
     reportChartInstance = new Chart(ctx, { type: 'bar', data: { labels: areas, datasets: [{ label: 'Avg Compliance (%)', data: avgRates, backgroundColor: avgRates.map(getComplianceColor) }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Avg Rate (%)' } } } } });
     let table = `<h3>Compliance (${formatDate(from)} to ${formatDate(to)}) - ${totalAudits} Audits</h3><table class="report-table"><thead><tr><th>Area</th><th>Avg Rate</th><th>Status</th></tr></thead><tbody>`;
     areas.forEach((a, i) => { const r = avgRates[i]; const { statusClass, statusText } = getComplianceStatus(r); table += `<tr><td>${escapeHtml(a)}</td><td>${r}%</td><td class="${statusClass}">${statusText}</td></tr>`; });
@@ -1012,14 +1064,16 @@ function generateComplianceReport(reportAudits, from, to) {
 
 function generateNonConformanceReport(reportAudits, from, to) {
     console.log("Generating NC Report");
+     if (!reportChartCanvas || !reportTableContainer) return;
     const ctx = reportChartCanvas.getContext('2d');
     const ncByReq = {}; let totalNC = 0, totalItems = 0;
     reportAudits.forEach(a => { if (a.checklist) { a.checklist.forEach(i => { totalItems++; if (i.compliance === 'no') { totalNC++; const key = `${i.id}|${i.requirement}`; ncByReq[key] = (ncByReq[key] || 0) + 1; } }); } });
     const sortedNC = Object.entries(ncByReq).sort(([, a], [, b]) => b - a);
-    if (sortedNC.length === 0) { reportTableContainer.innerHTML = '<p>No NCs found.</p>'; reportChartContainer.style.display = 'none'; return; }
+    if (sortedNC.length === 0) { reportTableContainer.innerHTML = '<p>No NCs found.</p>'; if(reportChartContainer) reportChartContainer.style.display = 'none'; return; }
     const topN = 10; const topNC = sortedNC.slice(0, topN);
     const labels = topNC.map(([k]) => { const r = k.split('|')[1]; return r.length > 40 ? r.substring(0, 37) + '...' : r; });
     const data = topNC.map(([, c]) => c);
+    if (reportChartInstance) reportChartInstance.destroy();
     reportChartInstance = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ label: 'NC Count', data, backgroundColor: '#e76f51' }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { beginAtZero: true, title: { display: true, text: 'Count' } } }, plugins: { legend: { display: false } } } });
     let table = `<h3>NC Analysis (${formatDate(from)} to ${formatDate(to)})</h3><p>Total NCs: ${totalNC} (${totalItems} items checked)</p><table class="report-table"><thead><tr><th>ID</th><th>Requirement</th><th>Clause</th><th>Count</th><th>% of Total NC</th></tr></thead><tbody>`;
     sortedNC.forEach(([k, c]) => { const [id, req] = k.split('|'); const cl = auditChecklist.find(i => i.id.toString() === id)?.clause || 'N/A'; const perc = totalNC > 0 ? Math.round((c / totalNC) * 100) : 0; table += `<tr><td>${id}</td><td>${escapeHtml(req)}</td><td>${cl}</td><td>${c}</td><td>${perc}%</td></tr>`; });
@@ -1028,12 +1082,14 @@ function generateNonConformanceReport(reportAudits, from, to) {
 
 function generateTrendReport(reportAudits, from, to) {
     console.log("Generating Trend Report");
+     if (!reportChartCanvas || !reportTableContainer) return;
     const ctx = reportChartCanvas.getContext('2d');
     const monthly = {};
     reportAudits.forEach(a => { if (a.date && a.checklist) { const m = a.date.substring(0, 7); if (!monthly[m]) monthly[m] = { items: 0, compliant: 0, audits: 0 }; monthly[m].audits++; monthly[m].items += a.checklist.length; monthly[m].compliant += a.checklist.filter(i => i.compliance === 'yes').length; } });
     const months = Object.keys(monthly).sort();
-    if (months.length === 0) { reportTableContainer.innerHTML = '<p>No trend data.</p>'; reportChartContainer.style.display = 'none'; return; }
+    if (months.length === 0) { reportTableContainer.innerHTML = '<p>No trend data.</p>'; if(reportChartContainer) reportChartContainer.style.display = 'none'; return; }
     const rates = months.map(m => { const d = monthly[m]; return d.items > 0 ? Math.round((d.compliant / d.items) * 100) : 0; });
+    if (reportChartInstance) reportChartInstance.destroy();
     reportChartInstance = new Chart(ctx, { type: 'line', data: { labels: months.map(formatMonth), datasets: [{ label: 'Monthly Compliance (%)', data: rates, borderColor: '#3498db', tension: 0.1 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Rate (%)' } } } } });
     let table = `<h3>Trend (${formatDate(from)} to ${formatDate(to)})</h3><table class="report-table"><thead><tr><th>Month</th><th>Audits</th><th>Items</th><th>Compliant</th><th>Rate</th></tr></thead><tbody>`;
     months.forEach(m => { const d = monthly[m]; const r = d.items > 0 ? Math.round((d.compliant / d.items) * 100) : 0; table += `<tr><td>${formatMonth(m)}</td><td>${d.audits}</td><td>${d.items}</td><td>${d.compliant}</td><td>${r}%</td></tr>`; });
@@ -1062,14 +1118,13 @@ function exportDashboardData() {
          const lead = formatAuditorCSV(a.leadAuditors); const auds = formatAuditorCSV(a.auditors);
          const created = formatDateTime(a.createdAt); const modified = formatDateTime(a.lastModified); const submitted = a.submittedAt ? formatDateTime(a.submittedAt) : '';
          if (a.checklist?.length > 0) {
-             a.checklist.forEach(i => { rows.push([ a.id, a.date, a.directorateUnit || a.auditedArea, a.refNo, lead, auds, a.status, a.createdByEmail, created, modified, submitted, i.id, i.requirement, i.clause, i.compliance === 'yes' ? 'C' : i.compliance === 'no' ? 'NC' : 'NA', i.objectiveEvidence, i.correctiveActionNeeded ? 'Y' : 'N', i.correctiveActionNeeded ? (i.correctiveActionsCount ?? '') : '', i.comments ]); });
-         } else { rows.push([ a.id, a.date, a.directorateUnit || a.auditedArea, a.refNo, lead, auds, a.status, a.createdByEmail, created, modified, submitted, '', '', '', '', '', '', '', '' ]); }
+             a.checklist.forEach(i => { rows.push([ a.id, a.date, a.directorateUnit || a.auditedArea, a.refNo || '', lead, auds, a.status, a.createdByEmail || '', created, modified, submitted, i.id, i.requirement, i.clause || '', i.compliance === 'yes' ? 'C' : i.compliance === 'no' ? 'NC' : 'NA', i.objectiveEvidence || '', i.correctiveActionNeeded ? 'Y' : 'N', i.correctiveActionNeeded ? (i.correctiveActionsCount ?? '') : '', i.comments || '' ]); });
+         } else { rows.push([ a.id, a.date, a.directorateUnit || a.auditedArea, a.refNo || '', lead, auds, a.status, a.createdByEmail || '', created, modified, submitted, '', '', '', '', '', '', '', '' ]); }
      });
      let csv = headers.map(formatCsvCell).join(',') + '\n';
      csv += rows.map(r => r.map(formatCsvCell).join(',')).join('\n');
      downloadCSV(csv, `all_audit_data_${new Date().toISOString().split('T')[0]}.csv`);
 }
-
 
 // --- User Management ---
 
@@ -1080,7 +1135,7 @@ async function loadUsersForManagement() {
         const snap = await db.collection('users').orderBy('email').get();
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderUserList(list);
-    } catch (e) { console.error("Error loading users:", e); userListContainer.innerHTML = '<p class="error">Failed to load users.</p>'; }
+    } catch (e) { console.error("Error loading users:", e); userListContainer.innerHTML = '<p class="error-message">Failed to load users.</p>'; } // Use error class
 }
 
 function renderUserList(users) {
@@ -1104,7 +1159,7 @@ function renderUserList(users) {
 async function handleRoleChange(event) {
     if (!hasPermission('manage_users')) { alert("Permission Denied."); event.target.value = event.target.dataset.originalRole; return; }
     const sel = event.target; const userId = sel.dataset.userId; const newRole = sel.value; const oldRole = sel.dataset.originalRole;
-    if (!userId || !newRole || !oldRole) return;
+    if (!userId || !newRole || !oldRole) { console.error("Missing data for role change."); return;}
     const email = sel.closest('.user-list-item')?.querySelector('.user-email')?.textContent || `UID ${userId}`;
     if (!confirm(`Change role for ${email} from '${oldRole}' to '${newRole}'?`)) { sel.value = oldRole; return; }
     console.log(`Updating role for ${userId} to ${newRole}`); sel.disabled = true;
@@ -1148,10 +1203,17 @@ function formatDateTime(timestamp) {
     return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// Correct escapeHtml function
 function escapeHtml(unsafe) {
     if (unsafe === null || typeof unsafe === 'undefined') return '';
-    return unsafe.toString().replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">").replace(/"/g, """).replace(/'/g, "'");
+    return unsafe.toString()
+         .replace(/&/g, "&")
+         .replace(/</g, "<")
+         .replace(/>/g, ">")
+         .replace(/"/g, """)
+         .replace(/'/g, "'");
 }
+
 
 function formatCsvCell(cell) {
      const str = String(cell ?? '');
