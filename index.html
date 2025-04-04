@@ -6,7 +6,7 @@
     <title>NAFDAC Internal Audit System</title>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="styles.css"> <!-- Link to your NEW styles.css -->
+    <link rel="stylesheet" href="styles.css">
     <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase SDK -->
@@ -20,7 +20,7 @@
     <div id="login-screen" class="auth-screen">
         <div class="auth-container">
              <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo"> <!-- Optional: Add logo -->
-            <h1>NAFDAC Internal Audit System</h1>
+            <h1>NAFDAC QMS Internal Audit System</h1>
             <div class="auth-form">
                 <input type="email" id="login-email" placeholder="Email Address" required>
                 <input type="password" id="login-password" placeholder="Password" required>
@@ -37,27 +37,29 @@
     <div id="app-container" class="hidden">
         <!-- Header -->
         <header class="app-header">
-            <!-- Optional Wrapper:
-            <div class="header-content container"> -->
+            <div class="container"> <!-- Wrap header content -->
                 <div class="header-left">
                      <!-- Optional: <img src="nafdac-logo-small.png" alt="NAFDAC Logo" class="header-logo"> -->
-                    <h1>NAFDAC Internal Audit</h1>
+                    <h1>NAFDAC QMS Internal Audit</h1>
                 </div>
                 <div class="header-right">
                     <span id="user-email" class="user-info"></span>
                     <button id="logout-btn" class="btn btn-danger btn-sm">Logout</button>
                 </div>
-            <!-- </div> -->
+            </div>
         </header>
 
         <!-- Navigation -->
         <nav class="app-nav">
              <div class="container"> <!-- Wrap nav ul in container -->
                 <ul>
-                    <li class="active" data-section="dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
-                    <li data-section="new-audit"><i class="fas fa-plus-circle"></i> New Audit</li>
-                    <li data-section="audit-history"><i class="fas fa-history"></i> Audit History</li>
-                    <li data-section="reports"><i class="fas fa-chart-bar"></i> Reports</li>
+                    <!-- Permissions applied via JS based on current user's role -->
+                    <li class="active" data-section="dashboard" data-permission="view_dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
+                    <li data-section="new-audit" data-permission="create_audit"><i class="fas fa-plus-circle"></i> New Audit</li>
+                    <li data-section="audit-history" data-permission="view_all_audits"><i class="fas fa-history"></i> Audit History</li>
+                    <li data-section="reports" data-permission="view_reports"><i class="fas fa-chart-bar"></i> Reports</li>
+                    <!-- User Management Link - Hidden by default, shown via JS if permission exists -->
+                    <li data-section="user-management" data-permission="manage_users" class="permission-hidden"><i class="fas fa-users-cog"></i> User Management</li>
                 </ul>
              </div>
         </nav>
@@ -65,7 +67,7 @@
         <!-- Main Content -->
         <main class="container app-main">
             <!-- Dashboard Section -->
-            <section id="dashboard-section" class="content-section">
+            <section id="dashboard-section" class="content-section" data-permission="view_dashboard">
                 <h2>Compliance Dashboard</h2>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
@@ -77,7 +79,6 @@
                     <div class="dashboard-card">
                         <h3>Recent Audits</h3>
                         <div id="recent-audits-list" class="audit-list styled-list">
-                            <!-- Content dynamically populated -->
                             <p>Loading recent audits...</p>
                         </div>
                     </div>
@@ -90,10 +91,11 @@
                     <div class="dashboard-card">
                         <h3>Quick Actions</h3>
                         <div class="quick-actions">
-                            <button id="quick-new-audit" class="btn btn-secondary action-btn">
+                            <!-- Buttons hidden/shown via JS permission checks -->
+                            <button id="quick-new-audit" class="btn btn-secondary action-btn permission-hidden" data-permission="create_audit">
                                 <i class="fas fa-plus"></i> New Audit
                             </button>
-                            <button id="quick-export" class="btn btn-outline action-btn">
+                            <button id="quick-export" class="btn btn-outline action-btn permission-hidden" data-permission="export_data">
                                 <i class="fas fa-file-export"></i> Export All Data
                             </button>
                         </div>
@@ -102,7 +104,7 @@
             </section>
 
             <!-- New Audit Section -->
-            <section id="new-audit-section" class="content-section hidden">
+            <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
                     <div class="form-row">
@@ -122,14 +124,15 @@
                     </div>
 
                     <div class="form-actions">
-                        <button type="button" id="save-draft-btn" class="btn btn-warning">Save Draft</button>
-                        <button type="button" id="submit-audit-btn" class="btn btn-success">Submit Audit</button>
+                         <!-- Buttons hidden/shown via JS permission checks -->
+                        <button type="button" id="save-draft-btn" class="btn btn-warning permission-hidden" data-permission="create_audit">Save Draft</button>
+                        <button type="button" id="submit-audit-btn" class="btn btn-success permission-hidden" data-permission="submit_audit">Submit Audit</button>
                     </div>
                 </form>
             </section>
 
             <!-- Audit History Section -->
-            <section id="audit-history-section" class="content-section hidden">
+            <section id="audit-history-section" class="content-section hidden" data-permission="view_all_audits">
                 <h2>Audit History</h2>
                 <div class="filter-controls">
                     <div class="form-group">
@@ -150,13 +153,12 @@
                     <button id="filter-btn" class="btn btn-primary">Filter</button>
                 </div>
                 <div id="audit-history-list" class="audit-list styled-list">
-                    <!-- Dynamically populated -->
                      <p>Loading audit history...</p>
                 </div>
             </section>
 
             <!-- Reports Section -->
-            <section id="reports-section" class="content-section hidden">
+            <section id="reports-section" class="content-section hidden" data-permission="view_reports">
                 <h2>Reports & Analysis</h2>
                 <div class="report-controls">
                     <div class="form-group">
@@ -187,14 +189,15 @@
                         </div>
                     </div>
                     <div class="report-actions">
-                        <button id="generate-report-btn" class="btn btn-primary">Generate Report</button>
-                        <button id="export-csv-btn" class="btn btn-success">
+                         <!-- Buttons hidden/shown via JS permission checks -->
+                        <button id="generate-report-btn" class="btn btn-primary permission-hidden" data-permission="generate_reports">Generate Report</button>
+                        <button id="export-csv-btn" class="btn btn-success permission-hidden" data-permission="export_data">
                             <i class="fas fa-file-csv"></i> Export to CSV
                         </button>
                     </div>
                 </div>
                 <div id="report-results">
-                    <div class="report-chart-container">
+                    <div class="report-chart-container" style="display: none;"> <!-- Hide chart initially -->
                         <canvas id="report-chart"></canvas>
                     </div>
                     <div id="report-table-container" class="report-table-container">
@@ -202,6 +205,16 @@
                     </div>
                 </div>
             </section>
+
+             <!-- User Management Section -->
+            <section id="user-management-section" class="content-section hidden" data-permission="manage_users">
+                <h2>User Management</h2>
+                <div id="user-list-container">
+                    <p>Loading users...</p>
+                    <!-- User list will be populated here -->
+                </div>
+            </section>
+
         </main>
     </div> <!-- /#app-container -->
 
@@ -211,18 +224,20 @@
              <div class="modal-content">
                 <button class="close-modal" aria-label="Close modal">×</button>
                 <h2 id="modal-title">Audit Details</h2>
-                <div id="modal-body"> <!-- Changed ID for clarity -->
+                <div id="modal-body"> <!-- Consistent ID -->
                     <!-- Dynamic Content -->
                 </div>
                 <div class="modal-actions">
-                    <button id="edit-audit-btn" class="btn btn-secondary"> <i class="fas fa-edit"></i> Edit</button>
-                    <button id="export-audit-btn" class="btn btn-success"> <i class="fas fa-file-export"></i> Export</button>
+                    <!-- Edit button visibility controlled by JS (canEditAudit) -->
+                    <button id="edit-audit-btn" class="btn btn-secondary permission-hidden" data-permission="edit_audit"> <i class="fas fa-edit"></i> Edit</button>
+                    <!-- Export button visibility controlled by JS (hasPermission) -->
+                    <button id="export-audit-btn" class="btn btn-success permission-hidden" data-permission="export_data"> <i class="fas fa-file-export"></i> Export</button>
                     <button id="close-modal-btn" class="btn btn-outline">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script> <!-- Your existing JS -->
+    <script src="app.js"></script> <!-- Your final JS -->
 </body>
 </html>
