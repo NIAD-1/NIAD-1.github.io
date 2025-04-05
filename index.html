@@ -107,13 +107,11 @@
   <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
-                    <div class="form-row">
-                        <!-- 1. Renamed Field -->
+                    <!-- Change this in your HTML -->
                         <div class="form-group">
                             <label for="directorate-unit">Directorate / Unit:</label>
                             <select id="directorate-unit" required>
-                                <option value="" disabled selected>Select Directorate</option>
-                                <!-- Options will be populated by JavaScript -->
+                                <!-- Options will be populated by JS -->
                             </select>
                         </div>
                         <!-- 4. New Ref No Field -->
@@ -125,24 +123,26 @@
 
                     <!-- 2. New Lead Auditors / Auditors Fields -->
                     <div class="form-row">
-                         <div class="form-group">
-                             <label for="lead-auditors-select">Lead Auditor(s):</label>
-                             <select id="lead-auditors-select" multiple required>
-                                 <!-- Options populated by JS -->
-                                 <option value="" disabled>Select Lead Auditors</option>
-                             </select>
-                             <small>Hold Ctrl/Cmd to select multiple.</small>
-                             <div class="selected-items" id="lead-auditors-selected"></div>
-                         </div>
-                         <div class="form-group">
-                             <label for="auditors-select">Auditor(s):</label>
-                             <select id="auditors-select" multiple required>
-                                 <!-- Options populated by JS -->
-                                 <option value="" disabled>Select Auditors</option>
-                              </select>
-                              <small>Hold Ctrl/Cmd to select multiple.</small>
-                              <div class="selected-items" id="auditors-selected"></div>
-                         </div>
+                        <div class="form-group">
+                            <label for="lead-auditors-select">Lead Auditor(s):</label>
+                            <div class="select-wrapper">
+                                <select id="lead-auditors-select" multiple required>
+                                    <!-- Options populated by JS -->
+                                </select>
+                            </div>
+                            <div id="lead-auditors-tags" class="selected-items"></div>
+                            <small>Click to select multiple auditors</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="auditors-select">Auditor(s):</label>
+                            <div class="select-wrapper">
+                                <select id="auditors-select" multiple required>
+                                    <!-- Options populated by JS -->
+                                </select>
+                            </div>
+                            <div id="auditors-tags" class="selected-items"></div>
+                            <small>Click to select multiple auditors</small>
+                        </div>
                     </div>
 
                     <!-- 5. Renamed Checklist Section Title -->

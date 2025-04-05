@@ -11,7 +11,6 @@ const firebaseConfig = {
     appId: "1:510488169711:web:271ed61bd7c4e6c14c5f1a",
     measurementId: "G-43ESSX8GLJ"
   };
-// Add this array at the top of your app.js with other global variables
 
   // --- Initialize Firebase ---//
 
@@ -40,23 +39,6 @@ const PERMISSIONS = {
     generate_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR]
 };
-
-const DIRECTORATES = [
-    "Registration and Regulatory Affairs (R&R)",
-    "Laboratory Services (Food)",
-    "Laboratory Services (Drug)",
-    "Chemical Evaluation and Research (CER)",
-    "Food Safety and Applied Nutrition (FSAN)",
-    "Pharmacovigilance (PV)",
-    "Post-Marketing Surveillance (PMS)",
-    "Investigation and Enforcement (I&E)",
-    "Port Inspection Directorate (PID)",
-    "Veterinary Medicines and Allied Products (VMAP)",
-    "Planning, Research and Statistics (PRS)",
-    "Administration and Human Resources (A&HR)",
-    "Finance and Accounts (F&A)",
-    "Legal Services"
-];
 
 // --- DOM Elements ---
 const loginScreen = document.getElementById('login-screen');
@@ -106,7 +88,22 @@ const checklistContainer = document.getElementById('checklist-container');
 const saveDraftBtn = document.getElementById('save-draft-btn');
 const submitAuditBtn = document.getElementById('submit-audit-btn');
 
-
+const DIRECTORATES = [
+    "Registration and Regulatory Affairs (R&R)",
+    "Laboratory Services (Food)",
+    "Laboratory Services (Drug)",
+    "Chemical Evaluation and Research (CER)",
+    "Food Safety and Applied Nutrition (FSAN)",
+    "Pharmacovigilance (PV)",
+    "Post-Marketing Surveillance (PMS)",
+    "Investigation and Enforcement (I&E)",
+    "Port Inspection Directorate (PID)",
+    "Veterinary Medicines and Allied Products (VMAP)",
+    "Planning, Research and Statistics (PRS)",
+    "Administration and Human Resources (A&HR)",
+    "Finance and Accounts (F&A)",
+    "Legal Services"
+];
 // --- Audit Checklist Data ---
 const auditChecklist = [
     { id: 1, requirement: "Identification of interested parties and needs", clause: "4.1" },
@@ -430,75 +427,8 @@ async function getUsersByRole(role) {
 }
 
 // --- Audit Management ---
-function populateDirectoratesDropdown() {
-    if (!directorateUnitInput) return;
-    
-    directorateUnitInput.innerHTML = '<option value="" disabled selected>Select Directorate</option>';
-    
-    DIRECTORATES.forEach(dir => {
-        const option = document.createElement('option');
-        option.value = dir;
-        option.textContent = dir;
-        directorateUnitInput.appendChild(option);
-    });
-}
 
-function populateAuditorSelect(selectElement, users, typeLabel) {
-    if (!selectElement) return;
-    
-    selectElement.innerHTML = `<option value="" disabled>Select ${typeLabel}</option>`;
-    
-    if (users.length === 0) {
-        selectElement.innerHTML = `<option value="" disabled>No ${typeLabel} found</option>`;
-        return;
-    }
-    
-    users.forEach(user => {
-        const option = document.createElement('option');
-        option.value = user.uid;
-        option.textContent = `${user.displayName || user.email.split('@')[0]} (${user.email})`;
-        option.dataset.displayName = user.displayName || user.email.split('@')[0];
-        selectElement.appendChild(option);
-    });
-    
-    // Add event listener to update selected items display
-    selectElement.addEventListener('change', function() {
-        updateSelectedItemsDisplay(this, document.getElementById(`${this.id}-selected`));
-    });
-}
-
-function updateSelectedItemsDisplay(select, container) {
-    if (!container) return;
-    
-    container.innerHTML = '';
-    const selected = Array.from(select.selectedOptions)
-        .filter(opt => opt.value);
-    
-    selected.forEach(option => {
-        const item = document.createElement('div');
-        item.className = 'selected-item';
-        item.innerHTML = `
-            ${option.dataset.displayName || option.textContent.split(' (')[0]}
-            <button type="button" class="remove-selected" data-value="${option.value}">
-                &times;
-            </button>
-        `;
-        container.appendChild(item);
-    });
-    
-    // Add event listeners to remove buttons
-    container.querySelectorAll('.remove-selected').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const option = select.querySelector(`option[value="${btn.dataset.value}"]`);
-            if (option) option.selected = false;
-            updateSelectedItemsDisplay(select, container);
-        });
-    });
-}
-
-
-async function initNewAuditForm() { // Made async
+async function initNewAuditForm() {
     console.log("Initializing new audit form.");
     if (!auditForm || !directorateUnitInput || !leadAuditorsSelect || !auditorsSelect || !checklistContainer) {
         console.error("Required form elements not found for new audit."); return;
@@ -509,33 +439,39 @@ async function initNewAuditForm() { // Made async
     checklistContainer.innerHTML = '<p>Loading checklist...</p>';
     currentAudit = null;
 
-    populateDirectoratesDropdown();
+    // Populate Directorate dropdown
+    directorateUnitInput.innerHTML = '<option value="" disabled selected>Select Directorate/Unit</option>';
+    DIRECTORATES.forEach(dir => {
+        const option = document.createElement('option');
+        option.value = dir;
+        option.textContent = dir;
+        directorateUnitInput.appendChild(option);
+    });
+
     // Fetch and Populate Auditor Selects
-    leadAuditorsSelect.innerHTML = '<option value="" disabled>Loading Lead Auditors...</option>';
-    auditorsSelect.innerHTML = '<option value="" disabled>Loading Auditors...</option>';
-    leadAuditorsSelect.disabled = true; // Disable while loading
+    leadAuditorsSelect.innerHTML = '<option value="" disabled selected>Select Lead Auditors</option>';
+    auditorsSelect.innerHTML = '<option value="" disabled selected>Select Auditors</option>';
+    leadAuditorsSelect.disabled = true;
     auditorsSelect.disabled = true;
 
     try {
-        // Fetch users if not already cached (or always fetch for freshness)
-        // if (leadAuditorUsers.length === 0 || auditorUsers.length === 0) {
-            [leadAuditorUsers, auditorUsers] = await Promise.all([
-                getUsersByRole(ROLES.LEAD_AUDITOR),
-                getUsersByRole(ROLES.AUDITOR)
-            ]);
-        // }
+        [leadAuditorUsers, auditorUsers] = await Promise.all([
+            getUsersByRole(ROLES.LEAD_AUDITOR),
+            getUsersByRole(ROLES.AUDITOR)
+        ]);
 
         populateAuditorSelect(leadAuditorsSelect, leadAuditorUsers, "Lead Auditors");
         populateAuditorSelect(auditorsSelect, auditorUsers, "Auditors");
 
     } catch (error) {
-         console.error("Failed to populate auditor dropdowns:", error);
-         leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
-         auditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
+        console.error("Failed to populate auditor dropdowns:", error);
+        leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
+        auditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
     } finally {
-        leadAuditorsSelect.disabled = false; // Re-enable after loading/error
+        leadAuditorsSelect.disabled = false;
         auditorsSelect.disabled = false;
     }
+
 
     // Populate Checklist Items
     checklistContainer.innerHTML = '';
@@ -595,21 +531,97 @@ async function initNewAuditForm() { // Made async
 }
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
-     if (!selectElement) return;
-     selectElement.innerHTML = '';
-     if (users.length === 0) {
-         selectElement.innerHTML = `<option value="" disabled>No ${typeLabel} found</option>`;
-         return;
-     }
-     users.forEach(user => {
-         const option = document.createElement('option');
-         option.value = user.uid;
-         option.textContent = `${user.displayName} (${user.email})`;
-         option.dataset.displayName = user.displayName;
-         option.dataset.email = user.email;
-         selectElement.appendChild(option);
-     });
+    if (!selectElement) return;
+    selectElement.innerHTML = '';
+    
+    // Add a placeholder option
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = `Select ${typeLabel}...`;
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    selectElement.appendChild(placeholder);
+    
+    if (users.length === 0) {
+        const noUsersOption = document.createElement('option');
+        noUsersOption.value = '';
+        noUsersOption.textContent = `No ${typeLabel} available`;
+        noUsersOption.disabled = true;
+        selectElement.appendChild(noUsersOption);
+        return;
+    }
+    
+    // Group by first letter for better organization
+    const groupedUsers = {};
+    users.forEach(user => {
+        const firstLetter = user.displayName.charAt(0).toUpperCase();
+        if (!groupedUsers[firstLetter]) {
+            groupedUsers[firstLetter] = [];
+        }
+        groupedUsers[firstLetter].push(user);
+    });
+    
+    // Sort groups alphabetically
+    const sortedGroups = Object.keys(groupedUsers).sort();
+    
+    sortedGroups.forEach(letter => {
+        // Add group header
+        const groupHeader = document.createElement('option');
+        groupHeader.disabled = true;
+        groupHeader.textContent = `── ${letter} ──`;
+        selectElement.appendChild(groupHeader);
+        
+        // Add users in this group
+        groupedUsers[letter].forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.uid;
+            option.textContent = `${user.displayName} (${user.email})`;
+            option.dataset.displayName = user.displayName;
+            option.dataset.email = user.email;
+            selectElement.appendChild(option);
+        });
+    });
 }
+// Add this to your initNewAuditForm() function after populating the selects
+function setupEnhancedSelect(selectElement, tagsContainerId) {
+    const tagsContainer = document.getElementById(tagsContainerId);
+    
+    function updateSelectedTags() {
+        tagsContainer.innerHTML = '';
+        Array.from(selectElement.selectedOptions).forEach(option => {
+            const tag = document.createElement('div');
+            tag.className = 'selected-tag';
+            tag.innerHTML = `
+                ${option.textContent.split('(')[0].trim()}
+                <button type="button" data-value="${option.value}">&times;</button>
+            `;
+            tagsContainer.appendChild(tag);
+        });
+    }
+    
+    // Initial update
+    updateSelectedTags();
+    
+    // Update on change
+    selectElement.addEventListener('change', updateSelectedTags);
+    
+    // Handle tag removal
+    tagsContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            const valueToRemove = e.target.getAttribute('data-value');
+            const optionToRemove = Array.from(selectElement.options)
+                .find(option => option.value === valueToRemove);
+            if (optionToRemove) {
+                optionToRemove.selected = false;
+                selectElement.dispatchEvent(new Event('change'));
+            }
+        }
+    });
+}
+
+// Call this for both selects after they're populated
+setupEnhancedSelect(leadAuditorsSelect, 'lead-auditors-tags');
+setupEnhancedSelect(auditorsSelect, 'auditors-tags');
 
 function generateNumberOptions(start, end) {
     let options = '';
@@ -983,7 +995,7 @@ async function editAudit() { // Made async
     currentAudit = { ...auditToEdit }; // Restore context
 
     console.log(`Loading audit ${currentAudit.id} for editing.`);
-    if(directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || '';
+    if(directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || currentAudit.auditedArea || '';
     if(refNoInput) refNoInput.value = currentAudit.refNo || '';
     if(auditDateInput) auditDateInput.value = currentAudit.date || '';
 

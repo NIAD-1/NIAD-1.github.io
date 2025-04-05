@@ -910,107 +910,67 @@ select {
      .report-table th { white-space: normal; } /* Allow header text to wrap */
 
 }
-
-select:not([multiple]) {
-    padding: 0.7rem 0.9rem;
-    font-size: 0.95rem;
-    border: 1px solid var(--medium-grey);
-    border-radius: var(--border-radius);
-    background-color: white;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 0.75rem center;
-    background-size: 16px 12px;
-    width: 100%;
-    appearance: none;
-    transition: var(--transition-base);
-}
-
-select:not([multiple]):focus {
-    border-color: var(--secondary-color);
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(10, 147, 150, 0.25);
-}
-
-/* Multi-Select Dropdown Styles */
 select[multiple] {
-    min-height: 120px;
-    padding: 0.5rem;
-    background-image: none;
-    border: 1px solid var(--medium-grey);
-    border-radius: var(--border-radius);
-    width: 100%;
-    font-size: 0.95rem;
-    transition: var(--transition-base);
+    min-height: 100px; /* Give multi-selects some height */
+    background-image: none; /* Remove arrow for multi-select */
+    padding-right: 0.9rem; /* Reset padding */
 }
-
-select[multiple]:focus {
-    border-color: var(--secondary-color);
-    outline: 0;
-    box-shadow: 0 0 0 0.2rem rgba(10, 147, 150, 0.25);
-}
-
-select[multiple] option {
-    padding: 0.5rem 0.8rem;
-    margin: 2px 0;
-    border-radius: 3px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-select[multiple] option:hover {
-    background-color: rgba(10, 147, 150, 0.1);
-}
-
-select[multiple] option:checked {
-    background-color: var(--secondary-color);
-    color: white;
-}
-
-/* Selected Items Display */
-.selected-items {
-    margin-top: 0.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-}
-
-.selected-item {
-    background-color: var(--light-color);
-    padding: 0.3rem 0.6rem;
-    border-radius: 1rem;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
-.selected-item button {
-    background: none;
-    border: none;
-    color: var(--danger-color);
-    cursor: pointer;
-    padding: 0;
-    font-size: 0.9em;
-}
-
-/* Form Group Enhancements */
-.form-group {
-    position: relative;
-    margin-bottom: calc(var(--spacing-unit) * 1.2);
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.4rem;
-    font-weight: 500;
-    font-size: 0.9rem;
+select option:disabled {
     color: var(--text-muted);
 }
 
-.form-group small {
+.form-group small { /* Help text for multi-select */
+    display: block;
     font-size: 0.8rem;
     color: var(--text-muted);
-    display: block;
     margin-top: 0.3rem;
+}
+
+/* Checklist Item Enhancements */
+.checklist-item .corrective-action-group {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--medium-grey); /* Separator */
+}
+
+.checklist-item .corrective-action-toggle label {
+    margin-right: 1rem;
+    font-weight: normal; /* Make radio labels normal weight */
+    cursor: pointer;
+}
+.checklist-item .corrective-action-toggle input[type="radio"] {
+    margin-right: 0.4rem;
+    width: auto; /* Override default form width */
+    display: inline-block; /* Align radio with label */
+    vertical-align: middle;
+}
+
+/* Class to hide the 'how many' dropdown */
+.hidden-conditional {
+    display: none;
+}
+
+/* Ensure modal body audit-meta handles new lines */
+#modal-body .audit-meta p {
+    white-space: pre-wrap; /* Allow wrapping for auditor lists */
+}
+
+/* Improve modal checklist display */
+#modal-body .checklist-item-summary p strong {
+    display: inline-block;
+     min-width: 150px; /* Align labels somewhat */
+}
+#modal-body .checklist-item-summary .correction-details {
+    margin-left: 1rem; /* Indent correction details */
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+
+/* --- Responsive Adjustments --- */
+@media (max-width: 768px) {
+    /* Stack multi-selects below labels if needed */
+     .form-row select[multiple] {
+          /* Adjust if layout breaks */
+     }
 }
