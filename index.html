@@ -111,7 +111,10 @@
                         <!-- 1. Renamed Field -->
                         <div class="form-group">
                             <label for="directorate-unit">Directorate / Unit:</label>
-                            <input type="text" id="directorate-unit" required placeholder="e.g., Laboratory Services / Microbiology Unit">
+                            <select id="directorate-unit" required>
+                                <option value="" disabled selected>Select Directorate</option>
+                                <!-- Options will be populated by JavaScript -->
+                            </select>
                         </div>
                         <!-- 4. New Ref No Field -->
                         <div class="form-group">
@@ -126,17 +129,19 @@
                              <label for="lead-auditors-select">Lead Auditor(s):</label>
                              <select id="lead-auditors-select" multiple required>
                                  <!-- Options populated by JS -->
-                                 <option value="" disabled>Loading...</option>
+                                 <option value="" disabled>Select Lead Auditors</option>
                              </select>
                              <small>Hold Ctrl/Cmd to select multiple.</small>
+                             <div class="selected-items" id="lead-auditors-selected"></div>
                          </div>
                          <div class="form-group">
                              <label for="auditors-select">Auditor(s):</label>
                              <select id="auditors-select" multiple required>
                                  <!-- Options populated by JS -->
-                                 <option value="" disabled>Loading...</option>
+                                 <option value="" disabled>Select Auditors</option>
                               </select>
                               <small>Hold Ctrl/Cmd to select multiple.</small>
+                              <div class="selected-items" id="auditors-selected"></div>
                          </div>
                     </div>
 
