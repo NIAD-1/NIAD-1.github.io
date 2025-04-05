@@ -107,8 +107,8 @@
             <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
-                    <!-- Directorate Row -->
                     <div class="form-row">
+                        <!-- Directorate Dropdown -->
                         <div class="form-group">
                             <label for="directorate-unit">Directorate / Unit:</label>
                             <select id="directorate-unit" required>
@@ -127,16 +127,15 @@
                                 <option value="Administration and Human Resources (A&HR)">Administration and Human Resources (A&HR)</option>
                                 <option value="Finance and Accounts (F&A)">Finance and Accounts (F&A)</option>
                                 <option value="Legal Services">Legal Services</option>
-                                <!-- Other directorate options -->
                             </select>
                         </div>
+            
                         <div class="form-group">
                             <label for="ref-no">Ref No.:</label>
                             <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
                         </div>
                     </div>
             
-                    <!-- Auditors Row -->
                     <div class="form-row">
                         <!-- Lead Auditors -->
                         <div class="form-group">
@@ -155,12 +154,11 @@
                                 <option value="Stephanie Adeoye">Stephanie Adeoye</option>
                                 <option value="Sunday Adown">Sunday Adown</option>
                                 <option value="Vivien Ibeh">Vivien Ibeh</option>
-                                <option value="Wendy Ndugbu">Wendy Ndugbu</option>    
-                                <!-- Other lead auditor options -->
+                                <option value="Wendy Ndugbu">Wendy Ndugbu</option>
                             </select>
                         </div>
             
-                        <!-- Regular Auditors -->
+                        <!-- Auditors -->
                         <div class="form-group">
                             <label for="auditors-select">Auditor(s):</label>
                             <select id="auditors-select" multiple required class="enhanced-select">
@@ -168,7 +166,7 @@
                                 <option value="Omoru Emmanuel">Omoru Emmanuel</option>
                                 <option value="Mrs. Offor Adaku F.">Mrs. Offor Adaku F.</option>
                                 <option value="Onwualu Rosemary N.">Onwualu Rosemary N.</option>
-                                <option value="MARIAN.I. BOJUWOYE">MARIAN.I. BOJUWOYE</option> 
+                                <option value="MARIAN.I. BOJUWOYE">MARIAN.I. BOJUWOYE</option>
                                 <option value="Ms. Azogini Ebosie">Ms. Azogini Ebosie</option>
                                 <option value="Mrs. Bolanle Ikusagba">Mrs. Bolanle Ikusagba</option>
                                 <option value="IBEH, Vivien Ify">IBEH, Vivien Ify</option>
@@ -185,19 +183,16 @@
                                 <option value="Mr. Umar Mala Bukar">Mr. Umar Mala Bukar</option>
                                 <option value="Mrs. Ekwealor Chinenye">Mrs. Ekwealor Chinenye</option>
                                 <option value="Yunusa Hadizah Ibrahim">Yunusa Hadizah Ibrahim</option>
-                                <option value="Ojo Ayodeji Olukunle">Ojo Ayodeji Olukunle</option>   
-                                <!-- Other auditor options -->
+                                <option value="Ojo Ayodeji Olukunle">Ojo Ayodeji Olukunle</option>
                             </select>
                         </div>
                     </div>
             
-                    <!-- Checklist Section -->
                     <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
                     <div id="checklist-container">
                         <p>Loading checklist...</p>
                     </div>
             
-                    <!-- Form Actions -->
                     <div class="form-actions">
                         <button type="button" id="save-draft-btn" class="btn btn-warning permission-hidden" data-permission="create_audit">Save Draft</button>
                         <button type="button" id="submit-audit-btn" class="btn btn-success permission-hidden" data-permission="submit_audit">Submit Audit</button>

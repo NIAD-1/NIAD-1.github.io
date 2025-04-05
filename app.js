@@ -413,50 +413,35 @@ async function getUsersByRole(role) {
 
 // --- Audit Management ---
 
-async function initNewAuditForm() { // Made async
+async function initNewAuditForm() {
     console.log("Initializing new audit form.");
-    if (!auditForm || !directorateUnitInput || !leadAuditorsSelect || !auditorsSelect || !checklistContainer) {
-        console.error("Required form elements not found for new audit."); return;
+    
+    // Reset form elements
+    auditForm?.reset();
+    
+    // Set default date
+    if(auditDateInput) {
+        auditDateInput.value = new Date().toISOString().split('T')[0];
     }
 
-    auditForm.reset();
-    if(auditDateInput) auditDateInput.value = new Date().toISOString().split('T')[0];
-    checklistContainer.innerHTML = '<p>Loading checklist...</p>';
+    // Initialize checklist container
+    if(checklistContainer) {
+        checklistContainer.innerHTML = '<p>Loading checklist...</p>';
+    }
+
     currentAudit = null;
 
-    // Fetch and Populate Auditor Selects
-    leadAuditorsSelect.innerHTML = '<option value="" disabled>Loading Lead Auditors...</option>';
-    auditorsSelect.innerHTML = '<option value="" disabled>Loading Auditors...</option>';
-    leadAuditorsSelect.disabled = true; // Disable while loading
-    auditorsSelect.disabled = true;
-
-    try {
-        // Fetch users if not already cached (or always fetch for freshness)
-        // if (leadAuditorUsers.length === 0 || auditorUsers.length === 0) {
-            [leadAuditorUsers, auditorUsers] = await Promise.all([
-                getUsersByRole(ROLES.LEAD_AUDITOR),
-                getUsersByRole(ROLES.AUDITOR)
-            ]);
-        // }
-
-        populateAuditorSelect(leadAuditorsSelect, leadAuditorUsers, "Lead Auditors");
-        populateAuditorSelect(auditorsSelect, auditorUsers, "Auditors");
-
-    } catch (error) {
-         console.error("Failed to populate auditor dropdowns:", error);
-         leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
-         auditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
-    } finally {
-        leadAuditorsSelect.disabled = false; // Re-enable after loading/error
-        auditorsSelect.disabled = false;
+    // Clear existing checklist items
+    if(checklistContainer) {
+        checklistContainer.innerHTML = '';
     }
 
-    // Populate Checklist Items
-    checklistContainer.innerHTML = '';
+    // Create checklist items
     auditChecklist.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'checklist-item';
         itemDiv.dataset.itemId = item.id;
+
         const correctiveActionName = `corrective-action-${item.id}`;
         const yesRadioId = `ca-yes-${item.id}`;
         const noRadioId = `ca-no-${item.id}`;
@@ -477,35 +462,74 @@ async function initNewAuditForm() { // Made async
             <div class="corrective-action-group">
                 <div class="form-group corrective-action-toggle">
                     <label>Corrective Action Needed?</label>
-                    <input type="radio" id="${yesRadioId}" name="${correctiveActionName}" value="yes"> <label for="${yesRadioId}">Yes</label>
-                    <input type="radio" id="${noRadioId}" name="${correctiveActionName}" value="no" checked> <label for="${noRadioId}">No</label>
+                    <input type="radio" id="${yesRadioId}" name="${correctiveActionName}" value="yes">
+                    <label for="${yesRadioId}">Yes</label>
+                    <input type="radio" id="${noRadioId}" name="${correctiveActionName}" value="no" checked>
+                    <label for="${noRadioId}">No</label>
                 </div>
                 <div class="form-group hidden-conditional" id="${howManyGroupId}">
                     <label for="${howManySelectId}">How many needed?</label>
-                    <select id="${howManySelectId}"> ${generateNumberOptions(1, 100)} </select>
+                    <select id="${howManySelectId}">${generateNumberOptions(1, 100)}</select>
                 </div>
                 <div class="form-group">
                     <label for="${commentsId}">Comments:</label>
                     <textarea id="${commentsId}" class="comments-input" rows="2"></textarea>
                 </div>
             </div>`;
+
         checklistContainer.appendChild(itemDiv);
 
-        // Add Event Listeners for THIS checklist item
-        const complianceBtns = itemDiv.querySelectorAll('.compliance-btn');
-        complianceBtns.forEach(btn => btn.addEventListener('click', function() {
-            const toggleGroup = this.closest('.compliance-toggle');
-            toggleGroup.querySelectorAll('.compliance-btn').forEach(b => b.classList.remove('active', 'compliance-yes', 'compliance-no'));
-            this.classList.add('active', this.dataset.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
-        }));
-        const correctiveActionRadios = itemDiv.querySelectorAll(`input[name="${correctiveActionName}"]`);
-        correctiveActionRadios.forEach(radio => radio.addEventListener('change', (event) => {
-            const showHowMany = event.target.value === 'yes';
-            itemDiv.querySelector(`#${howManyGroupId}`)?.classList.toggle('hidden-conditional', !showHowMany);
-        }));
+        // Event listeners for compliance buttons
+        itemDiv.querySelectorAll('.compliance-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.compliance-toggle').querySelectorAll('.compliance-btn').forEach(b => {
+                    b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                });
+                this.classList.add('active', this.dataset.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
+            });
+        });
+
+        // Event listeners for corrective action radios
+        itemDiv.querySelectorAll(`input[name="${correctiveActionName}"]`).forEach(radio => {
+            radio.addEventListener('change', (event) => {
+                const showHowMany = event.target.value === 'yes';
+                itemDiv.querySelector(`#${howManyGroupId}`)?.classList.toggle('hidden-conditional', !showHowMany);
+            });
+        });
     });
 
     updateUIForRole();
+}
+
+// Helper function to generate number options
+function generateNumberOptions(start, end) {
+    let options = '';
+    for (let i = start; i <= end; i++) {
+        options += `<option value="${i}">${i}</option>`;
+    }
+    return options;
+}
+
+// Data collection function (simplified)
+function collectAuditFormData() {
+    return {
+        directorateUnit: document.getElementById('directorate-unit').value,
+        refNo: document.getElementById('ref-no').value,
+        leadAuditors: Array.from(leadAuditorsSelect.selectedOptions).map(opt => ({
+            displayName: opt.value
+        })),
+        auditors: Array.from(auditorsSelect.selectedOptions).map(opt => ({
+            displayName: opt.value
+        })),
+        checklist: auditChecklist.map((item, index) => ({
+            id: item.id,
+            compliance: document.querySelector(`#checklist-container [data-item-id="${item.id}"] .compliance-btn.active`)?.dataset.compliance || '',
+            objectiveEvidence: document.getElementById(`evidence-${item.id}`)?.value || '',
+            correctiveActionNeeded: document.getElementById(`ca-yes-${item.id}`)?.checked || false,
+            correctiveActionsCount: parseInt(document.getElementById(`how-many-needed-${item.id}`)?.value) || 0,
+            comments: document.getElementById(`comments-${item.id}`)?.value || ''
+        }))
+    };
 }
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
