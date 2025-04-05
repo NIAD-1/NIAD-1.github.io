@@ -2260,4 +2260,3 @@ async function handleRoleChange(event) {
 
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
-```
