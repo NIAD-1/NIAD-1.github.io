@@ -33,10 +33,6 @@
         </div>
     </div>
 
-    <div id="loading-overlay" class="hidden">
-        <div class="spinner"></div>
-        <p id="loading-message">Loading...</p>
-    </div>
     <!-- Main App -->
     <div id="app-container" class="hidden">
         <!-- Header -->
@@ -108,46 +104,42 @@
             </section>
 
             <!-- New Audit Section -->
-            <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
-                <h2>New QMS Internal Audit</h2>
+  <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
+                <h2>New Internal Audit</h2>
                 <form id="audit-form">
-                    <!-- Change this in your HTML -->
-                        <!-- Directorate Dropdown -->
-                    <div class="form-group">
-                        <label for="directorate-unit">Directorate / Unit:</label>
-                        <div class="select-wrapper">
-                            <select id="directorate-unit" required>
-                                <option value="" disabled selected>Select Directorate/Unit</option>
-                                <!-- Options will be populated by JS -->
-                            </select>
+                    <div class="form-row">
+                        <!-- 1. Renamed Field -->
+                        <div class="form-group">
+                            <label for="directorate-unit">Directorate / Unit:</label>
+                            <input type="text" id="directorate-unit" required placeholder="e.g., Laboratory Services / Microbiology Unit">
+                        </div>
+                        <!-- 4. New Ref No Field -->
+                        <div class="form-group">
+                             <label for="ref-no">Ref No.:</label>
+                             <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
                         </div>
                     </div>
 
-                    <!-- Lead Auditors Dropdown -->
-                    <div class="form-group">
-                        <label for="lead-auditors-select">Lead Auditor(s):</label>
-                        <div class="select-wrapper">
-                            <select id="lead-auditors-select" multiple required>
-                                <option value="" disabled>Select Lead Auditors...</option>
-                                <!-- Options populated by JS -->
-                            </select>
-                        </div>
-                        <div id="lead-auditors-tags" class="selected-items"></div>
-                        <small>Start typing to search or click to select multiple</small>
+                    <!-- 2. New Lead Auditors / Auditors Fields -->
+                    <div class="form-row">
+                         <div class="form-group">
+                             <label for="lead-auditors-select">Lead Auditor(s):</label>
+                             <select id="lead-auditors-select" multiple required>
+                                 <!-- Options populated by JS -->
+                                 <option value="" disabled>Loading...</option>
+                             </select>
+                             <small>Hold Ctrl/Cmd to select multiple.</small>
+                         </div>
+                         <div class="form-group">
+                             <label for="auditors-select">Auditor(s):</label>
+                             <select id="auditors-select" multiple required>
+                                 <!-- Options populated by JS -->
+                                 <option value="" disabled>Loading...</option>
+                              </select>
+                              <small>Hold Ctrl/Cmd to select multiple.</small>
+                         </div>
                     </div>
 
-                    <!-- Auditors Dropdown -->
-                    <div class="form-group">
-                        <label for="auditors-select">Auditor(s):</label>
-                        <div class="select-wrapper">
-                            <select id="auditors-select" multiple>
-                                <option value="" disabled>Select Auditors...</option>
-                                <!-- Options populated by JS -->
-                            </select>
-                        </div>
-                        <div id="auditors-tags" class="selected-items"></div>
-                        <small>Start typing to search or click to select multiple</small>
-                    </div>  
                     <!-- 5. Renamed Checklist Section Title -->
                     <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
                     <div id="checklist-container">

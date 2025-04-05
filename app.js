@@ -88,22 +88,7 @@ const checklistContainer = document.getElementById('checklist-container');
 const saveDraftBtn = document.getElementById('save-draft-btn');
 const submitAuditBtn = document.getElementById('submit-audit-btn');
 
-const DIRECTORATES = [
-    "Registration and Regulatory Affairs (R&R)",
-    "Laboratory Services (Food)",
-    "Laboratory Services (Drug)",
-    "Chemical Evaluation and Research (CER)",
-    "Food Safety and Applied Nutrition (FSAN)",
-    "Pharmacovigilance (PV)",
-    "Post-Marketing Surveillance (PMS)",
-    "Investigation and Enforcement (I&E)",
-    "Port Inspection Directorate (PID)",
-    "Veterinary Medicines and Allied Products (VMAP)",
-    "Planning, Research and Statistics (PRS)",
-    "Administration and Human Resources (A&HR)",
-    "Finance and Accounts (F&A)",
-    "Legal Services"
-];
+
 // --- Audit Checklist Data ---
 const auditChecklist = [
     { id: 1, requirement: "Identification of interested parties and needs", clause: "4.1" },
@@ -301,19 +286,6 @@ function logout() {
     });
 }
 
-function showLoading(message = "Loading...") {
-    const overlay = document.getElementById('loading-overlay');
-    const msg = document.getElementById('loading-message');
-    if (overlay && msg) {
-      msg.textContent = message;
-      overlay.classList.remove('hidden');
-    }
-  }
-  
-  function hideLoading() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) overlay.classList.add('hidden');
-  }
 // --- Permission & UI Control ---
 
 function hasPermission(permission) {
@@ -441,11 +413,10 @@ async function getUsersByRole(role) {
 
 // --- Audit Management ---
 
-async function initNewAuditForm() {
+async function initNewAuditForm() { // Made async
     console.log("Initializing new audit form.");
     if (!auditForm || !directorateUnitInput || !leadAuditorsSelect || !auditorsSelect || !checklistContainer) {
-        console.error("Required form elements not found for new audit."); 
-        return;
+        console.error("Required form elements not found for new audit."); return;
     }
 
     auditForm.reset();
@@ -453,45 +424,32 @@ async function initNewAuditForm() {
     checklistContainer.innerHTML = '<p>Loading checklist...</p>';
     currentAudit = null;
 
-    // Populate Directorate dropdown (NEW)
-    directorateUnitInput.innerHTML = '';
-    const dirOption = document.createElement('option');
-    dirOption.value = ''; 
-    dirOption.textContent = 'Select Directorate/Unit';
-    dirOption.disabled = true;
-    dirOption.selected = true;
-    directorateUnitInput.appendChild(dirOption);
-    
-    DIRECTORATES.forEach(dir => {
-        const option = document.createElement('option');
-        option.value = dir;
-        option.textContent = dir;
-        directorateUnitInput.appendChild(option);
-    });
+    // Fetch and Populate Auditor Selects
+    leadAuditorsSelect.innerHTML = '<option value="" disabled>Loading Lead Auditors...</option>';
+    auditorsSelect.innerHTML = '<option value="" disabled>Loading Auditors...</option>';
+    leadAuditorsSelect.disabled = true; // Disable while loading
+    auditorsSelect.disabled = true;
 
-    // Initialize Lead Auditors and Auditors dropdowns (MODIFIED)
-    leadAuditorsSelect.innerHTML = '<option value="" disabled selected>Select Lead Auditors...</option>';
-    auditorsSelect.innerHTML = '<option value="" disabled selected>Select Auditors...</option>';
-    
     try {
-        [leadAuditorUsers, auditorUsers] = await Promise.all([
-            getUsersByRole(ROLES.LEAD_AUDITOR),
-            getUsersByRole(ROLES.AUDITOR)
-        ]);
+        // Fetch users if not already cached (or always fetch for freshness)
+        // if (leadAuditorUsers.length === 0 || auditorUsers.length === 0) {
+            [leadAuditorUsers, auditorUsers] = await Promise.all([
+                getUsersByRole(ROLES.LEAD_AUDITOR),
+                getUsersByRole(ROLES.AUDITOR)
+            ]);
+        // }
 
         populateAuditorSelect(leadAuditorsSelect, leadAuditorUsers, "Lead Auditors");
         populateAuditorSelect(auditorsSelect, auditorUsers, "Auditors");
-        
-        // Setup tag display (NEW)
-        setupSelectWithTags(leadAuditorsSelect, 'lead-auditors-tags');
-        setupSelectWithTags(auditorsSelect, 'auditors-tags');
 
     } catch (error) {
-        console.error("Failed to populate dropdowns:", error);
-        leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading lead auditors</option>';
-        auditorsSelect.innerHTML = '<option value="" disabled>Error loading auditors</option>';
+         console.error("Failed to populate auditor dropdowns:", error);
+         leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
+         auditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
+    } finally {
+        leadAuditorsSelect.disabled = false; // Re-enable after loading/error
+        auditorsSelect.disabled = false;
     }
-
 
     // Populate Checklist Items
     checklistContainer.innerHTML = '';
@@ -551,80 +509,27 @@ async function initNewAuditForm() {
 }
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
-    if (!selectElement) return;
-    selectElement.innerHTML = '';
-    
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = users.length ? `Select ${typeLabel}...` : `No ${typeLabel} available`;
-    defaultOption.disabled = true;
-    defaultOption.selected = true;
-    selectElement.appendChild(defaultOption);
-    
-    if (users.length === 0) return;
-
-    // Group users by first letter (NEW)
-    const groups = {};
-    users.forEach(user => {
-        const firstLetter = (user.displayName || user.email || 'A').charAt(0).toUpperCase();
-        if (!groups[firstLetter]) groups[firstLetter] = [];
-        groups[firstLetter].push(user);
-    });
-
-    // Add grouped options (NEW)
-    Object.keys(groups).sort().forEach(letter => {
-        const groupHeader = document.createElement('option');
-        groupHeader.disabled = true;
-        groupHeader.textContent = `── ${letter} ──`;
-        selectElement.appendChild(groupHeader);
-        
-        groups[letter].forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.uid;
-            option.textContent = `${user.displayName || user.email} (${user.email})`;
-            option.dataset.displayName = user.displayName;
-            option.dataset.email = user.email;
-            selectElement.appendChild(option);
-        });
-    });
+     if (!selectElement) return;
+     selectElement.innerHTML = '';
+     if (users.length === 0) {
+         selectElement.innerHTML = `<option value="" disabled>No ${typeLabel} found</option>`;
+         return;
+     }
+     users.forEach(user => {
+         const option = document.createElement('option');
+         option.value = user.uid;
+         option.textContent = `${user.displayName} (${user.email})`;
+         option.dataset.displayName = user.displayName;
+         option.dataset.email = user.email;
+         selectElement.appendChild(option);
+     });
 }
 
-function setupSelectWithTags(selectElement, tagsContainerId) {
-    const tagsContainer = document.getElementById(tagsContainerId);
-    if (!tagsContainer) return;
-    
-    function updateTags() {
-        tagsContainer.innerHTML = '';
-        Array.from(selectElement.selectedOptions).forEach(option => {
-            if (option.value) {
-                const tag = document.createElement('div');
-                tag.className = 'selected-tag';
-                tag.innerHTML = `
-                    ${option.textContent.split('(')[0].trim()}
-                    <button type="button" data-value="${option.value}">&times;</button>
-                `;
-                tagsContainer.appendChild(tag);
-            }
-        });
-    }
-    
-    selectElement.addEventListener('change', updateTags);
-    
-    tagsContainer.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') {
-            const value = e.target.getAttribute('data-value');
-            const option = selectElement.querySelector(`option[value="${value}"]`);
-            if (option) {
-                option.selected = false;
-                selectElement.dispatchEvent(new Event('change'));
-            }
-        }
-    });
-    
-    updateTags();
+function generateNumberOptions(start, end) {
+    let options = '';
+    for (let i = start; i <= end; i++) options += `<option value="${i}">${i}</option>`;
+    return options;
 }
-
-// Add this to your initNewAuditForm() function after populating the selects
 
 function collectAuditFormData() {
     const auditDate = auditDateInput?.value;
@@ -821,15 +726,6 @@ function renderComplianceChart() {
         type: 'doughnut',
         data: { labels: ['Compliant', 'Non-Compliant'], datasets: [{ data: [complianceRate, 100 - complianceRate], backgroundColor: ['#2a9d8f', '#e76f51'], borderWidth: 2 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.label}: ${c.raw}%` } } } }
-    });
-}
-
-function cleanupCharts() {
-    [complianceChartInstance, ncChartInstance, reportChartInstance].forEach(chart => {
-      if (chart) {
-        chart.destroy();
-        chart = null;
-      }
     });
 }
 
