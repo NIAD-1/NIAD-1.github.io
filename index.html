@@ -16,10 +16,6 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage-compat.js"></script>
 </head>
 <body>
-    <div id="loading-spinner" class="spinner-overlay hidden">
-        <div class="spinner"></div>
-        <p>Loading...</p>
-    </div>
     <!-- Login Screen -->
     <div id="login-screen" class="auth-screen">
         <div class="auth-container">
@@ -108,49 +104,100 @@
             </section>
 
             <!-- New Audit Section -->
-  <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
+            <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
+                    <!-- Directorate Row -->
                     <div class="form-row">
-                        <!-- 1. Renamed Field -->
                         <div class="form-group">
                             <label for="directorate-unit">Directorate / Unit:</label>
-                            <input type="text" id="directorate-unit" required placeholder="e.g., Laboratory Services / Microbiology Unit">
+                            <select id="directorate-unit" required>
+                                <option value="">Select Directorate/Unit</option>
+                                <option value="Registration and Regulatory Affairs (R&R)">Registration and Regulatory Affairs (R&R)</option>
+                                <option value="Laboratory Services (Food)">Laboratory Services (Food)</option>
+                                <option value="Laboratory Services (Drug)">Laboratory Services (Drug)</option>
+                                <option value="Chemical Evaluation and Research (CER)">Chemical Evaluation and Research (CER)</option>
+                                <option value="Food Safety and Applied Nutrition (FSAN)">Food Safety and Applied Nutrition (FSAN)</option>
+                                <option value="Pharmacovigilance (PV)">Pharmacovigilance (PV)</option>
+                                <option value="Post-Marketing Surveillance (PMS)">Post-Marketing Surveillance (PMS)</option>
+                                <option value="Investigation and Enforcement (I&E)">Investigation and Enforcement (I&E)</option>
+                                <option value="Port Inspection Directorate (PID)">Port Inspection Directorate (PID)</option>
+                                <option value="Veterinary Medicines and Allied Products (VMAP)">Veterinary Medicines and Allied Products (VMAP)</option>
+                                <option value="Planning, Research and Statistics (PRS)">Planning, Research and Statistics (PRS)</option>
+                                <option value="Administration and Human Resources (A&HR)">Administration and Human Resources (A&HR)</option>
+                                <option value="Finance and Accounts (F&A)">Finance and Accounts (F&A)</option>
+                                <option value="Legal Services">Legal Services</option>
+                                <!-- Other directorate options -->
+                            </select>
                         </div>
-                        <!-- 4. New Ref No Field -->
                         <div class="form-group">
-                             <label for="ref-no">Ref No.:</label>
-                             <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
+                            <label for="ref-no">Ref No.:</label>
+                            <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
                         </div>
                     </div>
-
-                    <!-- 2. New Lead Auditors / Auditors Fields -->
+            
+                    <!-- Auditors Row -->
                     <div class="form-row">
-                         <div class="form-group">
-                             <label for="lead-auditors-select">Lead Auditor(s):</label>
-                             <select id="lead-auditors-select" multiple required>
-                                 <!-- Options populated by JS -->
-                                 <option value="" disabled>Loading...</option>
-                             </select>
-                             <small>Hold Ctrl/Cmd to select multiple.</small>
-                         </div>
-                         <div class="form-group">
-                             <label for="auditors-select">Auditor(s):</label>
-                             <select id="auditors-select" multiple required>
-                                 <!-- Options populated by JS -->
-                                 <option value="" disabled>Loading...</option>
-                              </select>
-                              <small>Hold Ctrl/Cmd to select multiple.</small>
-                         </div>
+                        <!-- Lead Auditors -->
+                        <div class="form-group">
+                            <label for="lead-auditors-select">Lead Auditor(s):</label>
+                            <select id="lead-auditors-select" multiple required class="enhanced-select">
+                                <option value="" disabled selected>Select Lead Auditor(s)</option>
+                                <option value="Fatoki Sa">Fatoki Sa</option>
+                                <option value="Biyama Kalang">Biyama Kalang</option>
+                                <option value="Bolanle Ikusagba">Bolanle Ikusagba</option>
+                                <option value="Chinyelu Danga">Chinyelu Danga</option>
+                                <option value="Folashade Osho">Folashade Osho</option>
+                                <option value="Ifudu N">Ifudu N</option>
+                                <option value="Kem Ashibuogwu">Kem Ashibuogwu</option>
+                                <option value="Khadijah Ade-Abolade">Khadijah Ade-Abolade</option>
+                                <option value="Onwualu Rosemary">Onwualu Rosemary</option>
+                                <option value="Stephanie Adeoye">Stephanie Adeoye</option>
+                                <option value="Sunday Adown">Sunday Adown</option>
+                                <option value="Vivien Ibeh">Vivien Ibeh</option>
+                                <option value="Wendy Ndugbu">Wendy Ndugbu</option>    
+                                <!-- Other lead auditor options -->
+                            </select>
+                        </div>
+            
+                        <!-- Regular Auditors -->
+                        <div class="form-group">
+                            <label for="auditors-select">Auditor(s):</label>
+                            <select id="auditors-select" multiple required class="enhanced-select">
+                                <option value="" disabled selected>Select Auditor(s)</option>
+                                <option value="Omoru Emmanuel">Omoru Emmanuel</option>
+                                <option value="Mrs. Offor Adaku F.">Mrs. Offor Adaku F.</option>
+                                <option value="Onwualu Rosemary N.">Onwualu Rosemary N.</option>
+                                <option value="MARIAN.I. BOJUWOYE">MARIAN.I. BOJUWOYE</option> 
+                                <option value="Ms. Azogini Ebosie">Ms. Azogini Ebosie</option>
+                                <option value="Mrs. Bolanle Ikusagba">Mrs. Bolanle Ikusagba</option>
+                                <option value="IBEH, Vivien Ify">IBEH, Vivien Ify</option>
+                                <option value="Sanwoolu Oluwaseyi">Sanwoolu Oluwaseyi</option>
+                                <option value="Tabitha Bukar">Tabitha Bukar</option>
+                                <option value="AKINYEMI, S. O">AKINYEMI, S. O</option>
+                                <option value="Mrs. Anulika Princess Nwosu">Mrs. Anulika Princess Nwosu</option>
+                                <option value="Oriade-Shabi Olabisi A">Oriade-Shabi Olabisi A</option>
+                                <option value="Mrs. Akinyemi Julianah">Mrs. Akinyemi Julianah</option>
+                                <option value="Mr. Adewale Muniru">Mr. Adewale Muniru</option>
+                                <option value="Mr. Salihu Bello">Mr. Salihu Bello</option>
+                                <option value="Alex Tanko, Joyce">Alex Tanko, Joyce</option>
+                                <option value="Mr. Shallwanga Sunday">Mr. Shallwanga Sunday</option>
+                                <option value="Mr. Umar Mala Bukar">Mr. Umar Mala Bukar</option>
+                                <option value="Mrs. Ekwealor Chinenye">Mrs. Ekwealor Chinenye</option>
+                                <option value="Yunusa Hadizah Ibrahim">Yunusa Hadizah Ibrahim</option>
+                                <option value="Ojo Ayodeji Olukunle">Ojo Ayodeji Olukunle</option>   
+                                <!-- Other auditor options -->
+                            </select>
+                        </div>
                     </div>
-
-                    <!-- 5. Renamed Checklist Section Title -->
+            
+                    <!-- Checklist Section -->
                     <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
                     <div id="checklist-container">
-                        <!-- Dynamically populated by JS with NEW structure -->
                         <p>Loading checklist...</p>
                     </div>
-
+            
+                    <!-- Form Actions -->
                     <div class="form-actions">
                         <button type="button" id="save-draft-btn" class="btn btn-warning permission-hidden" data-permission="create_audit">Save Draft</button>
                         <button type="button" id="submit-audit-btn" class="btn btn-success permission-hidden" data-permission="submit_audit">Submit Audit</button>
