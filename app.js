@@ -301,6 +301,19 @@ function logout() {
     });
 }
 
+function showLoading(message = "Loading...") {
+    const overlay = document.getElementById('loading-overlay');
+    const msg = document.getElementById('loading-message');
+    if (overlay && msg) {
+      msg.textContent = message;
+      overlay.classList.remove('hidden');
+    }
+  }
+  
+  function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
 // --- Permission & UI Control ---
 
 function hasPermission(permission) {
@@ -431,7 +444,8 @@ async function getUsersByRole(role) {
 async function initNewAuditForm() {
     console.log("Initializing new audit form.");
     if (!auditForm || !directorateUnitInput || !leadAuditorsSelect || !auditorsSelect || !checklistContainer) {
-        console.error("Required form elements not found for new audit."); return;
+        console.error("Required form elements not found for new audit."); 
+        return;
     }
 
     auditForm.reset();
@@ -439,8 +453,15 @@ async function initNewAuditForm() {
     checklistContainer.innerHTML = '<p>Loading checklist...</p>';
     currentAudit = null;
 
-    // Populate Directorate dropdown
-    directorateUnitInput.innerHTML = '<option value="" disabled selected>Select Directorate/Unit</option>';
+    // Populate Directorate dropdown (NEW)
+    directorateUnitInput.innerHTML = '';
+    const dirOption = document.createElement('option');
+    dirOption.value = ''; 
+    dirOption.textContent = 'Select Directorate/Unit';
+    dirOption.disabled = true;
+    dirOption.selected = true;
+    directorateUnitInput.appendChild(dirOption);
+    
     DIRECTORATES.forEach(dir => {
         const option = document.createElement('option');
         option.value = dir;
@@ -448,12 +469,10 @@ async function initNewAuditForm() {
         directorateUnitInput.appendChild(option);
     });
 
-    // Fetch and Populate Auditor Selects
-    leadAuditorsSelect.innerHTML = '<option value="" disabled selected>Select Lead Auditors</option>';
-    auditorsSelect.innerHTML = '<option value="" disabled selected>Select Auditors</option>';
-    leadAuditorsSelect.disabled = true;
-    auditorsSelect.disabled = true;
-
+    // Initialize Lead Auditors and Auditors dropdowns (MODIFIED)
+    leadAuditorsSelect.innerHTML = '<option value="" disabled selected>Select Lead Auditors...</option>';
+    auditorsSelect.innerHTML = '<option value="" disabled selected>Select Auditors...</option>';
+    
     try {
         [leadAuditorUsers, auditorUsers] = await Promise.all([
             getUsersByRole(ROLES.LEAD_AUDITOR),
@@ -462,14 +481,15 @@ async function initNewAuditForm() {
 
         populateAuditorSelect(leadAuditorsSelect, leadAuditorUsers, "Lead Auditors");
         populateAuditorSelect(auditorsSelect, auditorUsers, "Auditors");
+        
+        // Setup tag display (NEW)
+        setupSelectWithTags(leadAuditorsSelect, 'lead-auditors-tags');
+        setupSelectWithTags(auditorsSelect, 'auditors-tags');
 
     } catch (error) {
-        console.error("Failed to populate auditor dropdowns:", error);
-        leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
-        auditorsSelect.innerHTML = '<option value="" disabled>Error loading users</option>';
-    } finally {
-        leadAuditorsSelect.disabled = false;
-        auditorsSelect.disabled = false;
+        console.error("Failed to populate dropdowns:", error);
+        leadAuditorsSelect.innerHTML = '<option value="" disabled>Error loading lead auditors</option>';
+        auditorsSelect.innerHTML = '<option value="" disabled>Error loading auditors</option>';
     }
 
 
@@ -534,100 +554,77 @@ function populateAuditorSelect(selectElement, users, typeLabel) {
     if (!selectElement) return;
     selectElement.innerHTML = '';
     
-    // Add a placeholder option
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = `Select ${typeLabel}...`;
-    placeholder.disabled = true;
-    placeholder.selected = true;
-    selectElement.appendChild(placeholder);
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = users.length ? `Select ${typeLabel}...` : `No ${typeLabel} available`;
+    defaultOption.disabled = true;
+    defaultOption.selected = true;
+    selectElement.appendChild(defaultOption);
     
-    if (users.length === 0) {
-        const noUsersOption = document.createElement('option');
-        noUsersOption.value = '';
-        noUsersOption.textContent = `No ${typeLabel} available`;
-        noUsersOption.disabled = true;
-        selectElement.appendChild(noUsersOption);
-        return;
-    }
-    
-    // Group by first letter for better organization
-    const groupedUsers = {};
+    if (users.length === 0) return;
+
+    // Group users by first letter (NEW)
+    const groups = {};
     users.forEach(user => {
-        const firstLetter = user.displayName.charAt(0).toUpperCase();
-        if (!groupedUsers[firstLetter]) {
-            groupedUsers[firstLetter] = [];
-        }
-        groupedUsers[firstLetter].push(user);
+        const firstLetter = (user.displayName || user.email || 'A').charAt(0).toUpperCase();
+        if (!groups[firstLetter]) groups[firstLetter] = [];
+        groups[firstLetter].push(user);
     });
-    
-    // Sort groups alphabetically
-    const sortedGroups = Object.keys(groupedUsers).sort();
-    
-    sortedGroups.forEach(letter => {
-        // Add group header
+
+    // Add grouped options (NEW)
+    Object.keys(groups).sort().forEach(letter => {
         const groupHeader = document.createElement('option');
         groupHeader.disabled = true;
         groupHeader.textContent = `── ${letter} ──`;
         selectElement.appendChild(groupHeader);
         
-        // Add users in this group
-        groupedUsers[letter].forEach(user => {
+        groups[letter].forEach(user => {
             const option = document.createElement('option');
             option.value = user.uid;
-            option.textContent = `${user.displayName} (${user.email})`;
+            option.textContent = `${user.displayName || user.email} (${user.email})`;
             option.dataset.displayName = user.displayName;
             option.dataset.email = user.email;
             selectElement.appendChild(option);
         });
     });
 }
-// Add this to your initNewAuditForm() function after populating the selects
-function setupEnhancedSelect(selectElement, tagsContainerId) {
+
+function setupSelectWithTags(selectElement, tagsContainerId) {
     const tagsContainer = document.getElementById(tagsContainerId);
+    if (!tagsContainer) return;
     
-    function updateSelectedTags() {
+    function updateTags() {
         tagsContainer.innerHTML = '';
         Array.from(selectElement.selectedOptions).forEach(option => {
-            const tag = document.createElement('div');
-            tag.className = 'selected-tag';
-            tag.innerHTML = `
-                ${option.textContent.split('(')[0].trim()}
-                <button type="button" data-value="${option.value}">&times;</button>
-            `;
-            tagsContainer.appendChild(tag);
+            if (option.value) {
+                const tag = document.createElement('div');
+                tag.className = 'selected-tag';
+                tag.innerHTML = `
+                    ${option.textContent.split('(')[0].trim()}
+                    <button type="button" data-value="${option.value}">&times;</button>
+                `;
+                tagsContainer.appendChild(tag);
+            }
         });
     }
     
-    // Initial update
-    updateSelectedTags();
+    selectElement.addEventListener('change', updateTags);
     
-    // Update on change
-    selectElement.addEventListener('change', updateSelectedTags);
-    
-    // Handle tag removal
     tagsContainer.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
-            const valueToRemove = e.target.getAttribute('data-value');
-            const optionToRemove = Array.from(selectElement.options)
-                .find(option => option.value === valueToRemove);
-            if (optionToRemove) {
-                optionToRemove.selected = false;
+            const value = e.target.getAttribute('data-value');
+            const option = selectElement.querySelector(`option[value="${value}"]`);
+            if (option) {
+                option.selected = false;
                 selectElement.dispatchEvent(new Event('change'));
             }
         }
     });
+    
+    updateTags();
 }
 
-// Call this for both selects after they're populated
-setupEnhancedSelect(leadAuditorsSelect, 'lead-auditors-tags');
-setupEnhancedSelect(auditorsSelect, 'auditors-tags');
-
-function generateNumberOptions(start, end) {
-    let options = '';
-    for (let i = start; i <= end; i++) options += `<option value="${i}">${i}</option>`;
-    return options;
-}
+// Add this to your initNewAuditForm() function after populating the selects
 
 function collectAuditFormData() {
     const auditDate = auditDateInput?.value;
@@ -824,6 +821,15 @@ function renderComplianceChart() {
         type: 'doughnut',
         data: { labels: ['Compliant', 'Non-Compliant'], datasets: [{ data: [complianceRate, 100 - complianceRate], backgroundColor: ['#2a9d8f', '#e76f51'], borderWidth: 2 }] },
         options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.label}: ${c.raw}%` } } } }
+    });
+}
+
+function cleanupCharts() {
+    [complianceChartInstance, ncChartInstance, reportChartInstance].forEach(chart => {
+      if (chart) {
+        chart.destroy();
+        chart = null;
+      }
     });
 }
 
