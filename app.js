@@ -11,7 +11,10 @@ const firebaseConfig = {
     appId: "1:510488169711:web:271ed61bd7c4e6c14c5f1a",
     measurementId: "G-43ESSX8GLJ"
   };
-// --- Initialize Firebase ---
+// Add this array at the top of your app.js with other global variables
+
+  // --- Initialize Firebase ---//
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
@@ -37,6 +40,23 @@ const PERMISSIONS = {
     generate_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR]
 };
+
+const DIRECTORATES = [
+    "Registration and Regulatory Affairs (R&R)",
+    "Laboratory Services (Food)",
+    "Laboratory Services (Drug)",
+    "Chemical Evaluation and Research (CER)",
+    "Food Safety and Applied Nutrition (FSAN)",
+    "Pharmacovigilance (PV)",
+    "Post-Marketing Surveillance (PMS)",
+    "Investigation and Enforcement (I&E)",
+    "Port Inspection Directorate (PID)",
+    "Veterinary Medicines and Allied Products (VMAP)",
+    "Planning, Research and Statistics (PRS)",
+    "Administration and Human Resources (A&HR)",
+    "Finance and Accounts (F&A)",
+    "Legal Services"
+];
 
 // --- DOM Elements ---
 const loginScreen = document.getElementById('login-screen');
@@ -410,6 +430,73 @@ async function getUsersByRole(role) {
 }
 
 // --- Audit Management ---
+function populateDirectoratesDropdown() {
+    if (!directorateUnitInput) return;
+    
+    directorateUnitInput.innerHTML = '<option value="" disabled selected>Select Directorate</option>';
+    
+    DIRECTORATES.forEach(dir => {
+        const option = document.createElement('option');
+        option.value = dir;
+        option.textContent = dir;
+        directorateUnitInput.appendChild(option);
+    });
+}
+
+function populateAuditorSelect(selectElement, users, typeLabel) {
+    if (!selectElement) return;
+    
+    selectElement.innerHTML = `<option value="" disabled>Select ${typeLabel}</option>`;
+    
+    if (users.length === 0) {
+        selectElement.innerHTML = `<option value="" disabled>No ${typeLabel} found</option>`;
+        return;
+    }
+    
+    users.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.uid;
+        option.textContent = `${user.displayName || user.email.split('@')[0]} (${user.email})`;
+        option.dataset.displayName = user.displayName || user.email.split('@')[0];
+        selectElement.appendChild(option);
+    });
+    
+    // Add event listener to update selected items display
+    selectElement.addEventListener('change', function() {
+        updateSelectedItemsDisplay(this, document.getElementById(`${this.id}-selected`));
+    });
+}
+
+function updateSelectedItemsDisplay(select, container) {
+    if (!container) return;
+    
+    container.innerHTML = '';
+    const selected = Array.from(select.selectedOptions)
+        .filter(opt => opt.value);
+    
+    selected.forEach(option => {
+        const item = document.createElement('div');
+        item.className = 'selected-item';
+        item.innerHTML = `
+            ${option.dataset.displayName || option.textContent.split(' (')[0]}
+            <button type="button" class="remove-selected" data-value="${option.value}">
+                &times;
+            </button>
+        `;
+        container.appendChild(item);
+    });
+    
+    // Add event listeners to remove buttons
+    container.querySelectorAll('.remove-selected').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const option = select.querySelector(`option[value="${btn.dataset.value}"]`);
+            if (option) option.selected = false;
+            updateSelectedItemsDisplay(select, container);
+        });
+    });
+}
+
 
 async function initNewAuditForm() { // Made async
     console.log("Initializing new audit form.");
@@ -422,6 +509,7 @@ async function initNewAuditForm() { // Made async
     checklistContainer.innerHTML = '<p>Loading checklist...</p>';
     currentAudit = null;
 
+    populateDirectoratesDropdown();
     // Fetch and Populate Auditor Selects
     leadAuditorsSelect.innerHTML = '<option value="" disabled>Loading Lead Auditors...</option>';
     auditorsSelect.innerHTML = '<option value="" disabled>Loading Auditors...</option>';
@@ -895,7 +983,7 @@ async function editAudit() { // Made async
     currentAudit = { ...auditToEdit }; // Restore context
 
     console.log(`Loading audit ${currentAudit.id} for editing.`);
-    if(directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || currentAudit.auditedArea || '';
+    if(directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || '';
     if(refNoInput) refNoInput.value = currentAudit.refNo || '';
     if(auditDateInput) auditDateInput.value = currentAudit.date || '';
 
