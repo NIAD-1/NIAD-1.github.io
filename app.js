@@ -3,7 +3,7 @@
 
 // --- Firebase Configuration ---
 // IMPORTANT: Replace with your actual Firebase project config
-const firebaseConfig = {
+ firebaseConfig = {
     apiKey: "AIzaSyCLp8nKO2rb7yMyaL0mM6sJOzoFRmm0BdI",
     authDomain: "internalaudit-2cd8c.firebaseapp.com",
     projectId: "internalaudit-2cd8c",
@@ -2260,3 +2260,4 @@ async function handleRoleChange(event) {
 
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
+```
