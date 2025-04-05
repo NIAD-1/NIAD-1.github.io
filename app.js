@@ -1,16 +1,16 @@
-```javascript
+
 // app.js
 
 // --- Firebase Configuration ---
 // IMPORTANT: Replace with your actual Firebase project config
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY", // Replace
-    authDomain: "YOUR_AUTH_DOMAIN", // Replace
-    projectId: "YOUR_PROJECT_ID", // Replace
-    storageBucket: "YOUR_STORAGE_BUCKET", // Replace
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace
-    appId: "YOUR_APP_ID", // Replace
-    measurementId: "YOUR_MEASUREMENT_ID" // Optional
+    apiKey: "AIzaSyCLp8nKO2rb7yMyaL0mM6sJOzoFRmm0BdI",
+    authDomain: "internalaudit-2cd8c.firebaseapp.com",
+    projectId: "internalaudit-2cd8c",
+    storageBucket: "internalaudit-2cd8c.firebasestorage.app",
+    messagingSenderId: "510488169711",
+    appId: "1:510488169711:web:271ed61bd7c4e6c14c5f1a",
+    measurementId: "G-43ESSX8GLJ"
   };
 
 // --- Initialize Firebase ---
