@@ -1207,13 +1207,12 @@ function formatDateTime(timestamp) {
 function escapeHtml(unsafe) {
     if (unsafe === null || typeof unsafe === 'undefined') return '';
     return unsafe.toString()
-         .replace(/&/g, "&")
-         .replace(/</g, "<")
-         .replace(/>/g, ">")
-         .replace(/"/g, """)
-         .replace(/'/g, "'");
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
 }
-
 
 function formatCsvCell(cell) {
      const str = String(cell ?? '');
