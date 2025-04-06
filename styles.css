@@ -1140,7 +1140,7 @@ select option:disabled {
     font-size: 0.95rem;
     line-height: 1.6;
     resize: vertical;
-    background: transparent;
+    background: white;
 }
 
 .evidence-input:focus {
