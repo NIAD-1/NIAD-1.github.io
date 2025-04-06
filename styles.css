@@ -482,6 +482,25 @@ select {
     display: block; /* Ensure it takes block space */
 }
 
+.audit-item .meta {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.audit-item .meta div {
+    margin-bottom: 0.3rem;
+}
+
+.audit-item .dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
 
 .status {
     padding: 0.25rem 0.6rem;
@@ -1073,14 +1092,30 @@ select option:disabled {
 
 /* Evidence Section Styling */
 .evidence-container {
-    margin: 2rem 0;
-    border-top: 2px solid var(--primary-color);
-    padding-top: 1.5rem;
+    margin: 2.5rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
 }
 
-.evidence-container h3 {
-    color: var(--primary-color);
-    margin-bottom: 1rem;
+.evidence-header {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.8rem 1.2rem;
+}
+
+
+.evidence-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.evidence-header i {
+    font-size: 1rem;
 }
 
 .evidence-box {
@@ -1099,17 +1134,39 @@ select option:disabled {
 .evidence-input {
     width: 100%;
     min-height: 150px;
-    padding: 1rem;
-    border: 1px solid var(--medium-grey);
-    border-radius: calc(var(--border-radius) * 0.7);
+    padding: 1.2rem;
+    border: none;
     font-family: var(--font-family-base);
     font-size: 0.95rem;
     line-height: 1.6;
-    transition: var(--transition-base);
+    resize: vertical;
+    background: transparent;
 }
 
 .evidence-input:focus {
-    border-color: var(--secondary-color);
-    box-shadow: 0 0 0 3px rgba(10, 147, 150, 0.1);
     outline: none;
+    box-shadow: inset 0 0 0 2px var(--secondary-color);
+}
+
+.evidence-input::placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+.evidence-summary {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: var(--light-color);
+    border-radius: var(--border-radius);
+}
+
+.evidence-summary h3 {
+    margin-top: 0;
+}
+
+.evidence-content pre {
+    white-space: pre-wrap;
+    background: white;
+    padding: 1rem;
+    border-radius: calc(var(--border-radius) * 0.7);
 }

@@ -512,23 +512,45 @@ function generateNumberOptions(start, end) {
 
 // Data collection function (simplified)
 function collectAuditFormData() {
-    return {
-        directorateUnit: document.getElementById('directorate-unit').value,
-        refNo: document.getElementById('ref-no').value,
-        leadAuditors: Array.from(leadAuditorsSelect.selectedOptions).map(opt => ({
-            displayName: opt.value
-        })),
-        auditors: Array.from(auditorsSelect.selectedOptions).map(opt => ({
-            displayName: opt.value
-        })),
-        checklist: auditChecklist.map((item, index) => ({
+    const auditDate = document.getElementById('audit-date').value;
+    const refNo = document.getElementById('ref-no').value;
+    const directorateUnit = document.getElementById('directorate-unit').value;
+    
+    // Get selected lead auditors and auditors
+    const leadAuditors = Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
+        .map(checkbox => checkbox.value);
+    
+    const auditors = Array.from(document.querySelectorAll('#auditors-options input:checked'))
+        .map(checkbox => checkbox.value);
+    
+    const objectiveEvidence = document.querySelector('.evidence-input').value;
+    
+    // Get checklist data
+    const checklist = auditChecklist.map(item => {
+        const itemElement = document.querySelector(`[data-item-id="${item.id}"]`);
+        return {
             id: item.id,
-            compliance: document.querySelector(`#checklist-container [data-item-id="${item.id}"] .compliance-btn.active`)?.dataset.compliance || '',
-            objectiveEvidence: document.getElementById(`evidence-${item.id}`)?.value || '',
-            correctiveActionNeeded: document.getElementById(`ca-yes-${item.id}`)?.checked || false,
-            correctiveActionsCount: parseInt(document.getElementById(`how-many-needed-${item.id}`)?.value) || 0,
-            comments: document.getElementById(`comments-${item.id}`)?.value || ''
-        }))
+            requirement: item.requirement,
+            clause: item.clause,
+            compliance: itemElement.querySelector('.compliance-btn.active')?.dataset.compliance || '',
+            objectiveEvidence: itemElement.querySelector('.evidence-input')?.value || '',
+            correctiveActionNeeded: itemElement.querySelector(`input[name="corrective-action-${item.id}"]:checked`)?.value === 'yes',
+            correctiveActionsCount: parseInt(itemElement.querySelector(`#how-many-needed-${item.id}`)?.value) || 0,
+            comments: itemElement.querySelector(`#comments-${item.id}`)?.value || ''
+        };
+    });
+
+    return {
+        date: auditDate,
+        refNo,
+        directorateUnit,
+        leadAuditors,
+        auditors,
+        objectiveEvidence, // Added this field
+        checklist,
+        status: 'draft', // or 'submitted' when submitted
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastModified: firebase.firestore.FieldValue.serverTimestamp()
     };
 }
 
@@ -645,59 +667,36 @@ function collectAuditFormData() {
     return { data: baseData, isComplete };
 }
 
-function saveAuditAsDraft() {
-    if (!hasPermission('create_audit')) { alert("Permission Denied."); return; }
-    const formDataResult = collectAuditFormData();
-    if (!formDataResult?.data) return;
-    const auditData = formDataResult.data;
+async function saveAuditAsDraft() {
+    const auditData = collectAuditFormData();
     auditData.status = 'draft';
-    saveAuditToFirestore(auditData);
+    await saveAuditToFirestore(auditData);
+    loadAudits(); // Refresh the audit history
 }
 
-function submitAudit() {
-    if (!hasPermission('submit_audit')) { alert("Permission Denied."); return; }
-    const formDataResult = collectAuditFormData();
-    if (!formDataResult?.data) return;
-
-    if (!formDataResult.isComplete) {
-        alert("Please ensure Compliance Status is selected and Corrective Action Count is specified (if needed) for ALL checklist items before submitting.");
-        const firstIncomplete = checklistContainer.querySelector('.checklist-item[style*="border: 2px solid red"]');
-        firstIncomplete?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-    }
-
-    const auditData = formDataResult.data;
+async function submitAudit() {
+    const auditData = collectAuditFormData();
     auditData.status = 'submitted';
     auditData.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
-    saveAuditToFirestore(auditData);
+    await saveAuditToFirestore(auditData);
+    loadAudits(); // Refresh the audit history
 }
 
-function saveAuditToFirestore(auditData) {
-    let promise;
-    let action = 'created';
-
-    if (currentAudit?.id) { // Editing existing
-        action = 'updated';
-        if (!canEditAudit(currentAudit)) { alert("Permission Denied: Cannot edit this audit."); return; }
-        const auditRef = db.collection('audits').doc(currentAudit.id);
-        const { createdBy, createdAt, createdByEmail, ...updateData } = auditData; // Don't overwrite creation fields
-        promise = auditRef.update(updateData);
-        console.log(`Updating audit ${currentAudit.id}`);
-    } else { // Creating new
-         if (!hasPermission('create_audit')) { alert("Permission Denied: Cannot create audits."); return; }
-         if (!auditData.createdBy) { alert("Error: Missing creator info."); return; }
-        promise = db.collection('audits').add(auditData);
-        console.log(`Creating new audit`);
+async function saveAuditToFirestore(auditData) {
+    try {
+        if (currentAudit?.id) {
+            // Update existing audit
+            await db.collection('audits').doc(currentAudit.id).update(auditData);
+        } else {
+            // Create new audit
+            auditData.createdBy = currentUser.uid;
+            auditData.createdByEmail = currentUser.email;
+            await db.collection('audits').add(auditData);
+        }
+    } catch (error) {
+        console.error("Error saving audit:", error);
+        alert("Failed to save audit: " + error.message);
     }
-
-    promise.then(() => {
-        alert(`Audit ${action} successfully!`);
-        loadAudits();
-        switchSection('audit-history');
-    }).catch(error => {
-        alert(`Error saving audit: ${error.message}`);
-        console.error("Firestore save error:", error);
-    });
 }
 
 function loadAudits() {
@@ -855,54 +854,59 @@ function updateAreaFilter() {
 // --- Modal Functionality ---
 
 function openAuditDetails(audit) {
-    // console.log("Opening details for audit:", audit.id);
     if (!modal || !modalTitle || !modalBody || !audit) return;
+    
     currentAudit = audit;
-    modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit || audit.auditedArea || 'N/A')} (${formatDate(audit.date)})`;
-
-    const createdBy = audit.createdByEmail ? escapeHtml(audit.createdByEmail) : audit.createdBy || 'Unknown';
-    const formatAuditorList = (arr) => arr?.map(a => escapeHtml(a.displayName || a.email || a.uid)).join(', ') || 'N/A';
-    const leadAuditorsText = formatAuditorList(audit.leadAuditors);
-    const auditorsText = formatAuditorList(audit.auditors);
-
+    modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
+    
+    // Format lead auditors and auditors
+    const leadAuditorsText = audit.leadAuditors?.join(', ') || 'None';
+    const auditorsText = audit.auditors?.join(', ') || 'None';
+    
+    // Build modal content
     let bodyContent = `
         <div class="audit-meta">
-            <p><strong>Directorate / Unit:</strong> ${escapeHtml(audit.directorateUnit || audit.auditedArea || 'N/A')}</p>
-            <p><strong>Ref No.:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
+            <p><strong>Ref No:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
             <p><strong>Audit Date:</strong> ${formatDate(audit.date)}</p>
             <p><strong>Lead Auditor(s):</strong> ${leadAuditorsText}</p>
             <p><strong>Auditor(s):</strong> ${auditorsText}</p>
             <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
-            <p><strong>Created By:</strong> ${createdBy}</p>
-            <p><strong>Created At:</strong> ${formatDateTime(audit.createdAt)}</p>
-            <p><strong>Last Modified:</strong> ${formatDateTime(audit.lastModified)}</p>
-            <p><strong>Submitted At:</strong> ${audit.submittedAt ? formatDateTime(audit.submittedAt) : 'N/A'}</p>
         </div>
-        <h3>Findings (${audit.checklist?.length || 0})</h3><div class="checklist-summary">`;
-
+        
+        <div class="evidence-summary">
+            <h3>Objective Evidence</h3>
+            <div class="evidence-content">${audit.objectiveEvidence ? `<pre>${escapeHtml(audit.objectiveEvidence)}</pre>` : '<p>No objective evidence provided.</p>'}</div>
+        </div>
+        
+        <h3>Checklist Findings</h3>
+        <div class="checklist-summary">`;
+    
+    // Add checklist items
     if (audit.checklist?.length > 0) {
         audit.checklist.forEach(item => {
-            const compClass = item.compliance === 'yes' ? 'compliant' : item.compliance === 'no' ? 'non-compliant' : '';
-            const compText = item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected';
-            const caText = item.correctiveActionNeeded ? 'Yes' : 'No';
-            const caCount = item.correctiveActionNeeded && item.correctiveActionsCount ? ` (${item.correctiveActionsCount} needed)` : '';
+            const compClass = item.compliance === 'yes' ? 'compliant' : 
+                            item.compliance === 'no' ? 'non-compliant' : '';
+            const compText = item.compliance === 'yes' ? 'Compliant' : 
+                            item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected';
+            
             bodyContent += `
                 <div class="checklist-item-summary">
                     <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Cl ${item.clause})` : ''}</h4>
                     <p><strong>Compliance:</strong> <span class="${compClass}">${compText}</span></p>
                     ${item.objectiveEvidence ? `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>` : ''}
-                    <p><strong>Correction Needed:</strong> ${caText}${caCount}</p>
+                    <p><strong>Correction Needed:</strong> ${item.correctiveActionNeeded ? 'Yes' : 'No'}</p>
                     ${item.comments ? `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>` : ''}
                 </div>`;
         });
-    } else { bodyContent += '<p>No checklist data.</p>'; }
+    } else {
+        bodyContent += '<p>No checklist data available.</p>';
+    }
+    
     bodyContent += `</div>`;
-
     modalBody.innerHTML = bodyContent;
     updateModalEditButtonVisibility();
     modal.classList.remove('hidden');
 }
-
 function closeModal() {
      if (!modal) return;
     modal.classList.add('hidden');
