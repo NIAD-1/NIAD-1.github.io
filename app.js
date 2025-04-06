@@ -1258,42 +1258,70 @@ function getComplianceColor(rate) {
     if (rate >= 90) return '#2a9d8f'; if (rate >= 75) return '#0077b6'; if (rate >= 50) return '#f4a261'; return '#e76f51';
 }
 
-// Dropdown Toggle Function
-function toggleDropdown(type) {
-    const options = document.getElementById(`${type}-options`);
-    options.style.display = options.style.display === 'block' ? 'none' : 'block';
-}
-
-// Close dropdowns when clicking outside
-document.addEventListener('click', function(e) {
-    if (!e.target.closest('.custom-multiselect')) {
-        document.querySelectorAll('.dropdown-options').forEach(dropdown => {
-            dropdown.style.display = 'none';
-        });
-    }
-});
-
-// Update selected names display
-document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
-    checkbox.addEventListener('change', function() {
-        const container = this.closest('.custom-multiselect');
-        const selected = Array.from(container.querySelectorAll('input:checked'))
-                            .map(cb => cb.value)
-                            .join(', ');
-        
-        container.querySelector('.selected-names').textContent = 
-            selected || container.querySelector('.selected-names').dataset.placeholder;
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize placeholders in dataset
+    document.querySelectorAll('.selected-names').forEach(span => {
+      span.dataset.placeholder = span.textContent;
     });
-});
-
-function getSelectedAuditors() {
-    return Array.from(document.querySelectorAll('#auditors-options input:checked'))
+    
+    // Dropdown Toggle Function
+    window.toggleDropdown = function(type) {
+      const options = document.getElementById(`${type}-options`);
+      const isVisible = options.style.display === 'block';
+      
+      // Close all dropdowns first
+      document.querySelectorAll('.dropdown-options').forEach(dropdown => {
+        dropdown.style.display = 'none';
+      });
+      
+      // Open the clicked dropdown if it wasn't already open
+      if (!isVisible) {
+        options.style.display = 'block';
+      }
+    };
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.dropdown-header')) {
+        document.querySelectorAll('.dropdown-options').forEach(dropdown => {
+          dropdown.style.display = 'none';
+        });
+      }
+    }, true);
+    
+    // Update selected names display
+    document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const type = this.closest('.dropdown-options').id.replace('-options', '');
+        updateSelectedText(type);
+      });
+    });
+    
+    // Function to update the selected text
+    function updateSelectedText(type) {
+      const container = document.getElementById(`${type}-options`).closest('.custom-multiselect');
+      const selectedSpan = document.getElementById(`${type}-selected`);
+      const selected = Array.from(container.querySelectorAll('input:checked'))
+        .map(cb => cb.value)
+        .join(', ');
+      
+      selectedSpan.textContent = selected || selectedSpan.dataset.placeholder;
+    }
+    
+    // Get selected values functions
+    window.getSelectedLeadAuditors = function() {
+      return Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
         .map(cb => cb.value);
-}
-
-function getSelectedLeadAuditors() {
-    return Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
+    };
+    
+    window.getSelectedAuditors = function() {
+      return Array.from(document.querySelectorAll('#auditors-options input:checked'))
         .map(cb => cb.value);
-}
+    };
+    
+    // Initialize the dropdowns
+    updateSelectedText('lead-auditors');
+    updateSelectedText('auditors');
+  });
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
