@@ -1008,44 +1008,108 @@ select option:disabled {
 /* Custom Multiselect Styles */
 .custom-multiselect {
     position: relative;
-    margin-bottom: 15px;
-    width: 300px;
-  }
-  
-  .dropdown-header {
-    padding: 10px;
-    border: 1px solid #ccc;
+    width: 100%;
+    margin-bottom: 1.5rem;
+}
+
+.dropdown-header {
+    padding: 0.8rem;
+    border: 2px solid var(--medium-grey);
+    border-radius: var(--border-radius);
     cursor: pointer;
-    background-color: #f8f8f8;
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-  
-  .dropdown-options {
+    background: white;
+    transition: var(--transition-base);
+}
+
+.dropdown-header:hover {
+    border-color: var(--secondary-color);
+}
+
+.dropdown-options {
     display: none;
     position: absolute;
     width: 100%;
-    max-height: 200px;
-    overflow-y: auto;
-    border: 1px solid #ccc;
+    border: 2px solid var(--medium-grey);
     border-top: none;
-    background-color: white;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    background: white;
     z-index: 1000;
-  }
-  
-  .dropdown-options label {
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: var(--box-shadow-sm);
+}
+
+.dropdown-options label {
     display: block;
-    padding: 8px 10px;
-  }
-  
-  .dropdown-options label:hover {
-    background-color: #f1f1f1;
-  }
-  
-  .selected-names {
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.dropdown-options label:hover {
+    background-color: var(--light-color);
+}
+
+.dropdown-options input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.selected-names {
+    color: var(--text-muted);
     flex-grow: 1;
+    margin-left: 10px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
+}
+
+.arrow {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+/* Evidence Section Styling */
+.evidence-container {
+    margin: 2rem 0;
+    border-top: 2px solid var(--primary-color);
+    padding-top: 1.5rem;
+}
+
+.evidence-container h3 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.evidence-box {
+    border: 2px solid var(--medium-grey);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    background: #fff;
+    box-shadow: var(--box-shadow-sm);
+    transition: var(--transition-base);
+}
+
+.evidence-box:hover {
+    border-color: var(--secondary-color);
+}
+
+.evidence-input {
+    width: 100%;
+    min-height: 150px;
+    padding: 1rem;
+    border: 1px solid var(--medium-grey);
+    border-radius: calc(var(--border-radius) * 0.7);
+    font-family: var(--font-family-base);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    transition: var(--transition-base);
+}
+
+.evidence-input:focus {
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(10, 147, 150, 0.1);
+    outline: none;
+}

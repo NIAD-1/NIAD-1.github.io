@@ -103,12 +103,26 @@
                 </div>
             </section>
 
+
             <!-- New Audit Section -->
+
             <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
                 <form id="audit-form">
+                    <!-- Audit Date and Ref No -->
                     <div class="form-row">
-                        <!-- Directorate Dropdown -->
+                        <div class="form-group">
+                            <label for="audit-date">Audit Date:</label>
+                            <input type="date" id="audit-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="ref-no">Ref No:</label>
+                            <input type="text" id="ref-no" placeholder="AR|001|2025" required>
+                        </div>
+                    </div>
+            
+                    <!-- Directorate/Unit Dropdown -->
+                    <div class="form-row">
                         <div class="form-group">
                             <label for="directorate-unit">Directorate / Unit:</label>
                             <select id="directorate-unit" required>
@@ -129,8 +143,10 @@
                                 <option value="Legal Services">Legal Services</option>
                             </select>
                         </div>
+                    </div>
             
-<!-- Lead Auditors Dropdown -->
+                    <!-- Lead Auditors Multi-Select -->
+                    <div class="form-row">
                         <div class="custom-multiselect">
                             <div class="dropdown-header" onclick="toggleDropdown('lead-auditors')">
                                 Lead Auditor(s):
@@ -153,8 +169,10 @@
                                 <label><input type="checkbox" value="Wendy Ndugbu"> Wendy Ndugbu</label>
                             </div>
                         </div>
-
-                        <!-- Auditors Dropdown -->
+                    </div>
+            
+                    <!-- Auditors Multi-Select -->
+                    <div class="form-row">
                         <div class="custom-multiselect">
                             <div class="dropdown-header" onclick="toggleDropdown('auditors')">
                                 Auditor(s):
@@ -185,19 +203,29 @@
                                 <label><input type="checkbox" value="Ojo Ayodeji Olukunle"> Ojo Ayodeji Olukunle</label>
                             </div>
                         </div>
+                    </div>
             
-                <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
-                <div id="checklist-container">
-                    <p>Loading checklist...</p>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="button" id="save-draft-btn" class="btn btn-warning permission-hidden" data-permission="create_audit">Save Draft</button>
-                    <button type="button" id="submit-audit-btn" class="btn btn-success permission-hidden" data-permission="submit_audit">Submit Audit</button>
-                </div>
-            </form>
-        </section>
-
+                    <!-- Objective Evidence Section -->
+                    <div class="evidence-container">
+                        <h3>Objective Evidence / Assessment Findings</h3>
+                        <div class="evidence-box">
+                            <textarea class="evidence-input" placeholder="Enter detailed objective evidence and assessment findings..."></textarea>
+                        </div>
+                    </div>
+            
+                    <!-- Checklist Section -->
+                    <h3>Checklist Items (ISO 9001:2015 Alignment)</h3>
+                    <div id="checklist-container">
+                        <!-- Dynamic checklist items will be inserted here -->
+                    </div>
+            
+                    <div class="form-actions">
+                        <button type="button" id="save-draft-btn" class="btn btn-warning">Save Draft</button>
+                        <button type="button" id="submit-audit-btn" class="btn btn-success">Submit Audit</button>
+                    </div>
+                </form>
+            </section>
+            
 
             <!-- Audit History Section -->
             <section id="audit-history-section" class="content-section hidden" data-permission="view_all_audits">
