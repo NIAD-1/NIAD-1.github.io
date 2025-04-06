@@ -130,63 +130,61 @@
                             </select>
                         </div>
             
-                        <div class="form-group">
-                            <label for="ref-no">Ref No.:</label>
-                            <input type="text" id="ref-no" placeholder="e.g., AR|001|2025">
+<!-- Lead Auditors Dropdown -->
+                        <div class="custom-multiselect">
+                            <div class="dropdown-header" onclick="toggleDropdown('lead-auditors')">
+                                Lead Auditor(s):
+                                <span class="selected-names" id="lead-auditors-selected">Select Lead Auditor(s)</span>
+                                <span class="arrow">▼</span>
+                            </div>
+                            <div class="dropdown-options" id="lead-auditors-options">
+                                <label><input type="checkbox" value="Fatoki Sa"> Fatoki Sa</label>
+                                <label><input type="checkbox" value="Biyama Kalang"> Biyama Kalang</label>
+                                <label><input type="checkbox" value="Bolanle Ikusagba"> Bolanle Ikusagba</label>
+                                <label><input type="checkbox" value="Chinyelu Danga"> Chinyelu Danga</label>
+                                <label><input type="checkbox" value="Folashade Osho"> Folashade Osho</label>
+                                <label><input type="checkbox" value="Ifudu N"> Ifudu N</label>
+                                <label><input type="checkbox" value="Kem Ashibuogwu"> Kem Ashibuogwu</label>
+                                <label><input type="checkbox" value="Khadijah Ade-Abolade"> Khadijah Ade-Abolade</label>
+                                <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
+                                <label><input type="checkbox" value="Stephanie Adeoye"> Stephanie Adeoye</label>
+                                <label><input type="checkbox" value="Sunday Adown"> Sunday Adown</label>
+                                <label><input type="checkbox" value="Vivien Ibeh"> Vivien Ibeh</label>
+                                <label><input type="checkbox" value="Wendy Ndugbu"> Wendy Ndugbu</label>
+                            </div>
                         </div>
-                    </div>
-            
-                    <div class="form-row">
-                        <!-- Lead Auditors -->
-                        <div class="form-group">
-                            <label for="lead-auditors-select">Lead Auditor(s):</label>
-                            <select id="lead-auditors-select" multiple required class="enhanced-select">
-                                <option value="" disabled selected>Select Lead Auditor(s)</option>
-                                <option value="Fatoki Sa">Fatoki Sa</option>
-                                <option value="Biyama Kalang">Biyama Kalang</option>
-                                <option value="Bolanle Ikusagba">Bolanle Ikusagba</option>
-                                <option value="Chinyelu Danga">Chinyelu Danga</option>
-                                <option value="Folashade Osho">Folashade Osho</option>
-                                <option value="Ifudu N">Ifudu N</option>
-                                <option value="Kem Ashibuogwu">Kem Ashibuogwu</option>
-                                <option value="Khadijah Ade-Abolade">Khadijah Ade-Abolade</option>
-                                <option value="Onwualu Rosemary">Onwualu Rosemary</option>
-                                <option value="Stephanie Adeoye">Stephanie Adeoye</option>
-                                <option value="Sunday Adown">Sunday Adown</option>
-                                <option value="Vivien Ibeh">Vivien Ibeh</option>
-                                <option value="Wendy Ndugbu">Wendy Ndugbu</option>
-                            </select>
+
+                        <!-- Auditors Dropdown -->
+                        <div class="custom-multiselect">
+                            <div class="dropdown-header" onclick="toggleDropdown('auditors')">
+                                Auditor(s):
+                                <span class="selected-names" id="auditors-selected">Select Auditor(s)</span>
+                                <span class="arrow">▼</span>
+                            </div>
+                            <div class="dropdown-options" id="auditors-options">
+                                <label><input type="checkbox" value="Omoru Emmanuel"> Omoru Emmanuel</label>
+                                <label><input type="checkbox" value="Mrs. Offor Adaku F."> Mrs. Offor Adaku F.</label>
+                                <label><input type="checkbox" value="Onwualu Rosemary N."> Onwualu Rosemary N.</label>
+                                <label><input type="checkbox" value="MARIAN.I. BOJUWOYE"> MARIAN.I. BOJUWOYE</label>
+                                <label><input type="checkbox" value="Ms. Azogini Ebosie"> Ms. Azogini Ebosie</label>
+                                <label><input type="checkbox" value="Mrs. Bolanle Ikusagba"> Mrs. Bolanle Ikusagba</label>
+                                <label><input type="checkbox" value="IBEH, Vivien Ify"> IBEH, Vivien Ify</label>
+                                <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
+                                <label><input type="checkbox" value="Tabitha Bukar"> Tabitha Bukar</label>
+                                <label><input type="checkbox" value="AKINYEMI, S. O"> AKINYEMI, S. O</label>
+                                <label><input type="checkbox" value="Mrs. Anulika Princess Nwosu"> Mrs. Anulika Princess Nwosu</label>
+                                <label><input type="checkbox" value="Oriade-Shabi Olabisi A"> Oriade-Shabi Olabisi A</label>
+                                <label><input type="checkbox" value="Mrs. Akinyemi Julianah"> Mrs. Akinyemi Julianah</label>
+                                <label><input type="checkbox" value="Mr. Adewale Muniru"> Mr. Adewale Muniru</label>
+                                <label><input type="checkbox" value="Mr. Salihu Bello"> Mr. Salihu Bello</label>
+                                <label><input type="checkbox" value="Alex Tanko, Joyce"> Alex Tanko, Joyce</label>
+                                <label><input type="checkbox" value="Mr. Shallwanga Sunday"> Mr. Shallwanga Sunday</label>
+                                <label><input type="checkbox" value="Mr. Umar Mala Bukar"> Mr. Umar Mala Bukar</label>
+                                <label><input type="checkbox" value="Mrs. Ekwealor Chinenye"> Mrs. Ekwealor Chinenye</label>
+                                <label><input type="checkbox" value="Yunusa Hadizah Ibrahim"> Yunusa Hadizah Ibrahim</label>
+                                <label><input type="checkbox" value="Ojo Ayodeji Olukunle"> Ojo Ayodeji Olukunle</label>
+                            </div>
                         </div>
-            
-                        <!-- Auditors -->
-                        <div class="form-group">
-                            <label for="auditors-select">Auditor(s):</label>
-                            <select id="auditors-select" multiple required class="enhanced-select">
-                                <option value="" disabled selected>Select Auditor(s)</option>
-                                <option value="Omoru Emmanuel">Omoru Emmanuel</option>
-                                <option value="Mrs. Offor Adaku F.">Mrs. Offor Adaku F.</option>
-                                <option value="Onwualu Rosemary N.">Onwualu Rosemary N.</option>
-                                <option value="MARIAN.I. BOJUWOYE">MARIAN.I. BOJUWOYE</option>
-                                <option value="Ms. Azogini Ebosie">Ms. Azogini Ebosie</option>
-                                <option value="Mrs. Bolanle Ikusagba">Mrs. Bolanle Ikusagba</option>
-                                <option value="IBEH, Vivien Ify">IBEH, Vivien Ify</option>
-                                <option value="Sanwoolu Oluwaseyi">Sanwoolu Oluwaseyi</option>
-                                <option value="Tabitha Bukar">Tabitha Bukar</option>
-                                <option value="AKINYEMI, S. O">AKINYEMI, S. O</option>
-                                <option value="Mrs. Anulika Princess Nwosu">Mrs. Anulika Princess Nwosu</option>
-                                <option value="Oriade-Shabi Olabisi A">Oriade-Shabi Olabisi A</option>
-                                <option value="Mrs. Akinyemi Julianah">Mrs. Akinyemi Julianah</option>
-                                <option value="Mr. Adewale Muniru">Mr. Adewale Muniru</option>
-                                <option value="Mr. Salihu Bello">Mr. Salihu Bello</option>
-                                <option value="Alex Tanko, Joyce">Alex Tanko, Joyce</option>
-                                <option value="Mr. Shallwanga Sunday">Mr. Shallwanga Sunday</option>
-                                <option value="Mr. Umar Mala Bukar">Mr. Umar Mala Bukar</option>
-                                <option value="Mrs. Ekwealor Chinenye">Mrs. Ekwealor Chinenye</option>
-                                <option value="Yunusa Hadizah Ibrahim">Yunusa Hadizah Ibrahim</option>
-                                <option value="Ojo Ayodeji Olukunle">Ojo Ayodeji Olukunle</option>
-                            </select>
-                        </div>
-                    </div>
             
                     <h3>Objective Evidence / Assessment Findings (ISO 9001:2015 Alignment)</h3>
                     <div id="checklist-container">

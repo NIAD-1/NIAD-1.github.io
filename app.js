@@ -1258,32 +1258,42 @@ function getComplianceColor(rate) {
     if (rate >= 90) return '#2a9d8f'; if (rate >= 75) return '#0077b6'; if (rate >= 50) return '#f4a261'; return '#e76f51';
 }
 
-function setupMultiSelects() {
-    // Add visual feedback for selected options
-    document.querySelectorAll('.enhanced-select').forEach(select => {
-        select.addEventListener('change', function() {
-            Array.from(this.options).forEach(option => {
-                option.style.backgroundColor = option.selected ? 
-                    'var(--primary-color)' : 'white';
-                option.style.color = option.selected ? 'white' : 'var(--dark-color)';
-            });
-        });
-    });
-
-    // Prevent closing dropdown on multiple selection
-    document.querySelectorAll('.enhanced-select').forEach(select => {
-        select.addEventListener('mousedown', function(e) {
-            e.preventDefault();
-            const option = e.target;
-            if (option.tagName === 'OPTION') {
-                option.selected = !option.selected;
-                this.dispatchEvent(new Event('change'));
-            }
-        });
-    });
+// Dropdown Toggle Function
+function toggleDropdown(type) {
+    const options = document.getElementById(`${type}-options`);
+    options.style.display = options.style.display === 'block' ? 'none' : 'block';
 }
 
-// Call this in your init function
-setupMultiSelects();
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.custom-multiselect')) {
+        document.querySelectorAll('.dropdown-options').forEach(dropdown => {
+            dropdown.style.display = 'none';
+        });
+    }
+});
+
+// Update selected names display
+document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const container = this.closest('.custom-multiselect');
+        const selected = Array.from(container.querySelectorAll('input:checked'))
+                            .map(cb => cb.value)
+                            .join(', ');
+        
+        container.querySelector('.selected-names').textContent = 
+            selected || container.querySelector('.selected-names').dataset.placeholder;
+    });
+});
+
+function getSelectedAuditors() {
+    return Array.from(document.querySelectorAll('#auditors-options input:checked'))
+        .map(cb => cb.value);
+}
+
+function getSelectedLeadAuditors() {
+    return Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
+        .map(cb => cb.value);
+}
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
