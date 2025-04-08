@@ -3,13 +3,13 @@
 // --- Firebase Configuration ---
 // IMPORTANT: Replace with your actual Firebase project config
 const firebaseConfig = {
-    apiKey: "AIzaSyCLp8nKO2rb7yMyaL0mM6sJOzoFRmm0BdI",
-    authDomain: "internalaudit-2cd8c.firebaseapp.com",
-    projectId: "internalaudit-2cd8c",
-    storageBucket: "internalaudit-2cd8c.firebasestorage.app",
-    messagingSenderId: "510488169711",
-    appId: "1:510488169711:web:271ed61bd7c4e6c14c5f1a",
-    measurementId: "G-43ESSX8GLJ"
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.REACT_APP_FIREBASE_APP_ID,
+    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
   };
 
   // --- Initialize Firebase ---//
@@ -87,6 +87,8 @@ const refNoInput = document.getElementById('ref-no');                   // New I
 const checklistContainer = document.getElementById('checklist-container');
 const saveDraftBtn = document.getElementById('save-draft-btn');
 const submitAuditBtn = document.getElementById('submit-audit-btn');
+
+// AUDIT STATUS //
 
 
 // --- Audit Checklist Data ---
