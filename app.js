@@ -416,30 +416,13 @@ async function getUsersByRole(role) {
 // --- Audit Management ---
 
 async function initNewAuditForm() {
-    console.log("Initializing new audit form.");
+    if (!checklistContainer) {
+        console.error("Checklist container not found");
+        return;
+    }
     
-    // Reset form elements
-    auditForm?.reset();
+    checklistContainer.innerHTML = '';
     
-    // Set default date
-    if(auditDateInput) {
-        auditDateInput.value = new Date().toISOString().split('T')[0];
-    }
-
-    // Initialize checklist container
-    if(checklistContainer) {
-        checklistContainer.innerHTML = '<p>Loading checklist...</p>';
-    }
-
-    currentAudit = null;
-
-    // Clear existing checklist items
-    if(checklistContainer) {
-        checklistContainer.innerHTML = '';
-    }
-
-    // Create checklist items
-    // Replace existing checklist item creation with:
     auditChecklist.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'checklist-item';
@@ -447,13 +430,24 @@ async function initNewAuditForm() {
 
         itemDiv.innerHTML = `
             <div class="applicability-toggle">
-                <label>Applicability Status:</label>
-                <input type="radio" id="applicable-${item.id}" name="applicable-${item.id}" value="yes">
-                <label for="applicable-${item.id}">Applicable/Reviewed</label>
-                <input type="radio" id="not-applicable-${item.id}" name="applicable-${item.id}" value="no" checked>
-                <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
+                <div class="question-header">
+                    <span class="question-number">${item.id}.</span>
+                    <span class="question-text">${item.requirement}</span>
+                    ${item.clause ? `<span class="question-clause">(Clause ${item.clause})</span>` : ''}
+                </div>
+                <div class="toggle-options">
+                    <input type="radio" id="applicable-${item.id}" name="applicable-${item.id}" value="yes">
+                    <label for="applicable-${item.id}">Applicable/Reviewed</label>
+                    <input type="radio" id="not-applicable-${item.id}" name="applicable-${item.id}" value="no" checked>
+                    <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
+                </div>
             </div>
-            <div class="checklist-content" style="display: none;">
+            <div class="checklist-content" style="display:none"></div>`;
+
+        // Add content fields
+        const content = itemDiv.querySelector('.checklist-content');
+        if (content) {
+            content.innerHTML = `
                 <div class="form-group">
                     <label for="evidence-${item.id}">Objective Evidence:</label>
                     <textarea id="evidence-${item.id}" rows="3"></textarea>
@@ -481,40 +475,40 @@ async function initNewAuditForm() {
                         <option value="Minor">Minor</option>
                         <option value="OFI">OFI</option>
                     </select>
-                </div>
-            </div>`;
+                </div>`;
+        }
 
-        // Add event listeners for applicability toggle
+        // Toggle functionality
         itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
             radio.addEventListener('change', (e) => {
-                const content = itemDiv.querySelector('.checklist-content');
-                content.style.display = e.target.value === 'yes' ? 'block' : 'none';
+                if (content) {
+                    content.style.display = e.target.value === 'yes' ? 'block' : 'none';
+                    if (e.target.value === 'no') {
+                        // Reset fields when marked not applicable
+                        content.querySelectorAll('textarea').forEach(t => t.value = '');
+                        content.querySelectorAll('.compliance-btn').forEach(b => 
+                            b.classList.remove('active'));
+                        content.querySelector(`input[name="corrective-action-${item.id}"][value="no"]`).checked = true;
+                        content.querySelector(`#classification-${item.id}`).value = 'Major';
+                    }
+                }
             });
         });
+
+        // Initialize compliance buttons
+        const complianceButtons = itemDiv.querySelectorAll('.compliance-btn');
+        if (complianceButtons) {
+            complianceButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    complianceButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+        }
 
         checklistContainer.appendChild(itemDiv);
-        // Event listeners for compliance buttons
-        itemDiv.querySelectorAll('.compliance-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                this.closest('.compliance-toggle').querySelectorAll('.compliance-btn').forEach(b => {
-                    b.classList.remove('active', 'compliance-yes', 'compliance-no');
-                });
-                this.classList.add('active', this.dataset.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
-            });
-        });
-
-        // Event listeners for corrective action radios
-        itemDiv.querySelectorAll(`input[name="${correctiveActionName}"]`).forEach(radio => {
-            radio.addEventListener('change', (event) => {
-                const showHowMany = event.target.value === 'yes';
-                itemDiv.querySelector(`#${howManyGroupId}`)?.classList.toggle('hidden-conditional', !showHowMany);
-            });
-        });
     });
-
-    updateUIForRole();
 }
-
 // Helper function to generate number options
 function generateNumberOptions(start, end) {
     let options = '';
@@ -743,6 +737,11 @@ function loadAudits() {
 
 function renderDashboard() {
     const dashboardCharts = document.getElementById('dashboard-charts');
+
+    if (!dashboardCharts) {
+        console.error("Dashboard charts container not found");
+        return;        
+    }
     dashboardCharts.innerHTML = '';
     
     if (!isSectionVisible('dashboard') || !hasPermission('view_dashboard')) return;

@@ -554,7 +554,7 @@ select {
 }
 .checklist-item {
     background-color: var(--light-color);
-    padding: 1.2rem;
+    padding: 1rem;
     border-radius: var(--border-radius);
     margin-bottom: 1.5rem;
     border: 1px solid var(--medium-grey);
@@ -564,6 +564,29 @@ select {
     margin-bottom: 1rem;
     font-size: 1rem;
     color: var(--primary-color);
+}
+
+.question-header {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+}
+
+.question-number {
+    font-weight: bold;
+    color: #005f73;
+}
+
+.question-clause {
+    font-size: 0.9em;
+    color: #6c757d;
+}
+
+.toggle-options {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
 }
 
 .compliance-toggle {
