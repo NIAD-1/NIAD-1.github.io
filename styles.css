@@ -501,6 +501,22 @@ select {
     margin-top: 0.5rem;
 }
 
+/* Add to dashboard styles */
+.audit-chart {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow-sm);
+    margin-bottom: 2rem;
+}
+
+.audit-chart h3 {
+    font-size: 1.1rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--light-color);
+}
 
 .status {
     padding: 0.25rem 0.6rem;
@@ -1169,4 +1185,159 @@ select option:disabled {
     background: white;
     padding: 1rem;
     border-radius: calc(var(--border-radius) * 0.7);
+}
+
+/* Add to existing applicability-toggle styles */
+.applicability-toggle {
+    background: #f8f9fa;
+    padding: 0.8rem;
+    border-radius: var(--border-radius);
+    margin: 0.5rem 0 1rem;
+}
+
+.applicability-toggle label {
+    padding: 0.6rem 1.2rem;
+    border-radius: 20px;
+    background: #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.applicability-toggle input:checked + label {
+    background: var(--secondary-color);
+    color: white;
+    box-shadow: var(--box-shadow-sm);
+}
+.checklist-content {
+    display: none;
+    padding: 1rem;
+    border-left: 3px solid var(--secondary-color);
+    margin: 0 0 1rem 2rem;
+    background: #fff;
+    border-radius: var(--border-radius);
+}
+
+.checklist-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.classification-group {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--medium-grey);
+}
+
+.classification-group select {
+    width: 100%;
+    max-width: 200px;
+    padding: 0.5rem 1rem;
+    background-image: none;
+    border: 2px solid var(--medium-grey);
+}
+
+#change-password-section {
+    max-width: 500px;
+    margin: 2rem auto;
+}
+
+#change-password-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+#password-change-message {
+    margin-top: 1rem;
+    font-size: 0.9rem;
+    padding: 0.8rem;
+    border-radius: var(--border-radius);
+}
+
+/* Update status badges */
+.status {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.status-draft { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+.status-submitted { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+
+@media (max-width: 768px) {
+    .checklist-content {
+        margin-left: 0;
+        padding: 1rem 0.5rem;
+    }
+    
+    .applicability-toggle {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .compliance-toggle {
+        flex-direction: column;
+    }
+    
+    .classification-group select {
+        max-width: 100%;
+    }
+}
+
+.chart-container canvas {
+    max-height: 400px;
+    min-height: 250px;
+    width: 100% !important;
+    height: auto !important;
+}
+.directorate-chart {
+    background: white;
+    padding: 1.5rem;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow-sm);
+    margin-bottom: 2rem;
+    border: 1px solid var(--medium-grey);
+}
+
+.chart-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.directorate-metrics table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.directorate-metrics th, 
+.directorate-metrics td {
+    padding: 0.5rem;
+    text-align: left;
+    border-bottom: 1px solid var(--medium-grey);
+}
+
+.directorate-metrics th {
+    font-weight: 500;
+    color: var(--primary-color);
+    white-space: nowrap;
+}
+
+.directorate-metrics tr:last-child th,
+.directorate-metrics tr:last-child td {
+    border-bottom: none;
+}
+
+@media (max-width: 768px) {
+    .chart-wrapper {
+        grid-template-columns: 1fr;
+    }
+    
+    .directorate-chart {
+        padding: 1rem;
+    }
 }

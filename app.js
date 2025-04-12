@@ -742,11 +742,160 @@ function loadAudits() {
 // --- Dashboard Rendering ---
 
 function renderDashboard() {
-    // console.log("Rendering dashboard");
+    const dashboardCharts = document.getElementById('dashboard-charts');
+    dashboardCharts.innerHTML = '';
+    
     if (!isSectionVisible('dashboard') || !hasPermission('view_dashboard')) return;
-    renderComplianceChart();
+
+    // Group audits by directorate
+    const directorateData = audits.reduce((acc, audit) => {
+        const directorate = audit.directorateUnit;
+        if (!acc[directorate]) {
+            acc[directorate] = {
+                audits: [],
+                totalItems: 0,
+                compliantItems: 0,
+                nonCompliantItems: 0,
+                correctiveActions: 0,
+                classifications: {
+                    Major: 0,
+                    Minor: 0,
+                    OFI: 0
+                }
+            };
+        }
+        acc[directorate].audits.push(audit);
+        
+        // Calculate metrics for this audit
+        audit.checklist.forEach(item => {
+            if (item.applicable === 'yes') {
+                acc[directorate].totalItems++;
+                if (item.compliance === 'yes') {
+                    acc[directorate].compliantItems++;
+                } else {
+                    acc[directorate].nonCompliantItems++;
+                    if (item.correctiveAction === 'yes') {
+                        acc[directorate].correctiveActions++;
+                    }
+                    if (item.classification) {
+                        acc[directorate].classifications[item.classification]++;
+                    }
+                }
+            }
+        });
+        
+        return acc;
+    }, {});
+
+    // Create chart for each directorate
+    Object.entries(directorateData).forEach(([directorate, data]) => {
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'directorate-chart';
+        
+        // Calculate percentages
+        const complianceRate = data.totalItems > 0 
+            ? Math.round((data.compliantItems / data.totalItems) * 100)
+            : 0;
+        
+        const nonComplianceRate = data.totalItems > 0
+            ? Math.round((data.nonCompliantItems / data.totalItems) * 100)
+            : 0;
+        
+        const correctiveActionRate = data.nonCompliantItems > 0
+            ? Math.round((data.correctiveActions / data.nonCompliantItems) * 100)
+            : 0;
+
+        // Create HTML for metrics table
+        const metricsHTML = `
+            <div class="directorate-metrics">
+                <table>
+                    <tr>
+                        <th>Total Items</th>
+                        <td>${data.totalItems}</td>
+                    </tr>
+                    <tr>
+                        <th>Compliant</th>
+                        <td>${data.compliantItems} (${complianceRate}%)</td>
+                    </tr>
+                    <tr>
+                        <th>Non-Compliant</th>
+                        <td>${data.nonCompliantItems} (${nonComplianceRate}%)</td>
+                    </tr>
+                    <tr>
+                        <th>Corrective Actions</th>
+                        <td>${data.correctiveActions} (${correctiveActionRate}%)</td>
+                    </tr>
+                    <tr>
+                        <th>Major Issues</th>
+                        <td>${data.classifications.Major}</td>
+                    </tr>
+                    <tr>
+                        <th>Minor Issues</th>
+                        <td>${data.classifications.Minor}</td>
+                    </tr>
+                    <tr>
+                        <th>OFIs</th>
+                        <td>${data.classifications.OFI}</td>
+                    </tr>
+                </table>
+            </div>
+        `;
+
+        chartContainer.innerHTML = `
+            <h3>${directorate}</h3>
+            <div class="chart-wrapper">
+                <canvas></canvas>
+                ${metricsHTML}
+            </div>
+        `;
+        
+        dashboardCharts.appendChild(chartContainer);
+
+        // Create chart
+        new Chart(chartContainer.querySelector('canvas'), {
+            type: 'bar',
+            data: {
+                labels: ['Compliance', 'Non-Compliance', 'Corrective Actions'],
+                datasets: [{
+                    label: 'Percentage',
+                    data: [complianceRate, nonComplianceRate, correctiveActionRate],
+                    backgroundColor: [
+                        '#2a9d8f',  // Compliance (green)
+                        '#e76f51',  // Non-compliance (red)
+                        '#f4a261'   // Corrective actions (orange)
+                    ],
+                    borderColor: '#1e3c72',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Percentage'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${directorate} Audit Metrics`
+                    },
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    });
+
+    // Keep these other dashboard components
     renderRecentAudits();
-    renderNonConformanceChart();
     updateUIForRole();
 }
 
