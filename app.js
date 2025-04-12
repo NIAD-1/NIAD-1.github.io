@@ -132,7 +132,6 @@ let reportChartInstance = null;
 // Store fetched auditors lists globally to avoid refetching constantly
 let leadAuditorUsers = [];
 let auditorUsers = [];
-let auditComplianceChartInstance = null;
 
 // --- Initialize the App ---
 function init() {
@@ -184,99 +183,6 @@ function setupEventListeners() {
     closeModalBtnFooter?.addEventListener('click', closeModal);
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
     editAuditBtn?.addEventListener('click', editAudit);
-
-    // Settings event listener
-    document.getElementById('change-password-form')?.addEventListener('submit', handleChangePassword);
-}
-
-// Handle Password change
-
-async function handleChangePassword(event) {
-    event.preventDefault(); // Prevent default form submission
-
-    const currentPasswordInput = document.getElementById('current-password');
-    const newPasswordInput = document.getElementById('new-password');
-    const confirmPasswordInput = document.getElementById('confirm-password');
-    const messageArea = document.getElementById('change-password-message');
-    const changeButton = document.getElementById('change-password-btn');
-
-    if (!currentPasswordInput || !newPasswordInput || !confirmPasswordInput || !messageArea || !changeButton) {
-        console.error("Password change form elements not found.");
-        return;
-    }
-
-    const currentPassword = currentPasswordInput.value;
-    const newPassword = newPasswordInput.value;
-    const confirmPassword = confirmPasswordInput.value;
-
-    // Reset message area
-    messageArea.textContent = '';
-    messageArea.className = 'message-area'; // Reset classes
-
-    // Basic validation
-    if (!currentPassword || !newPassword || !confirmPassword) {
-        messageArea.textContent = 'Please fill in all fields.';
-        messageArea.classList.add('error');
-        return;
-    }
-    if (newPassword.length < 6) {
-        messageArea.textContent = 'New password must be at least 6 characters long.';
-        messageArea.classList.add('error');
-        newPasswordInput.focus();
-        return;
-    }
-    if (newPassword !== confirmPassword) {
-        messageArea.textContent = 'New passwords do not match.';
-        messageArea.classList.add('error');
-        confirmPasswordInput.focus();
-        return;
-    }
-    if (newPassword === currentPassword) {
-        messageArea.textContent = 'New password cannot be the same as the current password.';
-        messageArea.classList.add('error');
-         newPasswordInput.focus();
-        return;
-    }
-
-    // Disable button during processing
-    changeButton.disabled = true;
-    messageArea.textContent = 'Processing...';
-
-    try {
-        if (!currentUser || !currentUser.email) {
-            throw new Error("User not properly logged in.");
-        }
-
-        // Re-authenticate the user - THIS IS CRUCIAL
-        const credential = firebase.auth.EmailAuthProvider.credential(currentUser.email, currentPassword);
-        await currentUser.reauthenticateWithCredential(credential);
-
-        // If re-authentication is successful, update the password
-        await currentUser.updatePassword(newPassword);
-
-        messageArea.textContent = 'Password updated successfully!';
-        messageArea.classList.add('success');
-        // Clear the form fields
-        currentPasswordInput.value = '';
-        newPasswordInput.value = '';
-        confirmPasswordInput.value = '';
-
-    } catch (error) {
-        console.error("Password change error:", error);
-        // Provide more specific error messages
-        if (error.code === 'auth/wrong-password') {
-            messageArea.textContent = 'Incorrect current password.';
-            currentPasswordInput.focus();
-        } else if (error.code === 'auth/too-many-requests') {
-             messageArea.textContent = 'Too many attempts. Please try again later.';
-        } else {
-            messageArea.textContent = `Error: ${error.message}`;
-        }
-        messageArea.classList.add('error');
-    } finally {
-        // Re-enable the button
-        changeButton.disabled = false;
-    }
 }
 
 // --- Authentication & Role Management ---
@@ -479,16 +385,6 @@ function initializeSection(sectionId) {
         case 'user-management':
             loadUsersForManagement();
             break;
-        case 'settings':
-             // Reset form message when switching to settings
-             const messageArea = document.getElementById('change-password-message');
-             if(messageArea) {
-                 messageArea.textContent = '';
-                 messageArea.className = 'message-area';
-             }
-             const form = document.getElementById('change-password-form');
-             form?.reset(); // Reset form fields
-            break;
         default:
             break;
     }
@@ -543,145 +439,82 @@ async function initNewAuditForm() {
     }
 
     // Create checklist items
+    // Replace existing checklist item creation with:
     auditChecklist.forEach(item => {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'checklist-item';
         itemDiv.dataset.itemId = item.id;
-    
-        const applicabilityName = `applicability-${item.id}`;
-        const applicableId = `applicable-${item.id}`;
-        const notApplicableId = `not-applicable-${item.id}`;
-        const detailsContainerId = `details-container-${item.id}`;
-        const evidenceId = `evidence-${item.id}`;
-        const commentsId = `comments-${item.id}`;
-        const complianceContainerId = `compliance-container-${item.id}`; // For compliance + correction + classification
-        const correctiveActionName = `corrective-action-${item.id}`;
-        const caYesId = `ca-yes-${item.id}`;
-        const caNoId = `ca-no-${item.id}`;
-        const classificationContainerId = `classification-container-${item.id}`;
-        const classificationId = `classification-${item.id}`;
-    
+
         itemDiv.innerHTML = `
-            <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${item.clause})` : ''}</h4>
-    
-            <!-- 1. Applicability Radio Buttons -->
-            <div class="form-group applicability-toggle">
-                <label>Status:</label>
-                <input type="radio" id="${applicableId}" name="${applicabilityName}" value="applicable" required>
-                <label for="${applicableId}">Applicable / Reviewed</label>
-                <input type="radio" id="${notApplicableId}" name="${applicabilityName}" value="not_applicable">
-                <label for="${notApplicableId}">Not Applicable / Not Reviewed</label>
+            <div class="applicability-toggle">
+                <label>Applicability Status:</label>
+                <input type="radio" id="applicable-${item.id}" name="applicable-${item.id}" value="yes">
+                <label for="applicable-${item.id}">Applicable/Reviewed</label>
+                <input type="radio" id="not-applicable-${item.id}" name="applicable-${item.id}" value="no" checked>
+                <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
             </div>
-    
-            <!-- 2. Container for details (hidden initially) -->
-            <div class="checklist-details-container hidden" id="${detailsContainerId}">
+            <div class="checklist-content" style="display: none;">
                 <div class="form-group">
-                    <label for="${evidenceId}">Objective Evidence:</label>
-                    <textarea id="${evidenceId}" class="evidence-input" rows="3"></textarea>
+                    <label for="evidence-${item.id}">Objective Evidence:</label>
+                    <textarea id="evidence-${item.id}" rows="3"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="${commentsId}">Comments:</label>
-                    <textarea id="${commentsId}" class="comments-input" rows="2"></textarea>
+                    <label for="comments-${item.id}">Comments:</label>
+                    <textarea id="comments-${item.id}" rows="2"></textarea>
                 </div>
-    
-                <!-- Container for Compliance, Correction, Classification -->
-                <div id="${complianceContainerId}">
-                    <div class="compliance-toggle">
-                        <label>Compliance:</label>
-                        <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
-                        <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
-                    </div>
-    
-                    <div class="corrective-action-group">
-                        <div class="form-group corrective-action-toggle">
-                            <label>Corrective Action Needed?</label>
-                            <input type="radio" id="${caYesId}" name="${correctiveActionName}" value="yes">
-                            <label for="${caYesId}">Yes</label>
-                            <input type="radio" id="${caNoId}" name="${correctiveActionName}" value="no" checked>
-                            <label for="${caNoId}">No</label>
-                        </div>
-                    </div>
-    
-                    <!-- Classification Dropdown (hidden initially) -->
-                    <div class="form-group classification-container hidden" id="${classificationContainerId}">
-                        <label for="${classificationId}">Classification:</label>
-                        <select id="${classificationId}">
-                            <option value="">Select Classification...</option>
-                            <option value="Major">Major</option>
-                            <option value="Minor">Minor</option>
-                            <option value="OFI">OFI (Opportunity for Improvement)</option>
-                        </select>
-                    </div>
+                <div class="compliance-toggle">
+                    <label>Compliance:</label>
+                    <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
+                    <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
                 </div>
-            </div>
-        `;
-    
+                <div class="corrective-action-group">
+                    <label>Corrective Action Needed?</label>
+                    <input type="radio" id="ca-yes-${item.id}" name="corrective-action-${item.id}" value="yes">
+                    <label for="ca-yes-${item.id}">Yes</label>
+                    <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
+                    <label for="ca-no-${item.id}">No</label>
+                </div>
+                <div class="classification-group">
+                    <label for="classification-${item.id}">Classification:</label>
+                    <select id="classification-${item.id}">
+                        <option value="Major">Major</option>
+                        <option value="Minor">Minor</option>
+                        <option value="OFI">OFI</option>
+                    </select>
+                </div>
+            </div>`;
+
+        // Add event listeners for applicability toggle
+        itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const content = itemDiv.querySelector('.checklist-content');
+                content.style.display = e.target.value === 'yes' ? 'block' : 'none';
+            });
+        });
+
         checklistContainer.appendChild(itemDiv);
-    
-        // --- Event Listeners for the new structure ---
-    
-        const detailsContainer = itemDiv.querySelector(`#${detailsContainerId}`);
-        const complianceBtns = itemDiv.querySelectorAll('.compliance-btn');
-        const correctiveActionRadios = itemDiv.querySelectorAll(`input[name="${correctiveActionName}"]`);
-        const classificationContainer = itemDiv.querySelector(`#${classificationContainerId}`);
-    
-        // Listener for Applicability changes
-        itemDiv.querySelectorAll(`input[name="${applicabilityName}"]`).forEach(radio => {
-            radio.addEventListener('change', (event) => {
-                const showDetails = event.target.value === 'applicable';
-                detailsContainer.classList.toggle('hidden', !showDetails);
-                // Reset compliance state when switching applicability
-                if (!showDetails) {
-                    complianceBtns.forEach(b => b.classList.remove('active', 'compliance-yes', 'compliance-no'));
-                    itemDiv.querySelector(`#${caNoId}`).checked = true; // Default correction to No
-                    classificationContainer.classList.add('hidden'); // Hide classification
-                    itemDiv.querySelector(`#${classificationId}`).value = ''; // Reset classification value
-                }
-                toggleClassificationVisibility(itemDiv); // Re-check classification visibility
-            });
-        });
-    
-        // Listener for Compliance buttons
-        complianceBtns.forEach(btn => {
+        // Event listeners for compliance buttons
+        itemDiv.querySelectorAll('.compliance-btn').forEach(btn => {
             btn.addEventListener('click', function() {
-                // Basic toggle logic
-                const parentToggle = this.closest('.compliance-toggle');
-                parentToggle.querySelectorAll('.compliance-btn').forEach(b => b.classList.remove('active', 'compliance-yes', 'compliance-no'));
+                this.closest('.compliance-toggle').querySelectorAll('.compliance-btn').forEach(b => {
+                    b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                });
                 this.classList.add('active', this.dataset.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
-                // Update classification visibility
-                toggleClassificationVisibility(itemDiv);
             });
         });
-    
-        // Listener for Corrective Action radios
-        correctiveActionRadios.forEach(radio => {
-            radio.addEventListener('change', () => {
-                // Update classification visibility
-                toggleClassificationVisibility(itemDiv);
+
+        // Event listeners for corrective action radios
+        itemDiv.querySelectorAll(`input[name="${correctiveActionName}"]`).forEach(radio => {
+            radio.addEventListener('change', (event) => {
+                const showHowMany = event.target.value === 'yes';
+                itemDiv.querySelector(`#${howManyGroupId}`)?.classList.toggle('hidden-conditional', !showHowMany);
             });
         });
     });
-    
-    // Helper function to manage classification visibility (place outside the loop, but within initNewAuditForm or globally)
-    function toggleClassificationVisibility(itemDiv) {
-        const classificationContainer = itemDiv.querySelector('.classification-container');
-        if (!classificationContainer) return;
-    
-        const isApplicable = itemDiv.querySelector('input[name^="applicability-"][value="applicable"]')?.checked;
-        const isNonCompliant = itemDiv.querySelector('.compliance-btn[data-compliance="no"].active');
-        const isCorrectiveActionYes = itemDiv.querySelector('input[name^="corrective-action-"][value="yes"]')?.checked;
-    
-        // Show classification only if Applicable, NonCompliant, and CorrectiveAction=Yes
-        const showClassification = isApplicable && isNonCompliant && isCorrectiveActionYes;
-        classificationContainer.classList.toggle('hidden', !showClassification);
-    
-        // Reset classification if conditions are no longer met
-        if (!showClassification) {
-            const classificationSelect = classificationContainer.querySelector('select');
-            if (classificationSelect) classificationSelect.value = '';
-        }
-    }
+
+    updateUIForRole();
 }
+
 // Helper function to generate number options
 function generateNumberOptions(start, end) {
     let options = '';
@@ -707,131 +540,52 @@ function collectAuditFormData() {
     const objectiveEvidence = document.querySelector('.evidence-input').value;
     
     // Get checklist data
-    // --- START OF NEW CODE ---
-    const checklistData = []; // Use a different name to avoid confusion temporarily
-    const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item'); // Assuming checklistContainer is defined globally or passed in
-    let isFormComplete = true; // Flag to check if all required fields are filled
-
-    if (!checklistItemElements || checklistItemElements.length !== auditChecklist.length) {
-        console.error("Checklist item mismatch or not found in DOM.");
-        alert("Error processing checklist items. Please refresh and try again.");
-        // Decide how to handle this - maybe return null or throw an error
-        // For now, we'll proceed but the data might be incomplete
-    }
-
-    checklistItemElements.forEach((itemElement, index) => {
-        const originalItem = auditChecklist[index]; // Get the corresponding definition
-        const itemId = originalItem.id;
-        itemElement.style.border = ''; // Reset any previous error highlighting
-
-        // 1. Get Applicability Status
-        const applicabilityRadio = itemElement.querySelector(`input[name="applicability-${itemId}"]:checked`);
-        const applicability = applicabilityRadio ? applicabilityRadio.value : ''; // 'applicable' or 'not_applicable'
-
-        if (!applicability) {
-            isFormComplete = false;
-            itemElement.style.border = '2px solid red'; // Highlight the whole item if applicability isn't selected
-        }
-
-        // Initialize variables for data points collected *only* if applicable
-        let itemObjectiveEvidence = '';
-        let itemComments = '';
-        let itemCompliance = '';
-        let itemCorrectiveActionNeeded = false;
-        let itemClassification = '';
-
-        // 2. Collect details ONLY if 'Applicable / Reviewed' is checked
-        if (applicability === 'applicable') {
-            const detailsContainer = itemElement.querySelector(`#details-container-${itemId}`);
-
-            // Get Objective Evidence (item-specific)
-            itemObjectiveEvidence = detailsContainer?.querySelector(`#evidence-${itemId}`)?.value.trim() || '';
-
-            // Get Comments (item-specific)
-            itemComments = detailsContainer?.querySelector(`#comments-${itemId}`)?.value.trim() || '';
-
-            // Get Compliance Status
-            const complianceBtn = detailsContainer?.querySelector('.compliance-btn.active');
-            itemCompliance = complianceBtn ? complianceBtn.dataset.compliance : ''; // 'yes' or 'no' or ''
-            if (!itemCompliance) { // Compliance MUST be selected if the item is applicable
-                isFormComplete = false;
-                detailsContainer?.querySelector('.compliance-toggle')?.style.setProperty('border', '2px solid red', 'important');
-            } else {
-                detailsContainer?.querySelector('.compliance-toggle')?.style.removeProperty('border');
-            }
-
-            // Get Corrective Action Needed Status
-            itemCorrectiveActionNeeded = detailsContainer?.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
-
-            // Get Classification ONLY if Non-Compliant AND Corrective Action is needed
-            const classificationSelect = detailsContainer?.querySelector(`#classification-${itemId}`);
-            if (itemCompliance === 'no' && itemCorrectiveActionNeeded) {
-                itemClassification = classificationSelect?.value || '';
-                if (!itemClassification) { // Classification MUST be selected in this specific case
-                    isFormComplete = false;
-                    classificationSelect?.style.setProperty('border', '2px solid red', 'important');
-                } else {
-                    classificationSelect?.style.removeProperty('border');
-                }
-            } else {
-                // Reset classification value and border if conditions aren't met
-                itemClassification = '';
-                if (classificationSelect) {
-                    classificationSelect.value = ''; // Clear the selection visually
-                    classificationSelect.style.removeProperty('border');
-                }
-            }
-        } else {
-            // If not applicable, ensure detail fields are cleared and borders removed
-            itemElement.querySelector('.compliance-toggle')?.style.removeProperty('border');
-            itemElement.querySelector(`#classification-${itemId}`)?.style.removeProperty('border');
-            // Values are already defaulted to empty/false
-        }
-
-        // 3. Add the collected data for this item to the array
-        checklistData.push({
-            id: itemId,
-            requirement: originalItem.requirement,
-            clause: originalItem.clause,
-            applicability: applicability,              // NEW: Added
-            objectiveEvidence: itemObjectiveEvidence,  // RENAMED/REPURPOSED: Now item-specific
-            comments: itemComments,                    // RENAMED/REPURPOSED: Now item-specific
-            compliance: itemCompliance,                // Logically same, but collected conditionally
-            correctiveActionNeeded: itemCorrectiveActionNeeded, // Logically same, but collected conditionally
-            // correctiveActionsCount: --- REMOVED ---
-            classification: itemClassification         // NEW: Added
-        });
+    const checklist = auditChecklist.map(item => {
+        const itemEl = document.querySelector(`[data-item-id="${item.id}"]`);
+        const applicable = itemEl.querySelector(`input[name="applicable-${item.id}"]:checked`).value;
+        
+        return {
+            id: item.id,
+            applicable,
+            ...(applicable === 'yes' && {
+                evidence: itemEl.querySelector(`#evidence-${item.id}`).value,
+                comments: itemEl.querySelector(`#comments-${item.id}`).value,
+                compliance: itemEl.querySelector('.compliance-btn.active')?.dataset.compliance || '',
+                correctiveAction: itemEl.querySelector(`input[name="corrective-action-${item.id}"]:checked`).value,
+                classification: itemEl.querySelector(`#classification-${item.id}`).value
+            })
+        };
     });
+
+    return {
+        date: auditDate,
+        refNo,
+        directorateUnit,
+        leadAuditors,
+        auditors,
+        objectiveEvidence, // Added this field
+        checklist,
+        status: 'draft', // or 'submitted' when submitted
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastModified: firebase.firestore.FieldValue.serverTimestamp()
+    };
 }
 
-function populateAuditSelector() {
-    const selectElement = document.getElementById('dashboard-audit-select');
-    if (!selectElement) return;
-
-    selectElement.innerHTML = '<option value="">-- Select Audit --</option>'; // Reset
-
-    // Filter for submitted audits and sort by date descending
-    const submittedAudits = audits
-        .filter(a => a.status === 'submitted' && a.date) // Ensure date exists
-        .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort newest first
-
-    if (submittedAudits.length === 0) {
-        selectElement.disabled = true;
-        return;
-    }
-
-    selectElement.disabled = false;
-    submittedAudits.forEach(audit => {
-        const option = document.createElement('option');
-        option.value = audit.id;
-        option.textContent = `${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date)})`;
-        selectElement.appendChild(option);
-    });
-
-     // Remove previous listener if exists to prevent duplicates
-    selectElement.removeEventListener('change', handleAuditSelectionChange);
-    // Add event listener
-    selectElement.addEventListener('change', handleAuditSelectionChange);
+function populateAuditorSelect(selectElement, users, typeLabel) {
+     if (!selectElement) return;
+     selectElement.innerHTML = '';
+     if (users.length === 0) {
+         selectElement.innerHTML = `<option value="" disabled>No ${typeLabel} found</option>`;
+         return;
+     }
+     users.forEach(user => {
+         const option = document.createElement('option');
+         option.value = user.uid;
+         option.textContent = `${user.displayName} (${user.email})`;
+         option.dataset.displayName = user.displayName;
+         option.dataset.email = user.email;
+         selectElement.appendChild(option);
+     });
 }
 
 function generateNumberOptions(start, end) {
@@ -850,17 +604,18 @@ function collectAuditFormData() {
     if (leadAuditorsSelect?.selectedOptions.length === 0) { alert('Select Lead Auditor(s).'); leadAuditorsSelect?.focus(); return null; }
     if (auditorsSelect?.selectedOptions.length === 0) { alert('Select Auditor(s).'); auditorsSelect?.focus(); return null; }
 
-// Get selected lead auditors and auditors from custom multiselects
-    const selectedLeadAuditors = Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
-        .map(checkbox => checkbox.value);
+    const getSelectedAuditorData = (selectElement) => {
+        // Handle cases where selectElement might be null
+        if (!selectElement) return [];
+        return Array.from(selectElement.selectedOptions).map(opt => ({
+            uid: opt.value,
+            displayName: opt.dataset.displayName || opt.textContent.split(' (')[0],
+            email: opt.dataset.email || ''
+        }));
+    }
+    const selectedLeadAuditors = getSelectedAuditorData(leadAuditorsSelect);
+    const selectedAuditors = getSelectedAuditorData(auditorsSelect);
 
-    const selectedAuditors = Array.from(document.querySelectorAll('#auditors-options input:checked'))
-        .map(checkbox => checkbox.value); 
-
-    
-    if (selectedLeadAuditors.length === 0) { alert('Select Lead Auditor(s).'); /* Optionally focus the dropdown header */ return null; }
-    if (selectedAuditors.length === 0) { alert('Select Auditor(s).'); /* Optionally focus the dropdown header */ return null; }
-    
     const checklistData = [];
     const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
     let isComplete = true;
@@ -964,18 +719,13 @@ async function saveAuditToFirestore(auditData) {
 function loadAudits() {
     console.log("Loading audits...");
     if (!currentUser) {
-        audits = [];
-        renderAuditHistory();
-        renderDashboard(); // This will now handle the empty state correctly
-        return;
+         audits = []; renderAuditHistory(); renderDashboard(); return;
     }
     db.collection('audits').orderBy('createdAt', 'desc').get()
         .then(querySnapshot => {
             audits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             console.log(`Loaded ${audits.length} audits.`);
-
-            // Call rendering functions AFTER data is loaded
-            if (isSectionVisible('dashboard')) renderDashboard(); // Calls populateAuditSelector inside
+            if (isSectionVisible('dashboard')) renderDashboard();
             if (isSectionVisible('audit-history')) renderAuditHistory();
             if (isSectionVisible('reports')) updateAreaFilter(); // Ensure area filter in reports is updated
             updateAreaFilter(); // Update history filter too
@@ -986,33 +736,17 @@ function loadAudits() {
             audits = [];
             if(recentAuditsList) recentAuditsList.innerHTML = '<p class="error-message">Error loading.</p>';
             if(auditHistoryList) auditHistoryList.innerHTML = '<p class="error-message">Error loading.</p>';
-             renderDashboard(); // Render dashboard even on error to show empty state
         });
 }
 
 // --- Dashboard Rendering ---
 
 function renderDashboard() {
-    console.log("Rendering dashboard");
+    // console.log("Rendering dashboard");
     if (!isSectionVisible('dashboard') || !hasPermission('view_dashboard')) return;
-
-    // 1. Populate Audit Selection Dropdown
-    populateAuditSelector(); // New function call
-
-    // 2. Render Recent Audits (unchanged)
+    renderComplianceChart();
     renderRecentAudits();
-
-    // 3. Render Non-Conformance Chart (unchanged)
     renderNonConformanceChart();
-
-    // 4. Clear the specific audit chart initially
-    const placeholder = document.getElementById('audit-compliance-placeholder');
-    const chartCanvas = document.getElementById('audit-compliance-chart');
-    if (auditComplianceChartInstance) auditComplianceChartInstance.destroy();
-    if (placeholder) placeholder.style.display = 'block'; // Show placeholder
-    if (chartCanvas) chartCanvas.style.display = 'none'; // Hide canvas
-
-    // 5. Update UI based on role (unchanged)
     updateUIForRole();
 }
 
@@ -1137,121 +871,59 @@ function updateAreaFilter() {
 // --- Modal Functionality ---
 
 function openAuditDetails(audit) {
-    if (!modal || !modalTitle || !modalBody || !audit) {
-        console.error("Modal elements or audit data missing for opening details.");
-        return; // Exit if essential elements/data are missing
-    }
-
-    currentAudit = audit; // Store the currently viewed audit globally
-    // Set the modal title using the directorate/unit and formatted date
-    modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date || null)})`;
-
-    // Format auditor lists for display
-    const leadAuditorsText = Array.isArray(audit.leadAuditors) && audit.leadAuditors.length > 0
-                             ? audit.leadAuditors.map(name => escapeHtml(name)).join(', ')
-                             : 'None Assigned';
-    const auditorsText = Array.isArray(audit.auditors) && audit.auditors.length > 0
-                         ? audit.auditors.map(name => escapeHtml(name)).join(', ')
-                         : 'None Assigned';
-
-    // --- Start Building Modal Body Content ---
+    if (!modal || !modalTitle || !modalBody || !audit) return;
+    
+    currentAudit = audit;
+    modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
+    
+    // Format lead auditors and auditors
+    const leadAuditorsText = audit.leadAuditors?.join(', ') || 'None';
+    const auditorsText = audit.auditors?.join(', ') || 'None';
+    
+    // Build modal content
     let bodyContent = `
         <div class="audit-meta">
             <p><strong>Ref No:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
-            <p><strong>Audit Date:</strong> ${formatDate(audit.date || null)}</p>
-            <p><strong>Directorate / Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')}</p>
+            <p><strong>Audit Date:</strong> ${formatDate(audit.date)}</p>
             <p><strong>Lead Auditor(s):</strong> ${leadAuditorsText}</p>
             <p><strong>Auditor(s):</strong> ${auditorsText}</p>
-            <p><strong>Status:</strong> <span class="status status-${audit.status || 'unknown'}">${escapeHtml(audit.status || 'Unknown')}</span></p>
-            ${audit.createdAt ? `<p><small>Created: ${formatDateTime(audit.createdAt)} by ${escapeHtml(audit.createdByEmail || 'Unknown User')}</small></p>` : ''}
-            ${audit.lastModified ? `<p><small>Last Modified: ${formatDateTime(audit.lastModified)}</small></p>` : ''}
-            ${audit.submittedAt ? `<p><small>Submitted: ${formatDateTime(audit.submittedAt)}</small></p>` : ''}
+            <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
         </div>
-
-        <!-- Display the Top-Level Objective Evidence Summary -->
+        
         <div class="evidence-summary">
-            <h3>Overall Objective Evidence / Assessment Findings</h3>
-            <div class="evidence-content">
-                ${audit.objectiveEvidence ? `<pre>${escapeHtml(audit.objectiveEvidence)}</pre>` : '<p>No overall objective evidence provided.</p>'}
-            </div>
+            <h3>Objective Evidence</h3>
+            <div class="evidence-content">${audit.objectiveEvidence ? `<pre>${escapeHtml(audit.objectiveEvidence)}</pre>` : '<p>No objective evidence provided.</p>'}</div>
         </div>
-
-        <!-- Display Checklist Findings -->
+        
         <h3>Checklist Findings</h3>
         <div class="checklist-summary">`;
-
-    // --- Process and Display Each Checklist Item (THIS IS THE MODIFIED PART) ---
-    if (audit.checklist && Array.isArray(audit.checklist) && audit.checklist.length > 0) {
+    
+    // Add checklist items
+    if (audit.checklist?.length > 0) {
         audit.checklist.forEach(item => {
-            // Start item container
-            bodyContent += `<div class="checklist-item-summary">
-                                <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${escapeHtml(item.clause)})` : ''}</h4>`;
-
-            // 1. Display Applicability Status
-            const applicabilityText = item.applicability === 'applicable' ? 'Applicable / Reviewed' :
-                                      item.applicability === 'not_applicable' ? 'Not Applicable / Not Reviewed' :
-                                      'Status Not Set'; // Fallback text
-            bodyContent += `<p><strong>Status:</strong> ${escapeHtml(applicabilityText)}</p>`;
-
-            // 2. Conditionally display details ONLY if applicable
-            if (item.applicability === 'applicable') {
-                // Display Item-Level Objective Evidence
-                if (item.objectiveEvidence) {
-                    bodyContent += `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>`;
-                } else {
-                     bodyContent += `<p><strong>Evidence:</strong> <span class="text-muted"><em>None provided for this item.</em></span></p>`;
-                }
-
-                // Display Item-Level Comments
-                if (item.comments) {
-                    bodyContent += `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>`;
-                } else {
-                     bodyContent += `<p><strong>Comments:</strong> <span class="text-muted"><em>None provided for this item.</em></span></p>`;
-                }
-
-                // Display Compliance Status
-                const compClass = item.compliance === 'yes' ? 'compliant' :
-                                  item.compliance === 'no' ? 'non-compliant' : '';
-                const compText = item.compliance === 'yes' ? 'Compliant' :
-                                 item.compliance === 'no' ? 'Non-Compliant' :
-                                 'Compliance Not Selected'; // Fallback text
-                bodyContent += `<p><strong>Compliance:</strong> <span class="${compClass}">${escapeHtml(compText)}</span></p>`;
-
-                // Display Corrective Action Needed
-                const caText = item.correctiveActionNeeded === true ? 'Yes' :
-                               item.correctiveActionNeeded === false ? 'No' :
-                               'Not Set'; // Fallback text
-                bodyContent += `<p><strong>Correction Needed:</strong> ${escapeHtml(caText)}</p>`;
-
-                // 3. Conditionally display Classification (Only if NC and CA needed)
-                if (item.compliance === 'no' && item.correctiveActionNeeded === true) {
-                    const classificationText = item.classification || 'Not Set'; // Use 'Not Set' if empty/null
-                    bodyContent += `<p><strong>Classification:</strong> ${escapeHtml(classificationText)}</p>`;
-                }
-            }
-             // If not applicable, no further details are shown for this item.
-
-            // Close item container
-            bodyContent += `</div>`;
+            const compClass = item.compliance === 'yes' ? 'compliant' : 
+                            item.compliance === 'no' ? 'non-compliant' : '';
+            const compText = item.compliance === 'yes' ? 'Compliant' : 
+                            item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected';
+            
+            bodyContent += `
+                <div class="checklist-item-summary">
+                    <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Cl ${item.clause})` : ''}</h4>
+                    <p><strong>Compliance:</strong> <span class="${compClass}">${compText}</span></p>
+                    ${item.objectiveEvidence ? `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>` : ''}
+                    <p><strong>Correction Needed:</strong> ${item.correctiveActionNeeded ? 'Yes' : 'No'}</p>
+                    ${item.comments ? `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>` : ''}
+                </div>`;
         });
     } else {
-        // Message if no checklist data exists for the audit
-        bodyContent += '<p>No checklist data available for this audit.</p>';
+        bodyContent += '<p>No checklist data available.</p>';
     }
-
-    // --- Finish Modal Body Content ---
-    bodyContent += `</div>`; // Close checklist-summary div
-
-    // Set the generated HTML to the modal body
+    
+    bodyContent += `</div>`;
     modalBody.innerHTML = bodyContent;
-
-    // Update button visibility based on permissions and audit status
-    updateModalEditButtonVisibility(); // Ensure this function checks if the user can edit *this specific* audit
-
-    // Display the modal
+    updateModalEditButtonVisibility();
     modal.classList.remove('hidden');
 }
-
 function closeModal() {
      if (!modal) return;
     modal.classList.add('hidden');
@@ -1277,79 +949,29 @@ async function editAudit() { // Made async
     setSelectedOptions(leadAuditorsSelect, currentAudit.leadAuditors || []);
     setSelectedOptions(auditorsSelect, currentAudit.auditors || []);
 
-    // Inside editAudit function, update the checklist population part:
-
     const checklistElements = checklistContainer?.querySelectorAll('.checklist-item');
     if (currentAudit.checklist && checklistElements?.length === currentAudit.checklist.length) {
         checklistElements.forEach((itemElement, index) => {
             const itemData = currentAudit.checklist[index]; if (!itemData) return;
             const itemId = itemData.id;
-            const detailsContainer = itemElement.querySelector(`#details-container-${itemId}`);
-
-            // 1. Set Applicability Radio
-            const applicableRadio = itemElement.querySelector(`#applicable-${itemId}`);
-            const notApplicableRadio = itemElement.querySelector(`#not-applicable-${itemId}`);
-            if (itemData.applicability === 'applicable') {
-                if (applicableRadio) applicableRadio.checked = true;
-                detailsContainer?.classList.remove('hidden'); // Show details
-            } else if (itemData.applicability === 'not_applicable') {
-                if (notApplicableRadio) notApplicableRadio.checked = true;
-                detailsContainer?.classList.add('hidden'); // Hide details
-            } else {
-                if(applicableRadio) applicableRadio.checked = false;
-                if(notApplicableRadio) notApplicableRadio.checked = false;
-                detailsContainer?.classList.add('hidden'); // Hide details if unset
-            }
-
-
-            // 2. Populate details IF applicable
-            if (itemData.applicability === 'applicable') {
-                // Set Evidence
-                const evidenceEl = itemElement.querySelector(`#evidence-${itemId}`);
-                if (evidenceEl) evidenceEl.value = itemData.objectiveEvidence || '';
-
-                // Set Comments
-                const commentsEl = itemElement.querySelector(`#comments-${itemId}`);
-                if (commentsEl) commentsEl.value = itemData.comments || '';
-
-                // Set Compliance Button
-                itemElement.querySelectorAll('.compliance-btn').forEach(btn => {
-                    btn.classList.remove('active', 'compliance-yes', 'compliance-no');
-                    if (btn.dataset.compliance === itemData.compliance) {
-                        btn.classList.add('active', itemData.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
-                    }
-                });
-
-                // Set Correction Needed Radio
-                const caYesRadio = itemElement.querySelector(`#ca-yes-${itemId}`);
-                const caNoRadio = itemElement.querySelector(`#ca-no-${itemId}`);
-                if (itemData.correctiveActionNeeded) {
-                    if (caYesRadio) caYesRadio.checked = true;
-                } else {
-                    if (caNoRadio) caNoRadio.checked = true;
-                }
-
-                // Set Classification (and visibility)
-                const classificationSelect = itemElement.querySelector(`#classification-${itemId}`);
-                const classificationContainer = itemElement.querySelector(`#classification-container-${itemId}`);
-
-                // Ensure visibility is correct based on loaded data BEFORE setting value
-                toggleClassificationVisibility(itemElement); // Use the helper
-
-                if (classificationSelect && itemData.classification) {
-                    // Set the value only if classification is supposed to be visible
-                    if (itemData.compliance === 'no' && itemData.correctiveActionNeeded) {
-                        classificationSelect.value = itemData.classification;
-                    } else {
-                        classificationSelect.value = ''; // Clear if not applicable
-                    }
-                } else if (classificationSelect) {
-                    classificationSelect.value = ''; // Clear if no data
-                }
-            }
+            // Set compliance
+            itemElement.querySelectorAll('.compliance-btn').forEach(btn => {
+                btn.classList.remove('active', 'compliance-yes', 'compliance-no');
+                if (btn.dataset.compliance === itemData.compliance) btn.classList.add('active', itemData.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
+            });
+            // Set evidence
+            const evidenceEl = itemElement.querySelector('.evidence-input'); if (evidenceEl) evidenceEl.value = itemData.objectiveEvidence || '';
+            // Set Correction Needed radio and count
+            const yesRadio = itemElement.querySelector(`#ca-yes-${itemId}`); const noRadio = itemElement.querySelector(`#ca-no-${itemId}`);
+            const howManyGrp = itemElement.querySelector(`#how-many-needed-group-${itemId}`); const howManySel = itemElement.querySelector(`#how-many-needed-${itemId}`);
+            if (itemData.correctiveActionNeeded) {
+                if(yesRadio) yesRadio.checked = true; if(howManyGrp) howManyGrp.classList.remove('hidden-conditional');
+                if(howManySel && itemData.correctiveActionsCount) howManySel.value = itemData.correctiveActionsCount;
+            } else { if(noRadio) noRadio.checked = true; if(howManyGrp) howManyGrp.classList.add('hidden-conditional'); }
+            // Set Comments
+            const commentsEl = itemElement.querySelector(`#comments-${itemId}`); if (commentsEl) commentsEl.value = itemData.comments || '';
         });
-    } else console.warn("Checklist mismatch or missing on edit load for audit:", currentAudit.id);
-
+    } else console.warn("Checklist mismatch on edit load for audit:", currentAudit.id);
 
     closeModal();
     switchSection('new-audit');
@@ -1691,112 +1313,5 @@ document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
         displayElement.style.color = selected ? 'var(--dark-color)' : 'var(--text-muted)';
     });
 });
-
-function handleAuditSelectionChange(event) {
-    const selectedAuditId = event.target.value;
-    const placeholder = document.getElementById('audit-compliance-placeholder');
-    const chartCanvas = document.getElementById('audit-compliance-chart');
-
-    if (auditComplianceChartInstance) {
-        auditComplianceChartInstance.destroy(); // Clear previous chart
-        auditComplianceChartInstance = null;
-    }
-
-    if (!selectedAuditId) {
-        if (placeholder) placeholder.style.display = 'block';
-        if (chartCanvas) chartCanvas.style.display = 'none';
-        return; // No audit selected
-    }
-
-    const selectedAudit = audits.find(a => a.id === selectedAuditId);
-    if (selectedAudit) {
-        if (placeholder) placeholder.style.display = 'none'; // Hide placeholder
-        if (chartCanvas) chartCanvas.style.display = 'block'; // Show canvas
-        renderSpecificAuditComplianceChart(selectedAudit);
-    } else {
-        console.error("Selected audit not found:", selectedAuditId);
-         if (placeholder) {
-             placeholder.textContent = "Error loading audit data.";
-             placeholder.style.display = 'block';
-         }
-        if (chartCanvas) chartCanvas.style.display = 'none';
-    }
-}
-
-
-// --- NEW: Render Specific Audit Chart ---
-function renderSpecificAuditComplianceChart(audit) {
-    const chartCanvas = document.getElementById('audit-compliance-chart');
-    if (!chartCanvas || !audit || !audit.checklist) {
-         console.warn("Cannot render compliance chart. Missing canvas, audit, or checklist data for:", audit?.id);
-         // Optionally display a message on the canvas area
-         return;
-     }
-
-    const ctx = chartCanvas.getContext('2d');
-    if (auditComplianceChartInstance) auditComplianceChartInstance.destroy(); // Destroy previous
-
-    // Filter checklist items that were applicable
-    const applicableItems = audit.checklist.filter(item => item.applicability === 'applicable');
-    const totalApplicable = applicableItems.length;
-    const compliantApplicable = applicableItems.filter(item => item.compliance === 'yes').length;
-
-    let complianceRate = 0;
-    if (totalApplicable > 0) {
-        complianceRate = Math.round((compliantApplicable / totalApplicable) * 100);
-    } else {
-        console.log(`No applicable checklist items found for audit ${audit.id} to calculate compliance.`);
-         // Optionally, display "No Applicable Items" message on chart area
-    }
-
-    auditComplianceChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Compliant', 'Non-Compliant'],
-            datasets: [{
-                data: [complianceRate, 100 - complianceRate],
-                backgroundColor: [
-                    getComplianceColor(complianceRate), // Color based on rate
-                     '#e76f51' // Standard color for non-compliant part
-                ],
-                borderColor: '#ffffff', // White border between segments
-                borderWidth: 2
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '70%',
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.parsed !== null) {
-                                // Show rate for compliant, or calculated rate for non-compliant
-                                const rate = context.label === 'Compliant' ? context.parsed : (100 - context.parsed);
-                                // Check if rate is the calculated one or the remainder
-                                const displayRate = context.dataset.data[context.dataIndex];
-                                label += displayRate + '%';
-                            }
-                            return label;
-                        }
-                    }
-                },
-                 title: { // Add a title to the chart
-                     display: true,
-                     text: `Compliance Rate (${totalApplicable} Applicable Items)`
-                 }
-            }
-        }
-    });
-}
-
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);

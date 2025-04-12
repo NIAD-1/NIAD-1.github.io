@@ -60,7 +60,6 @@
                     <li data-section="reports" data-permission="view_reports"><i class="fas fa-chart-bar"></i> Reports</li>
                     <!-- User Management Link - Hidden by default, shown via JS if permission exists -->
                     <li data-section="user-management" data-permission="manage_users" class="permission-hidden"><i class="fas fa-users-cog"></i> User Management</li>
-                    <li data-section="settings"><i class="fas fa-cog"></i> Settings</li>
                 </ul>
              </div>
         </nav>
@@ -68,44 +67,37 @@
         <!-- Main Content -->
         <main class="container app-main">
             <!-- Dashboard Section -->
-            <!-- Dashboard Section -->
             <section id="dashboard-section" class="content-section" data-permission="view_dashboard">
                 <h2>Compliance Dashboard</h2>
                 <div class="dashboard-grid">
-                    <!-- MODIFIED CARD -->
                     <div class="dashboard-card">
-                        <h3>Audit Compliance Overview</h3>
-                        <!-- Dropdown to select audit -->
-                        <div class="form-group">
-                            <label for="dashboard-audit-select">Select Audit:</label>
-                            <select id="dashboard-audit-select">
-                                <option value="">-- Select Audit --</option>
-                                <!-- Options populated by JS -->
-                            </select>
-                        </div>
-                        <div class="chart-container" id="audit-compliance-chart-container">
-                            <canvas id="audit-compliance-chart"></canvas>
-                            <p id="audit-compliance-placeholder" style="text-align:center; margin-top: 40px; color: var(--text-muted);">Select an audit to view its compliance chart.</p>
+                        <h3>Overall Compliance</h3>
+                        <div class="chart-container">
+                           <canvas id="compliance-chart"></canvas>
                         </div>
                     </div>
-                    <!-- END MODIFIED CARD -->
-
                     <div class="dashboard-card">
                         <h3>Recent Audits</h3>
                         <div id="recent-audits-list" class="audit-list styled-list">
                             <p>Loading recent audits...</p>
                         </div>
                     </div>
-                    <div class="dashboard-card">
+                     <div class="dashboard-card">
                         <h3>Non-Conformance Areas</h3>
-                        <div class="chart-container">
+                         <div class="chart-container">
                             <canvas id="nc-chart"></canvas>
-                        </div>
+                         </div>
                     </div>
                     <div class="dashboard-card">
                         <h3>Quick Actions</h3>
                         <div class="quick-actions">
-                            <!-- ... quick action buttons ... -->
+                            <!-- Buttons hidden/shown via JS permission checks -->
+                            <button id="quick-new-audit" class="btn btn-secondary action-btn permission-hidden" data-permission="create_audit">
+                                <i class="fas fa-plus"></i> New Audit
+                            </button>
+                            <button id="quick-export" class="btn btn-outline action-btn permission-hidden" data-permission="export_data">
+                                <i class="fas fa-file-export"></i> Export All Data
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -347,6 +339,27 @@
             </div>
         </div>
     </div>
+
+    <!-- Add to your sections -->
+    <section id="change-password-section" class="content-section hidden">
+        <h2>Change Password</h2>
+        <form id="change-password-form">
+            <div class="form-group">
+                <label>Current Password:</label>
+                <input type="password" id="current-password" required>
+            </div>
+            <div class="form-group">
+                <label>New Password:</label>
+                <input type="password" id="new-password" required>
+            </div>
+            <div class="form-group">
+                <label>Confirm New Password:</label>
+                <input type="password" id="confirm-password" required>
+            </div>
+            <button type="submit" class="btn">Change Password</button>
+            <div id="password-change-message"></div>
+        </form>
+    </section>
 
     <script src="app.js"></script>
 
