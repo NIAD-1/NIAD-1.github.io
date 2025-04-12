@@ -500,8 +500,11 @@ async function initNewAuditForm() {
         if (complianceButtons) {
             complianceButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
-                    complianceButtons.forEach(b => b.classList.remove('active'));
+                    complianceButtons.forEach(b => {
+                        b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                    });
                     this.classList.add('active');
+                    this.classList.add(`compliance-${this.dataset.compliance}`);
                 });
             });
         }
