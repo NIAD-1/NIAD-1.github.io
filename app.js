@@ -20,6 +20,29 @@ const db = firebase.firestore();
 const functions = firebase.functions();
 
 
+let firebaseFunctions;
+try {
+  // Only initialize functions if the method exists
+  if (typeof firebase.functions === 'function') {
+    functions = firebase.functions();
+  } else {
+    console.warn('Firebase functions not available. Functions will not work until deployed.');
+  }
+} catch (error) {
+  console.error('Error initializing Firebase functions:', error);
+}
+
+// Then anywhere you use functions, add a check
+function callMyFunction(data) {
+  if (!functions) {
+    console.warn('Functions not available. Please deploy Firebase functions first.');
+    return Promise.reject(new Error('Functions not available'));
+  }
+  
+  return functions.httpsCallable('myFunctionName')(data);
+}
+
+
 // --- Roles Definition ---
 const ROLES = {
     ADMIN: 'admin',
@@ -141,6 +164,7 @@ let reportChartInstance = null;
 // Store fetched auditors lists globally to avoid refetching constantly
 let leadAuditorUsers = [];
 let auditorUsers = [];
+
 
 // --- Initialize the App ---
 function init() {
