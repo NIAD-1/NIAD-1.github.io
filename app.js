@@ -17,7 +17,6 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-const functions = firebase.functions();
 
 
 // --- Roles Definition ---
@@ -26,14 +25,6 @@ const ROLES = {
     LEAD_AUDITOR: 'lead_auditor',
     AUDITOR: 'auditor'
 };
-
-// Workflow Status Constants
-const WORKFLOW_STEPS = [
-    { status: 'draft', label: 'Draft', percent: 0 },
-    { status: 'submitted_for_approval', label: 'Submitted', percent: 20 },
-    { status: 'lead_approved', label: 'Lead Approved', percent: 50 },
-    { status: 'admin_approved', label: 'Approved', percent: 100 }
-];
 
 // --- Permission Mapping ---
 // Maps conceptual permissions to the roles that have them
@@ -147,30 +138,8 @@ function init() {
     console.log("Initializing App...");
     setupEventListeners();
     checkAuthState();
-    setupAuthListeners();
 }
 
-function setupAuthListeners() {
-    auth.onAuthStateChanged(async (user) => {
-        if (user) {
-            currentUser = {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName || user.email.split('@')[0]
-            };
-            document.getElementById('user-email').textContent = currentUser.displayName;
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('app-container').classList.remove('hidden');
-            
-            // Load audits and update UI
-            loadAudits();
-        } else {
-            currentUser = null;
-            document.getElementById('login-screen').classList.remove('hidden');
-            document.getElementById('app-container').classList.add('hidden');
-        }
-    });
-}
 // --- Setup Event Listeners ---
 function setupEventListeners() {
     // Auth events
@@ -214,14 +183,6 @@ function setupEventListeners() {
     closeModalBtnFooter?.addEventListener('click', closeModal);
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
     editAuditBtn?.addEventListener('click', editAudit);
-
-     // Workflow Actions
-     document.getElementById('submit-for-approval-btn').addEventListener('click', submitForApproval);
-     document.getElementById('approve-lead-btn').addEventListener('click', () => approveAudit('lead'));
-     document.getElementById('approve-admin-btn').addEventListener('click', () => approveAudit('admin'));
-     document.getElementById('reject-audit-btn').addEventListener('click', rejectAudit);
-     document.getElementById('send-results-btn').addEventListener('click', showEmailDialog);
-     document.getElementById('confirm-send-email-btn').addEventListener('click', sendAuditResults);
 }
 
 // --- Authentication & Role Management ---
@@ -1503,181 +1464,5 @@ document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
         displayElement.style.color = selected ? 'var(--dark-color)' : 'var(--text-muted)';
     });
 });
-
-async function submitForApproval() {
-    if (!currentAudit) return;
-    
-    try {
-        await db.collection('audits').doc(currentAudit.id).update({
-            status: 'submitted_for_approval',
-            'workflow.currentStep': 1,
-            'workflow.steps': firebase.firestore.FieldValue.arrayUnion({
-                type: 'submission',
-                by: currentUser.uid,
-                byEmail: currentUser.email,
-                at: firebase.firestore.FieldValue.serverTimestamp(),
-                comments: '',
-                status: 'submitted'
-            }),
-            lastModified: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        alert('Audit submitted for approval!');
-        closeModal();
-        loadAudits();
-    } catch (error) {
-        console.error('Error submitting audit:', error);
-        alert('Failed to submit audit: ' + error.message);
-    }
-}
-
-async function approveAudit(approverType) {
-    if (!currentAudit) return;
-    
-    const comments = prompt(`Enter approval comments (optional):`);
-    const newStatus = approverType === 'lead' ? 'lead_approved' : 'admin_approved';
-    const nextStep = approverType === 'lead' ? 2 : 3;
-    
-    try {
-        await db.collection('audits').doc(currentAudit.id).update({
-            status: newStatus,
-            'workflow.currentStep': nextStep,
-            'workflow.steps': firebase.firestore.FieldValue.arrayUnion({
-                type: `${approverType}_approval`,
-                by: currentUser.uid,
-                byEmail: currentUser.email,
-                at: firebase.firestore.FieldValue.serverTimestamp(),
-                comments: comments || '',
-                status: 'approved'
-            }),
-            lastModified: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        alert(`Audit approved as ${approverType}!`);
-        closeModal();
-        loadAudits();
-    } catch (error) {
-        console.error('Error approving audit:', error);
-        alert('Failed to approve audit: ' + error.message);
-    }
-}
-
-async function rejectAudit() {
-    if (!currentAudit) return;
-    
-    const comments = prompt('Enter rejection reason (required):');
-    if (!comments) return alert('Rejection reason is required');
-    
-    const sendBackToAuditor = confirm('Send back to original auditor?');
-    const newStatus = sendBackToAuditor ? 'draft' : 'submitted_for_approval';
-    
-    try {
-        await db.collection('audits').doc(currentAudit.id).update({
-            status: newStatus,
-            'workflow.steps': firebase.firestore.FieldValue.arrayUnion({
-                type: 'rejection',
-                by: currentUser.uid,
-                byEmail: currentUser.email,
-                at: firebase.firestore.FieldValue.serverTimestamp(),
-                comments: comments,
-                status: 'rejected'
-            }),
-            lastModified: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        alert(`Audit rejected and ${sendBackToAuditor ? 'sent back to auditor' : 'returned to lead auditor'}`);
-        closeModal();
-        loadAudits();
-    } catch (error) {
-        console.error('Error rejecting audit:', error);
-        alert('Failed to reject audit: ' + error.message);
-    }
-}
-
-// Email Functions
-function showEmailDialog() {
-    if (!currentAudit) return;
-    
-    document.getElementById('email-subject').value = `Audit Results - ${currentAudit.directorateUnit}`;
-    document.getElementById('email-body').value = `Please find attached the audit results for ${currentAudit.directorateUnit}.\n\nRef: ${currentAudit.refNo}`;
-    document.getElementById('email-dialog').classList.remove('hidden');
-}
-
-async function sendAuditResults() {
-    const to = document.getElementById('email-to').value;
-    const cc = document.getElementById('email-cc').value;
-    const subject = document.getElementById('email-subject').value;
-    const body = document.getElementById('email-body').value;
-    
-    if (!to || !subject || !body) {
-        alert('Please fill all required fields');
-        return;
-    }
-    
-    try {
-        const sendEmail = functions.httpsCallable('sendAuditResultsEmail');
-        await sendEmail({
-            auditId: currentAudit.id,
-            to,
-            cc,
-            subject,
-            body
-        });
-        
-        alert('Email sent successfully!');
-        document.getElementById('email-dialog').classList.add('hidden');
-    } catch (error) {
-        console.error('Error sending email:', error);
-        alert('Failed to send email: ' + error.message);
-    }
-}
-
-// Render Workflow Status
-function renderWorkflowStatus(audit) {
-    const currentStep = WORKFLOW_STEPS.find(step => step.status === audit.status) || WORKFLOW_STEPS[0];
-    
-    return `
-        <div class="workflow-status">
-            <h3>Approval Progress</h3>
-            <div class="progress-container">
-                <div class="progress-bar" style="width: ${currentStep.percent}%"></div>
-            </div>
-            <div class="workflow-steps">
-                ${WORKFLOW_STEPS.map(step => `
-                    <div class="step ${step.percent <= currentStep.percent ? 'active' : ''}">
-                        <div class="step-marker"></div>
-                        <div class="step-label">${step.label}</div>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="workflow-history">
-                <h4>Workflow History</h4>
-                ${audit.workflow?.steps?.map(step => `
-                    <div class="workflow-item">
-                        <div><strong>${step.type.replace('_', ' ')}</strong> by ${step.byEmail}</div>
-                        <div class="timestamp">${formatDateTime(step.at)}</div>
-                        ${step.comments ? `<div class="comments">${step.comments}</div>` : ''}
-                    </div>
-                `).join('') || '<p>No workflow history yet</p>'}
-            </div>
-        </div>
-    `;
-}
-
-// Update UI based on workflow state
-function updateWorkflowUI(audit) {
-    const canSubmit = currentUser && audit.createdBy === currentUser.uid && audit.status === 'draft';
-    const canApproveLead = currentUser && audit.status === 'submitted_for_approval';
-    const canApproveAdmin = currentUser && audit.status === 'lead_approved';
-    const canReject = currentUser && ['submitted_for_approval', 'lead_approved'].includes(audit.status);
-    const canSendResults = currentUser && audit.status === 'admin_approved';
-    
-    document.getElementById('submit-for-approval-btn').classList.toggle('hidden', !canSubmit);
-    document.getElementById('approve-lead-btn').classList.toggle('hidden', !canApproveLead);
-    document.getElementById('approve-admin-btn').classList.toggle('hidden', !canApproveAdmin);
-    document.getElementById('reject-audit-btn').classList.toggle('hidden', !canReject);
-    document.getElementById('send-results-btn').classList.toggle('hidden', !canSendResults);
-}
-
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
