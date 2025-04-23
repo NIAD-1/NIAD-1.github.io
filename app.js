@@ -1145,7 +1145,6 @@ function openAuditDetails(audit) {
         }
     }
 
-    bodyContent += `</div>`;
     modalBody.innerHTML = bodyContent;
     updateModalEditButtonVisibility();
     modal.classList.remove('hidden');
@@ -1705,6 +1704,75 @@ async function postComment() {
         alert('Failed to post comment: ' + error.message);
     }
 }
+
+function triggerWorkflowEmail(audit, type) {
+    const baseUrl = "https://NIAD-1@github.io";
+    const auditLink = `${baseUrl}/?auditId=${audit.id}`;
+    
+    const emailMap = {
+        draft: {
+            subject: `Draft Audit Needs Review - ${audit.refNo}`,
+            body: `Please review the draft audit: ${auditLink}`
+        },
+        review: {
+            subject: `Audit Ready for Final Approval - ${audit.refNo}`,
+            body: `Audit ready for final approval: ${auditLink}`
+        },
+        final: {
+            subject: `Audit Finalized - ${audit.refNo}`,
+            body: `Audit has been finalized: ${auditLink}`
+        }
+    };
+
+    const { subject, body } = emailMap[type];
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+}
+
+// Update permission checks
+function updateFormActions() {
+    const isAdmin = currentUser?.role === ROLES.ADMIN;
+    const isLead = currentUser?.role === ROLES.LEAD_AUDITOR;
+    
+    document.getElementById('submit-draft-btn').classList.toggle('hidden', !isLead);
+    document.getElementById('submit-review-btn').classList.toggle('hidden', !isLead);
+    document.getElementById('final-submit-btn').classList.toggle('hidden', !isAdmin);
+}
+
+// In submit handlers
+async function submitDraft() {
+    const auditData = collectAuditFormData();
+    auditData.status = 'draft';
+    await saveAuditToFirestore(auditData);
+    triggerWorkflowEmail(auditData, 'draft');
+}
+
+async function submitReview() {
+    const auditData = collectAuditFormData();
+    auditData.status = 'review';
+    await saveAuditToFirestore(auditData);
+    triggerWorkflowEmail(auditData, 'review');
+}
+
+// In audit detail rendering
+function renderLeadComments(comments) {
+    if (!hasPermission('lead_auditor') && !hasPermission('admin')) return '';
+    
+    return comments.map(c => `
+        <div class="lead-comment">
+            <strong>Lead Comment:</strong>
+            <p>${escapeHtml(c.text)}</p>
+            <small>By ${c.author} at ${formatDateTime(c.timestamp)}</small>
+        </div>
+    `).join('');
+}
+
+// In form initialization
+document.querySelectorAll('.lead-comment-field').forEach(field => {
+    field.style.display = hasPermission('lead_auditor') || hasPermission('admin') 
+        ? 'block' 
+        : 'none';
+});
+
 
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);

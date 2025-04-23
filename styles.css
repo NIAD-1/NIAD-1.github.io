@@ -394,20 +394,16 @@ select {
 
 /* --- Dashboard --- */
 .dashboard-grid {
-    display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: calc(var(--spacing-unit) * 1.5);
+    gap: 1.5rem;
+    min-height: 60vh;
 }
 
 .dashboard-card {
-    background-color: white;
-    padding: var(--spacing-unit);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--medium-grey);
-    box-shadow: var(--box-shadow-sm);
-    display: flex;
-    flex-direction: column;
+    min-height: 300px;
+    overflow: hidden;
 }
+
 .dashboard-card h3 {
     font-size: 1.2rem;
     margin-bottom: 1rem;
