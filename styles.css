@@ -1367,48 +1367,49 @@ select option:disabled {
 
 /* Add to your existing CSS */
 .comment-section {
-    margin-top: 1.5rem;
-    padding: 1rem;
-    background-color: var(--light-color);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--medium-grey);
+    margin-top: 2rem;
+    border-top: 2px solid #eee;
+    padding-top: 1.5rem;
 }
 
-.comment-section h4 {
-    margin-top: 0;
+.comment-section h3 {
     color: var(--primary-color);
-}
-
-.comment-list {
-    max-height: 200px;
-    overflow-y: auto;
     margin-bottom: 1rem;
 }
 
-.comment-item {
-    padding: 0.5rem;
+.comments-list {
+    margin-bottom: 1.5rem;
+}
+
+.comment {
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
     margin-bottom: 0.5rem;
-    background-color: white;
-    border-radius: var(--border-radius);
-    border: 1px solid var(--medium-grey);
-}
-
-.comment-author {
-    font-weight: 500;
-    color: var(--primary-color);
-}
-
-.comment-date {
-    font-size: 0.8rem;
-    color: var(--text-muted);
+    font-size: 0.9em;
+    color: #666;
 }
 
 .comment-text {
-    margin-top: 0.3rem;
+    white-space: pre-wrap;
+    line-height: 1.5;
 }
 
-.approval-section {
-    margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px dashed var(--medium-grey);
+#new-comment {
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.8rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.no-comments {
+    color: #666;
+    font-style: italic;
 }

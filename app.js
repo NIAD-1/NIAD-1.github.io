@@ -1523,13 +1523,23 @@ document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
 });
 
 function triggerEmailWorkflow(auditData) {
-    const subject = `Audit Submission: ${auditData.directorateUnit} - ${formatDate(auditData.date)}`;
-    const body = `Please review the audit details:\n\n
-        Directorate/Unit: ${auditData.directorateUnit}\n
-        Date: ${formatDate(auditData.date)}\n
-        Reference Number: ${auditData.refNo}\n\n
-        Comments can be added through the audit system by authorized users.`;
-
+    const subject = `NAFDAC Audit Submission: ${auditData.directorateUnit} - ${formatDate(auditData.date)}`;
+    
+    let body = `Audit Details:\n\n`;
+    body += `Directorate/Unit: ${auditData.directorateUnit}\n`;
+    body += `Date: ${formatDate(auditData.date)}\n`;
+    body += `Ref No: ${auditData.refNo || 'N/A'}\n\n`;
+    
+    if (auditData.comments?.length > 0) {
+        body += `Internal Comments:\n`;
+        auditData.comments.forEach(comment => {
+            body += `- ${comment.authorName} (${formatDateTime(comment.timestamp)}): ${comment.text}\n`;
+        });
+        body += `\n`;
+    }
+    
+    body += `Please review the complete audit in the system for detailed findings.\n`;
+    
     const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     window.open(mailtoLink, '_blank');
 }
@@ -1567,16 +1577,16 @@ function addCommentSectionToModal() {
 
 function renderComments(comments) {
     if (!comments || comments.length === 0) {
-        return '<p>No comments yet.</p>';
+        return '<p class="no-comments">No internal comments yet</p>';
     }
-    
+
     return comments.map(comment => `
         <div class="comment">
             <div class="comment-header">
-                <span class="author">${comment.author}</span>
-                <span class="date">${formatDateTime(comment.timestamp)}</span>
+                <span class="comment-author">${escapeHtml(comment.authorName)}</span>
+                <span class="comment-date">${formatDateTime(comment.timestamp)}</span>
             </div>
-            <div class="comment-text">${comment.text}</div>
+            <div class="comment-text">${escapeHtml(comment.text)}</div>
         </div>
     `).join('');
 }
@@ -1647,6 +1657,33 @@ function triggerApprovalEmail(audit) {
     
     // Open email client
     window.open(mailtoLink, '_blank');
+}
+
+async function postComment() {
+    if (!currentAudit || !hasPermission('add_comments')) return;
+
+    const commentText = document.getElementById('new-comment')?.value.trim();
+    if (!commentText) return;
+
+    try {
+        const comment = {
+            text: commentText,
+            authorId: currentUser.uid,
+            authorName: currentUser.displayName,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await db.collection('audits').doc(currentAudit.id).update({
+            comments: firebase.firestore.FieldValue.arrayUnion(comment)
+        });
+
+        // Refresh the audit details view
+        openAuditDetails({ ...currentAudit, comments: [...(currentAudit.comments || []), comment] });
+        document.getElementById('new-comment').value = '';
+    } catch (error) {
+        console.error('Error posting comment:', error);
+        alert('Failed to post comment: ' + error.message);
+    }
 }
 
 // --- Run Initialization on Load ---
