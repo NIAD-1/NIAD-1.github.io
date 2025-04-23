@@ -37,7 +37,9 @@ const PERMISSIONS = {
     view_dashboard: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     view_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     generate_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
-    export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR]
+    export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
+    add_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
+    approve_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
 };
 
 // --- DOM Elements ---
@@ -292,9 +294,9 @@ function logout() {
 
 function hasPermission(permission) {
     if (!currentUser || !currentUser.role) return false;
-    const allowedRoles = PERMISSIONS[permission];
+    const allowedRoles = PERMISSIONS[permission] || [];
     if (!allowedRoles) { console.warn(`Permission definition missing: '${permission}'.`); return false; }
-    return allowedRoles.includes(currentUser.role);
+    return allowedRoles.includes(currentUser?.role);
 }
 
 function updateUIForRole() {
@@ -523,49 +525,63 @@ function generateNumberOptions(start, end) {
 
 // Data collection function (simplified)
 function collectAuditFormData() {
-    const auditDate = document.getElementById('audit-date').value;
-    const refNo = document.getElementById('ref-no').value;
-    const directorateUnit = document.getElementById('directorate-unit').value;
+    // Remove the isComplete tracking and validation
+    const auditDate = auditDateInput?.value;
+    const directorateUnit = directorateUnitInput?.value.trim();
+    const refNo = refNoInput?.value.trim();
+
+    if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
+    if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
+    if (leadAuditorsSelect?.selectedOptions.length === 0) { alert('Select Lead Auditor(s).'); leadAuditorsSelect?.focus(); return null; }
+    if (auditorsSelect?.selectedOptions.length === 0) { alert('Select Auditor(s).'); auditorsSelect?.focus(); return null; }
+
+    const checklistData = [];
+    const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
     
-    // Get selected lead auditors and auditors
-    const leadAuditors = Array.from(document.querySelectorAll('#lead-auditors-options input:checked'))
-        .map(checkbox => checkbox.value);
-    
-    const auditors = Array.from(document.querySelectorAll('#auditors-options input:checked'))
-        .map(checkbox => checkbox.value);
-    
-    const objectiveEvidence = document.querySelector('.evidence-input').value;
-    
-    // Get checklist data
-    const checklist = auditChecklist.map(item => {
-        const itemEl = document.querySelector(`[data-item-id="${item.id}"]`);
-        const applicable = itemEl.querySelector(`input[name="applicable-${item.id}"]:checked`).value;
+    checklistItemElements?.forEach((itemElement, index) => {
+        const originalItem = auditChecklist[index];
+        const itemId = originalItem.id;
         
-        return {
-            id: item.id,
-            applicable,
-            ...(applicable === 'yes' && {
-                evidence: itemEl.querySelector(`#evidence-${item.id}`).value,
-                comments: itemEl.querySelector(`#comments-${item.id}`).value,
-                compliance: itemEl.querySelector('.compliance-btn.active')?.dataset.compliance || '',
-                correctiveAction: itemEl.querySelector(`input[name="corrective-action-${item.id}"]:checked`).value,
-                classification: itemEl.querySelector(`#classification-${item.id}`).value
-            })
-        };
+        // Get the selected compliance (if any)
+        const complianceBtn = itemElement.querySelector('.compliance-btn.active');
+        const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
+        
+        // Get other fields (they can be empty)
+        const evidence = itemElement.querySelector(`#evidence-${itemId}`)?.value.trim() || '';
+        const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
+        const correctiveAction = itemElement.querySelector(`input[name="corrective-action-${itemId}"]:checked`)?.value || 'no';
+        const classification = itemElement.querySelector(`#classification-${itemId}`)?.value || 'Major';
+
+        checklistData.push({
+            id: itemId,
+            requirement: originalItem.requirement,
+            clause: originalItem.clause,
+            compliance,
+            objectiveEvidence: evidence,
+            comments,
+            correctiveActionNeeded: correctiveAction === 'yes',
+            classification
+        });
     });
 
-    return {
+    const baseData = {
         date: auditDate,
-        refNo,
         directorateUnit,
-        leadAuditors,
-        auditors,
-        objectiveEvidence, // Added this field
-        checklist,
-        status: 'draft', // or 'submitted' when submitted
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        refNo,
+        leadAuditors: getSelectedAuditorData(leadAuditorsSelect),
+        auditors: getSelectedAuditorData(auditorsSelect),
+        checklist: checklistData,
+        lastModified: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'draft'
     };
+
+    if (!currentAudit) {
+        baseData.createdBy = currentUser.uid;
+        baseData.createdByEmail = currentUser.email;
+        baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    }
+
+    return { data: baseData };
 }
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
@@ -689,11 +705,34 @@ async function saveAuditAsDraft() {
 }
 
 async function submitAudit() {
-    const auditData = collectAuditFormData();
+    const formData = collectAuditFormData();
+    if (!formData) return; // Basic validation failed
+    
+    // Confirm submission
+    if (!confirm("Are you ready to submit this audit? Once submitted, you won't be able to edit it unless you're an admin.")) {
+        return;
+    }
+    
+    const auditData = formData.data;
     auditData.status = 'submitted';
     auditData.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
-    await saveAuditToFirestore(auditData);
-    loadAudits(); // Refresh the audit history
+    
+    try {
+        if (currentAudit?.id) {
+            await db.collection('audits').doc(currentAudit.id).update(auditData);
+        } else {
+            await db.collection('audits').add(auditData);
+        }
+        
+        // After successful submission, trigger email workflow
+        triggerEmailWorkflow(auditData);
+        
+        loadAudits(); // Refresh the audit history
+        switchSection('audit-history'); // Redirect to history view
+    } catch (error) {
+        console.error("Error submitting audit:", error);
+        alert("Failed to submit audit: " + error.message);
+    }
 }
 
 async function saveAuditToFirestore(auditData) {
@@ -1069,12 +1108,30 @@ function openAuditDetails(audit) {
     } else {
         bodyContent += '<p>No checklist data available.</p>';
     }
-    
+    let commentsSection = '';
+    if (hasPermission('manage_users') || hasPermission('lead_auditor')) {
+        commentsSection = `
+            <div class="comments-section">
+                <h3>Lead Auditor Comments</h3>
+                ${renderComments(audit.comments || [])}
+                <textarea id="new-comment" placeholder="Add your comment..."></textarea>
+                <button onclick="addComment()" class="btn-primary">Add Comment</button>
+                ${audit.status === 'submitted' ? `
+                    <div class="approval-section">
+                        <button onclick="approveAudit()" class="btn-success">Approve Audit</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
     bodyContent += `</div>`;
     modalBody.innerHTML = bodyContent;
     updateModalEditButtonVisibility();
     modal.classList.remove('hidden');
+
 }
+
 function closeModal() {
      if (!modal) return;
     modal.classList.add('hidden');
@@ -1464,5 +1521,133 @@ document.querySelectorAll('.dropdown-options input').forEach(checkbox => {
         displayElement.style.color = selected ? 'var(--dark-color)' : 'var(--text-muted)';
     });
 });
+
+function triggerEmailWorkflow(auditData) {
+    const subject = `Audit Submission: ${auditData.directorateUnit} - ${formatDate(auditData.date)}`;
+    const body = `Please review the audit details:\n\n
+        Directorate/Unit: ${auditData.directorateUnit}\n
+        Date: ${formatDate(auditData.date)}\n
+        Reference Number: ${auditData.refNo}\n\n
+        Comments can be added through the audit system by authorized users.`;
+
+    const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
+}
+
+// Add comment functionality to the modal
+function addCommentSectionToModal() {
+    if (!modalBody || !currentAudit) return;
+    
+    // Only show comment section for admins and lead auditors
+    if (hasPermission('manage_users') || hasPermission('create_audit')) {
+        const commentSection = document.createElement('div');
+        commentSection.className = 'comment-section';
+        commentSection.innerHTML = `
+            <h4>Lead Auditor Comments</h4>
+            <div class="comment-list" id="comment-list">
+                ${renderComments(currentAudit.comments || [])}
+            </div>
+            <textarea id="new-comment" rows="3" placeholder="Add your comment..."></textarea>
+            <button id="add-comment-btn" class="btn btn-primary">Add Comment</button>
+            
+            ${currentAudit.status === 'submitted' ? `
+            <div class="approval-section">
+                <button id="approve-audit-btn" class="btn btn-success">Approve Audit</button>
+            </div>
+            ` : ''}
+        `;
+        
+        modalBody.appendChild(commentSection);
+        
+        // Add event listeners
+        document.getElementById('add-comment-btn')?.addEventListener('click', addComment);
+        document.getElementById('approve-audit-btn')?.addEventListener('click', approveAudit);
+    }
+}
+
+function renderComments(comments) {
+    if (!comments || comments.length === 0) {
+        return '<p>No comments yet.</p>';
+    }
+    
+    return comments.map(comment => `
+        <div class="comment">
+            <div class="comment-header">
+                <span class="author">${comment.author}</span>
+                <span class="date">${formatDateTime(comment.timestamp)}</span>
+            </div>
+            <div class="comment-text">${comment.text}</div>
+        </div>
+    `).join('');
+}
+
+async function addComment() {
+    if (!currentAudit || !hasPermission('manage_users') && !hasPermission('lead_auditor')) return;
+
+    const commentText = document.getElementById('new-comment')?.value;
+    if (!commentText) return;
+
+    const comment = {
+        text: commentText,
+        author: currentUser.email,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    await db.collection('audits').doc(currentAudit.id).update({
+        comments: firebase.firestore.FieldValue.arrayUnion(comment)
+    });
+
+    openAuditDetails({ ...currentAudit }); // Refresh view
+}
+
+async function approveAudit() {
+    if (!confirm("Approve this audit and notify auditors?")) return;
+
+    // Update audit status
+    await db.collection('audits').doc(currentAudit.id).update({
+        status: 'approved',
+        approvedBy: currentUser.email,
+        approvedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Trigger approval email
+    const subject = `Audit Approved: ${currentAudit.directorateUnit} - ${formatDate(currentAudit.date)}`;
+    const body = `The audit has been approved by ${currentUser.email}.\n\n
+        Please review the comments and complete any follow-up actions.\n
+        Audit Reference: ${currentAudit.refNo}`;
+
+    const mailtoLink = `mailto:${currentAudit.createdByEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.open(mailtoLink, '_blank');
+
+    closeModal();
+    loadAudits();
+}
+
+function triggerApprovalEmail(audit) {
+    const subject = `NAFDAC Audit Approved: ${audit.directorateUnit} - ${formatDate(audit.date)}`;
+    
+    let body = `Audit Approved:\n\n`;
+    body += `Directorate/Unit: ${audit.directorateUnit}\n`;
+    body += `Date: ${formatDate(audit.date)}\n`;
+    body += `Ref No: ${audit.refNo || 'N/A'}\n\n`;
+    
+    body += `This audit has been approved by ${currentUser.displayName || currentUser.email}.\n\n`;
+    body += `Please review the comments and take appropriate action.\n\n`;
+    
+    // Add any comments
+    if (audit.comments?.length > 0) {
+        body += `Comments:\n`;
+        audit.comments.forEach(comment => {
+            body += `- ${comment.authorName || comment.authorEmail} (${formatDateTime(comment.timestamp)}): ${comment.text}\n`;
+        });
+    }
+    
+    // Generate mailto link
+    const mailtoLink = `mailto:${audit.createdByEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open email client
+    window.open(mailtoLink, '_blank');
+}
+
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
