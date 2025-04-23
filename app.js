@@ -39,7 +39,8 @@ const PERMISSIONS = {
     generate_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     add_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
-    approve_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
+    approve_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
+    view_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
 };
 
 // --- DOM Elements ---
@@ -1123,6 +1124,9 @@ function openAuditDetails(audit) {
                 ` : ''}
             </div>
         `;
+        if (hasPermission('view_comments')) {
+            modalBody.insertAdjacentHTML('beforeend', commentSection);
+        }
     }
 
     bodyContent += `</div>`;
