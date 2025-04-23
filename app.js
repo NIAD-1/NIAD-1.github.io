@@ -40,7 +40,10 @@ const PERMISSIONS = {
     export_data: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     add_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
     approve_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
-    view_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
+    view_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
+    submit_review: [ROLES.LEAD_AUDITOR],
+    final_approval: [ROLES.ADMIN],
+    view_lead_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
 };
 
 // --- DOM Elements ---
@@ -136,6 +139,24 @@ let reportChartInstance = null;
 let leadAuditorUsers = [];
 let auditorUsers = [];
 
+
+// In your auth state handler
+auth.onAuthStateChanged(async user => {
+    console.log("Auth state changed - User:", user);
+    
+    if (user) {
+      const userRoleData = await getUserRole(user.uid);
+      console.log("User role data:", userRoleData);
+      
+      if (userRoleData?.role) {
+        console.log("Effective permissions:", 
+          Object.entries(PERMISSIONS).filter(([_, roles]) => 
+            roles.includes(userRoleData.role)
+          ).map(([perm]) => perm)
+        );
+      }
+    }
+  });
 // --- Initialize the App ---
 function init() {
     console.log("Initializing App...");
@@ -1733,10 +1754,13 @@ function updateFormActions() {
     const isAdmin = currentUser?.role === ROLES.ADMIN;
     const isLead = currentUser?.role === ROLES.LEAD_AUDITOR;
     
-    document.getElementById('submit-draft-btn').classList.toggle('hidden', !isLead);
     document.getElementById('submit-review-btn').classList.toggle('hidden', !isLead);
     document.getElementById('final-submit-btn').classList.toggle('hidden', !isAdmin);
+    document.querySelectorAll('.lead-comment-field').forEach(el => {
+        el.style.display = (isAdmin || isLead) ? 'block' : 'none';
+    })
 }
+
 
 // In submit handlers
 async function submitDraft() {
