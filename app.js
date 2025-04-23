@@ -1125,7 +1125,23 @@ function openAuditDetails(audit) {
             </div>
         `;
         if (hasPermission('view_comments')) {
-            modalBody.insertAdjacentHTML('beforeend', commentSection);
+            bodyContent += `
+                <div class="comment-section">
+                    <h3>Lead Auditor Comments</h3>
+                    <div class="comments-list">
+                        ${renderComments(audit.comments || [])}
+                    </div>
+                    ${hasPermission('add_comments') ? `
+                        <textarea id="new-comment" placeholder="Add internal comment..."></textarea>
+                        <button onclick="postComment()" class="btn btn-primary">Post Comment</button>
+                    ` : ''}
+                    ${audit.status === 'submitted' && hasPermission('approve_audits') ? `
+                        <div class="approval-section">
+                            <button onclick="approveAudit()" class="btn btn-success">Approve Audit</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
         }
     }
 
