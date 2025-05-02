@@ -410,6 +410,35 @@ select {
     border-bottom: 1px solid var(--light-color);
     padding-bottom: 0.5rem;
 }
+
+.dashboard-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.dashboard-row .dashboard-card {
+    flex: 1 1 calc(50% - 1.5rem);
+    min-width: 300px;
+}
+
+.chart-container {
+    position: relative;
+    height: 250px;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .dashboard-row .dashboard-card {
+        flex: 1 1 100%;
+    }
+    
+    .chart-container {
+        height: 200px;
+    }
+}
+
 .chart-container {
     position: relative;
     height: 250px; /* Adjust height as needed */

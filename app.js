@@ -546,65 +546,6 @@ function generateNumberOptions(start, end) {
 }
 
 // Data collection function (simplified)
-function collectAuditFormData() {
-    // Remove the isComplete tracking and validation
-    const auditDate = auditDateInput?.value;
-    const directorateUnit = directorateUnitInput?.value.trim();
-    const refNo = refNoInput?.value.trim();
-
-    if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
-    if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
-    if (leadAuditorsSelect?.selectedOptions.length === 0) { alert('Select Lead Auditor(s).'); leadAuditorsSelect?.focus(); return null; }
-    if (auditorsSelect?.selectedOptions.length === 0) { alert('Select Auditor(s).'); auditorsSelect?.focus(); return null; }
-
-    const checklistData = [];
-    const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
-    
-    checklistItemElements?.forEach((itemElement, index) => {
-        const originalItem = auditChecklist[index];
-        const itemId = originalItem.id;
-        
-        // Get the selected compliance (if any)
-        const complianceBtn = itemElement.querySelector('.compliance-btn.active');
-        const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
-        
-        // Get other fields (they can be empty)
-        const evidence = itemElement.querySelector(`#evidence-${itemId}`)?.value.trim() || '';
-        const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
-        const correctiveAction = itemElement.querySelector(`input[name="corrective-action-${itemId}"]:checked`)?.value || 'no';
-        const classification = itemElement.querySelector(`#classification-${itemId}`)?.value || 'Major';
-
-        checklistData.push({
-            id: itemId,
-            requirement: originalItem.requirement,
-            clause: originalItem.clause,
-            compliance,
-            objectiveEvidence: evidence,
-            comments,
-            correctiveActionNeeded: correctiveAction === 'yes',
-            classification
-        });
-    });
-
-    const baseData = {
-        date: auditDate,
-        directorateUnit,
-        refNo,
-        leadAuditors: getSelectedAuditorData(leadAuditorsSelect),
-        auditors: getSelectedAuditorData(auditorsSelect),
-        checklist: checklistData,
-        lastModified: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'draft'
-    };
-
-    if (!currentAudit) {
-        baseData.createdBy = currentUser.uid;
-        baseData.createdByEmail = currentUser.email;
-        baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-    }
-
-    return { data: baseData };
-}
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
      if (!selectElement) return;
@@ -800,15 +741,11 @@ function loadAudits() {
 // --- Dashboard Rendering ---
 
 function renderDashboard() {
-    const dashboardCharts = document.getElementById('dashboard-charts');
-
-    if (!dashboardCharts) {
-        console.error("Dashboard charts container not found");
-        return;        
-    }
-    dashboardCharts.innerHTML = '';
-    
     if (!isSectionVisible('dashboard') || !hasPermission('view_dashboard')) return;
+
+    // Clear existing charts
+    if (complianceChartInstance) complianceChartInstance.destroy();
+    if (ncChartInstance) ncChartInstance.destroy();
 
     // Group audits by directorate
     const directorateData = audits.reduce((acc, audit) => {
@@ -819,17 +756,11 @@ function renderDashboard() {
                 totalItems: 0,
                 compliantItems: 0,
                 nonCompliantItems: 0,
-                correctiveActions: 0,
-                classifications: {
-                    Major: 0,
-                    Minor: 0,
-                    OFI: 0
-                }
+                correctiveActions: 0
             };
         }
         acc[directorate].audits.push(audit);
         
-        // Calculate metrics for this audit
         audit.checklist.forEach(item => {
             if (item.applicable === 'yes') {
                 acc[directorate].totalItems++;
@@ -840,9 +771,6 @@ function renderDashboard() {
                     if (item.correctiveAction === 'yes') {
                         acc[directorate].correctiveActions++;
                     }
-                    if (item.classification) {
-                        acc[directorate].classifications[item.classification]++;
-                    }
                 }
             }
         });
@@ -850,116 +778,105 @@ function renderDashboard() {
         return acc;
     }, {});
 
-    // Create chart for each directorate
-    Object.entries(directorateData).forEach(([directorate, data]) => {
-        const chartContainer = document.createElement('div');
-        chartContainer.className = 'directorate-chart';
-        
-        // Calculate percentages
-        const complianceRate = data.totalItems > 0 
-            ? Math.round((data.compliantItems / data.totalItems) * 100)
-            : 0;
-        
-        const nonComplianceRate = data.totalItems > 0
-            ? Math.round((data.nonCompliantItems / data.totalItems) * 100)
-            : 0;
-        
-        const correctiveActionRate = data.nonCompliantItems > 0
-            ? Math.round((data.correctiveActions / data.nonCompliantItems) * 100)
-            : 0;
-
-        // Create HTML for metrics table
-        const metricsHTML = `
-            <div class="directorate-metrics">
-                <table>
-                    <tr>
-                        <th>Total Items</th>
-                        <td>${data.totalItems}</td>
-                    </tr>
-                    <tr>
-                        <th>Compliant</th>
-                        <td>${data.compliantItems} (${complianceRate}%)</td>
-                    </tr>
-                    <tr>
-                        <th>Non-Compliant</th>
-                        <td>${data.nonCompliantItems} (${nonComplianceRate}%)</td>
-                    </tr>
-                    <tr>
-                        <th>Corrective Actions</th>
-                        <td>${data.correctiveActions} (${correctiveActionRate}%)</td>
-                    </tr>
-                    <tr>
-                        <th>Major Issues</th>
-                        <td>${data.classifications.Major}</td>
-                    </tr>
-                    <tr>
-                        <th>Minor Issues</th>
-                        <td>${data.classifications.Minor}</td>
-                    </tr>
-                    <tr>
-                        <th>OFIs</th>
-                        <td>${data.classifications.OFI}</td>
-                    </tr>
-                </table>
+    // Create dashboard elements
+    const dashboardCharts = document.getElementById('dashboard-charts');
+    if (!dashboardCharts) return;
+    
+    dashboardCharts.innerHTML = `
+        <div class="dashboard-row">
+            <div class="dashboard-card">
+                <h3>Overall Compliance</h3>
+                <div class="chart-container">
+                    <canvas id="compliance-chart"></canvas>
+                </div>
             </div>
-        `;
-
-        chartContainer.innerHTML = `
-            <h3>${directorate}</h3>
-            <div class="chart-wrapper">
-                <canvas></canvas>
-                ${metricsHTML}
+            <div class="dashboard-card">
+                <h3>Non-Conformance Areas</h3>
+                <div class="chart-container">
+                    <canvas id="nc-chart"></canvas>
+                </div>
             </div>
-        `;
-        
-        dashboardCharts.appendChild(chartContainer);
+        </div>
+        <div class="dashboard-card">
+            <h3>Recent Audits</h3>
+            <div id="recent-audits-list" class="audit-list styled-list"></div>
+        </div>
+    `;
 
-        // Create chart
-        new Chart(chartContainer.querySelector('canvas'), {
-            type: 'bar',
-            data: {
-                labels: ['Compliance', 'Non-Compliance', 'Corrective Actions'],
-                datasets: [{
-                    label: 'Percentage',
-                    data: [complianceRate, nonComplianceRate, correctiveActionRate],
-                    backgroundColor: [
-                        '#2a9d8f',  // Compliance (green)
-                        '#e76f51',  // Non-compliance (red)
-                        '#f4a261'   // Corrective actions (orange)
-                    ],
-                    borderColor: '#1e3c72',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Percentage'
-                        }
-                    }
+    // Render compliance pie chart
+    const complianceCtx = document.getElementById('compliance-chart').getContext('2d');
+    const complianceRate = audits.reduce((acc, audit) => {
+        const total = audit.checklist.length;
+        const compliant = audit.checklist.filter(i => i.compliance === 'yes').length;
+        return total > 0 ? acc + (compliant / total) : acc;
+    }, 0) / (audits.length || 1) * 100;
+
+    complianceChartInstance = new Chart(complianceCtx, {
+        type: 'pie',
+        data: {
+            labels: ['Compliant', 'Non-Compliant'],
+            datasets: [{
+                data: [complianceRate, 100 - complianceRate],
+                backgroundColor: ['#2a9d8f', '#e76f51'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
                 },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: `${directorate} Audit Metrics`
-                    },
-                    legend: {
-                        display: false
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw.toFixed(1)}%`;
+                        }
                     }
                 }
             }
-        });
+        }
     });
 
-    // Keep these other dashboard components
+    // Render non-conformance doughnut chart
+    const ncCtx = document.getElementById('nc-chart').getContext('2d');
+    const ncByArea = {};
+    
+    audits.forEach(audit => {
+        if (audit.checklist && audit.directorateUnit) {
+            const ncCount = audit.checklist.filter(item => item.compliance === 'no').length;
+            if (ncCount > 0) {
+                ncByArea[audit.directorateUnit] = (ncByArea[audit.directorateUnit] || 0) + ncCount;
+            }
+        }
+    });
+
+    const sortedAreas = Object.entries(ncByArea).sort((a, b) => b[1] - a[1]);
+    const topAreas = sortedAreas.slice(0, 5); // Limit to top 5 for pie chart
+    
+    ncChartInstance = new Chart(ncCtx, {
+        type: 'doughnut',
+        data: {
+            labels: topAreas.map(([area]) => area),
+            datasets: [{
+                data: topAreas.map(([, count]) => count),
+                backgroundColor: ['#e76f51', '#f4a261', '#ee9b00', '#e9c46a', '#2a9d8f'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+
     renderRecentAudits();
-    updateUIForRole();
 }
 
 function renderComplianceChart() {
