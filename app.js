@@ -194,6 +194,8 @@ function setupEventListeners() {
     saveDraftBtn?.addEventListener('click', saveAuditAsDraft);
     submitAuditBtn?.addEventListener('click', submitAudit);
 
+    document.getElementById('submit-audit-btn')?.addEventListener('click', submitAudit);
+
     // Audit history events
     document.getElementById('filter-btn')?.addEventListener('click', filterAudits);
 
@@ -439,7 +441,7 @@ async function getUsersByRole(role) {
 
 // --- Audit Management ---
 
-async function initNewAuditForm() {
+function initNewAuditForm() {
     if (!checklistContainer) {
         console.error("Checklist container not found");
         return;
@@ -466,15 +468,10 @@ async function initNewAuditForm() {
                     <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
                 </div>
             </div>
-            <div class="checklist-content" style="display:none"></div>`;
-
-        // Add content fields
-        const content = itemDiv.querySelector('.checklist-content');
-        if (content) {
-            content.innerHTML = `
+            <div class="checklist-content" style="display:none">
                 <div class="form-group">
                     <label for="evidence-${item.id}">Objective Evidence:</label>
-                    <textarea id="evidence-${item.id}" rows="3"></textarea>
+                    <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
                 </div>
                 <div class="form-group">
                     <label for="comments-${item.id}">Comments:</label>
@@ -492,28 +489,32 @@ async function initNewAuditForm() {
                     <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
                     <label for="ca-no-${item.id}">No</label>
                 </div>
-                <div class="classification-group">
-                    <label for="classification-${item.id}">Classification:</label>
-                    <select id="classification-${item.id}">
-                        <option value="Major">Major</option>
-                        <option value="Minor">Minor</option>
-                        <option value="OFI">OFI</option>
+                ${item.clause === '8.7' ? `
+                <div class="classification-group" id="how-many-needed-group-${item.id}" style="display: none;">
+                    <label for="how-many-needed-${item.id}">How many corrective actions needed?</label>
+                    <select id="how-many-needed-${item.id}">
+                        ${generateNumberOptions(1, 10)}
                     </select>
-                </div>`;
-        }
+                </div>
+                ` : ''}
+            </div>`;
 
         // Toggle functionality
         itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
             radio.addEventListener('change', (e) => {
+                const content = itemDiv.querySelector('.checklist-content');
                 if (content) {
                     content.style.display = e.target.value === 'yes' ? 'block' : 'none';
+                    
+                    // Reset fields when marked not applicable
                     if (e.target.value === 'no') {
-                        // Reset fields when marked not applicable
                         content.querySelectorAll('textarea').forEach(t => t.value = '');
-                        content.querySelectorAll('.compliance-btn').forEach(b => 
-                            b.classList.remove('active'));
+                        content.querySelectorAll('.compliance-btn').forEach(b => {
+                            b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                        });
                         content.querySelector(`input[name="corrective-action-${item.id}"][value="no"]`).checked = true;
-                        content.querySelector(`#classification-${item.id}`).value = 'Major';
+                        const howManyGroup = content.querySelector(`#how-many-needed-group-${item.id}`);
+                        if (howManyGroup) howManyGroup.style.display = 'none';
                     }
                 }
             });
@@ -521,21 +522,31 @@ async function initNewAuditForm() {
 
         // Initialize compliance buttons
         const complianceButtons = itemDiv.querySelectorAll('.compliance-btn');
-        if (complianceButtons) {
-            complianceButtons.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    complianceButtons.forEach(b => {
-                        b.classList.remove('active', 'compliance-yes', 'compliance-no');
-                    });
-                    this.classList.add('active');
-                    this.classList.add(`compliance-${this.dataset.compliance}`);
+        complianceButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                complianceButtons.forEach(b => {
+                    b.classList.remove('active', 'compliance-yes', 'compliance-no');
                 });
+                this.classList.add('active');
+                this.classList.add(`compliance-${this.dataset.compliance}`);
             });
-        }
+        });
+
+        // Corrective action toggle
+        const correctiveActionRadios = itemDiv.querySelectorAll(`input[name="corrective-action-${item.id}"]`);
+        correctiveActionRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const howManyGroup = itemDiv.querySelector(`#how-many-needed-group-${item.id}`);
+                if (howManyGroup) {
+                    howManyGroup.style.display = e.target.value === 'yes' ? 'block' : 'none';
+                }
+            });
+        });
 
         checklistContainer.appendChild(itemDiv);
     });
 }
+
 // Helper function to generate number options
 function generateNumberOptions(start, end) {
     let options = '';
@@ -575,13 +586,28 @@ function collectAuditFormData() {
     const directorateUnit = directorateUnitInput?.value.trim();
     const refNo = refNoInput?.value.trim();
 
+    // Basic required field validation
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
     if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
-    if (leadAuditorsSelect?.selectedOptions.length === 0) { alert('Select Lead Auditor(s).'); leadAuditorsSelect?.focus(); return null; }
-    if (auditorsSelect?.selectedOptions.length === 0) { alert('Select Auditor(s).'); auditorsSelect?.focus(); return null; }
+    if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
+
+    // Check if at least one lead auditor is selected
+    const leadAuditorsSelected = Array.from(leadAuditorsSelect?.selectedOptions || []).length > 0;
+    if (!leadAuditorsSelected) { 
+        alert('Select at least one Lead Auditor.'); 
+        leadAuditorsSelect?.focus(); 
+        return null; 
+    }
+
+    // Check if at least one auditor is selected
+    const auditorsSelected = Array.from(auditorsSelect?.selectedOptions || []).length > 0;
+    if (!auditorsSelected) { 
+        alert('Select at least one Auditor.'); 
+        auditorsSelect?.focus(); 
+        return null; 
+    }
 
     const getSelectedAuditorData = (selectElement) => {
-        // Handle cases where selectElement might be null
         if (!selectElement) return [];
         return Array.from(selectElement.selectedOptions).map(opt => ({
             uid: opt.value,
@@ -589,75 +615,92 @@ function collectAuditFormData() {
             email: opt.dataset.email || ''
         }));
     }
+
     const selectedLeadAuditors = getSelectedAuditorData(leadAuditorsSelect);
     const selectedAuditors = getSelectedAuditorData(auditorsSelect);
 
     const checklistData = [];
     const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
-    let isComplete = true;
-
-    if (!checklistItemElements || checklistItemElements.length !== auditChecklist.length) {
-        console.error("Checklist item mismatch or not found.");
-        alert("Error processing checklist. Please refresh and try again.");
-        return null; // Critical error
+    
+    if (checklistItemElements) {
+        checklistItemElements.forEach((itemElement, index) => {
+            const originalItem = auditChecklist[index];
+            const itemId = originalItem.id;
+            
+            // Reset any error highlighting
+            itemElement.style.border = '';
+            
+            // Get applicability selection
+            const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemId}"]:checked`);
+            const isApplicable = applicableRadio?.value === 'yes';
+            
+            // Only collect data for applicable items
+            if (isApplicable) {
+                const complianceBtn = itemElement.querySelector('.compliance-btn.active');
+                const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
+                
+                const evidence = itemElement.querySelector('.evidence-input')?.value.trim() || '';
+                const correctiveActionYes = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
+                let correctiveActionsCount = null;
+                
+                if (correctiveActionYes) {
+                    const howManySelect = itemElement.querySelector(`#how-many-needed-${itemId}`);
+                    correctiveActionsCount = howManySelect ? parseInt(howManySelect.value, 10) : null;
+                }
+                
+                const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
+                
+                checklistData.push({
+                    id: itemId, 
+                    requirement: originalItem.requirement, 
+                    clause: originalItem.clause,
+                    applicable: 'yes',
+                    compliance, 
+                    objectiveEvidence: evidence, 
+                    correctiveActionNeeded: correctiveActionYes,
+                    correctiveActionsCount, 
+                    comments
+                });
+            } else {
+                // Mark as not applicable
+                checklistData.push({
+                    id: itemId,
+                    requirement: originalItem.requirement,
+                    clause: originalItem.clause,
+                    applicable: 'no',
+                    compliance: '',
+                    objectiveEvidence: '',
+                    correctiveActionNeeded: false,
+                    correctiveActionsCount: null,
+                    comments: ''
+                });
+            }
+        });
     }
 
-    checklistItemElements.forEach((itemElement, index) => {
-        const originalItem = auditChecklist[index];
-        const itemId = originalItem.id;
-        itemElement.style.border = ''; // Reset error indicator
-
-        const complianceBtn = itemElement.querySelector('.compliance-btn.active');
-        const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
-        if (!compliance) isComplete = false;
-
-        const evidence = itemElement.querySelector('.evidence-input')?.value.trim() || '';
-        const correctiveActionYes = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
-        let correctiveActionsCount = null;
-        if (correctiveActionYes) {
-            const howManySelect = itemElement.querySelector(`#how-many-needed-${itemId}`);
-            correctiveActionsCount = howManySelect ? parseInt(howManySelect.value, 10) : null;
-            // A count is implicitly required if Yes is selected for full completion
-            if (!correctiveActionsCount || isNaN(correctiveActionsCount)) { // Also check if parsing failed
-                 isComplete = false;
-                 // Ensure the select element itself exists before trying to style it
-                 if (howManySelect) {
-                    howManySelect.style.border = '2px solid red'; // Highlight the count dropdown
-                 }
-            } else {
-                 // Reset border if valid count is selected
-                 if (howManySelect) {
-                    howManySelect.style.border = '';
-                 }
-            }
-        }
-        const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
-
-        // Highlight the whole item if compliance is missing or count is missing when needed
-        if (!compliance || (correctiveActionYes && !correctiveActionsCount)) {
-            itemElement.style.border = '2px solid red'; // Highlight incomplete item
-        }
-
-
-        checklistData.push({
-            id: itemId, requirement: originalItem.requirement, clause: originalItem.clause,
-            compliance, objectiveEvidence: evidence, correctiveActionNeeded: correctiveActionYes,
-            correctiveActionsCount, comments
-        });
-    });
-
-     const baseData = {
-        date: auditDate, directorateUnit, refNo, leadAuditors: selectedLeadAuditors, auditors: selectedAuditors,
-        checklist: checklistData, lastModified: firebase.firestore.FieldValue.serverTimestamp()
+    const baseData = {
+        date: auditDate, 
+        directorateUnit, 
+        refNo, 
+        leadAuditors: selectedLeadAuditors, 
+        auditors: selectedAuditors,
+        checklist: checklistData, 
+        lastModified: firebase.firestore.FieldValue.serverTimestamp(),
+        status: 'draft' // Default status, will be updated when submitted
     };
-     if (!currentAudit) {
-         if (!currentUser) { console.error("No currentUser."); alert("Error: User session lost."); return null; }
+
+    if (!currentAudit) {
+        if (!currentUser) { 
+            console.error("No currentUser."); 
+            alert("Error: User session lost."); 
+            return null; 
+        }
         baseData.createdBy = currentUser.uid;
         baseData.createdByEmail = currentUser.email;
         baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-     }
+    }
 
-    return { data: baseData, isComplete };
+    return { data: baseData };
 }
 
 async function saveAuditAsDraft() {
