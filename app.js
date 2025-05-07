@@ -545,7 +545,7 @@ function generateNumberOptions(start, end) {
     return options;
 }
 
-// Data collection function (simplified)
+// Data collection function (simplified)//
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
      if (!selectElement) return;
@@ -687,8 +687,10 @@ async function submitAudit() {
             await db.collection('audits').add(auditData);
         }
         
-        // After successful submission, trigger email workflow
-        triggerEmailWorkflow(auditData);
+        await generateAuditDocument(auditData);
+        
+        // Redirect to Teams channel
+        redirectToTeamsChannel();
         
         loadAudits(); // Refresh the audit history
         switchSection('audit-history'); // Redirect to history view
@@ -1714,6 +1716,108 @@ document.querySelectorAll('.lead-comment-field').forEach(field => {
         : 'none';
 });
 
+// Function to generate a Word document from audit data
+async function generateAuditDocument(auditData) {
+    // Create a simple HTML template for the document
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>NAFDAC Audit Report - ${auditData.directorateUnit}</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 2cm; }
+                h1 { color: #005f73; }
+                h2 { color: #0a9396; margin-top: 1.5em; }
+                table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .status-compliant { color: #2a9d8f; }
+                .status-noncompliant { color: #e76f51; }
+            </style>
+        </head>
+        <body>
+            <h1>NAFDAC QMS Internal Audit Report</h1>
+            
+            <h2>Audit Details</h2>
+            <table>
+                <tr><th>Reference Number:</th><td>${escapeHtml(auditData.refNo || 'N/A')}</td></tr>
+                <tr><th>Date:</th><td>${formatDate(auditData.date)}</td></tr>
+                <tr><th>Directorate/Unit:</th><td>${escapeHtml(auditData.directorateUnit)}</td></tr>
+                <tr><th>Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', '))}</td></tr>
+                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', '))}</td></tr>
+                <tr><th>Status:</th><td>${escapeHtml(auditData.status)}</td></tr>
+            </table>
+            
+            <h2>Objective Evidence</h2>
+            <p>${auditData.objectiveEvidence ? escapeHtml(auditData.objectiveEvidence) : 'No objective evidence provided.'}</p>
+            
+            <h2>Checklist Findings</h2>
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Requirement</th>
+                    <th>Clause</th>
+                    <th>Compliance</th>
+                    <th>Evidence</th>
+                    <th>Correction Needed</th>
+                    <th>Comments</th>
+                </tr>
+                ${auditData.checklist.map(item => `
+                    <tr>
+                        <td>${item.id}</td>
+                        <td>${escapeHtml(item.requirement)}</td>
+                        <td>${item.clause || 'N/A'}</td>
+                        <td class="${item.compliance === 'yes' ? 'status-compliant' : 'status-noncompliant'}">
+                            ${item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected'}
+                        </td>
+                        <td>${item.objectiveEvidence ? escapeHtml(item.objectiveEvidence) : 'N/A'}</td>
+                        <td>${item.correctiveActionNeeded ? 'Yes' : 'No'}</td>
+                        <td>${item.comments ? escapeHtml(item.comments) : 'N/A'}</td>
+                    </tr>
+                `).join('')}
+            </table>
+            
+            ${auditData.comments?.length > 0 ? `
+            <h2>Lead Auditor Comments</h2>
+            <ul>
+                ${auditData.comments.map(comment => `
+                    <li>
+                        <strong>${escapeHtml(comment.authorName || comment.author)}</strong> (${formatDateTime(comment.timestamp)}):
+                        ${escapeHtml(comment.text)}
+                    </li>
+                `).join('')}
+            </ul>
+            ` : ''}
+            
+            <p style="page-break-before: always;">Report generated on ${new Date().toLocaleDateString()} by NAFDAC QMS Internal Audit System</p>
+        </body>
+        </html>
+    `;
+
+    // Convert HTML to Word document
+    const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `NAFDAC_Audit_${auditData.refNo || auditData.directorateUnit.replace(/[^a-z0-9]/gi, '_')}_${auditData.date}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Clean up
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+// Function to redirect to Teams channel
+function redirectToTeamsChannel() {
+    const teamsUrl = "https://teams.microsoft.com/l/channel/19%3acxtT91KHzwF9zsBj8vhezXXK8v-CiZJHE2v8HIjGVTE1%40thread.tacv2/AUDIT%20DRAFT?groupId=439a8fed-df14-44b9-9e4f-0a891f88c94c&tenantId=c9a3c7f2-9c4d-4d16-9756-d04bb4a060f5";
+    window.open(teamsUrl, '_blank');
+}
 
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
