@@ -280,6 +280,17 @@ select {
 .auth-form button { width: 100%; padding: 0.8rem 1rem; font-size: 1rem; }
 .auth-form .btn-google { margin-top: 0.5rem; }
 
+
+/* Add to your existing modal styles */
+.text-center { text-align: center; }
+#forgot-password-link, #change-password-link { 
+    color: var(--secondary-color); 
+    text-decoration: none;
+}
+#forgot-password-link:hover, #change-password-link:hover { 
+    text-decoration: underline; 
+}
+
 /* --- Main App Layout --- */
 #app-container {
     display: flex;

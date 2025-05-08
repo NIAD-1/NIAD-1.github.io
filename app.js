@@ -43,6 +43,7 @@ const PERMISSIONS = {
     view_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
     submit_review: [ROLES.LEAD_AUDITOR],
     final_approval: [ROLES.ADMIN],
+    change_password: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     view_lead_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR]
 };
 
@@ -203,6 +204,9 @@ function setupEventListeners() {
     document.getElementById('generate-report-btn')?.addEventListener('click', generateReport);
     document.getElementById('export-csv-btn')?.addEventListener('click', exportReportToCSV);
     document.getElementById('report-period')?.addEventListener('change', toggleCustomDateRange);
+    document.getElementById('change-password-link')?.addEventListener('click', showPasswordChangeModal);
+document.getElementById('login-page-password-form')?.addEventListener('submit', handleLoginPagePasswordChange);
+document.getElementById('forgot-password-link')?.addEventListener('click', handleForgotPassword);
 
     // Modal events
     closeModalButton?.addEventListener('click', closeModal);
@@ -218,6 +222,9 @@ function checkAuthState() {
         if (user) {
             console.log("User logged in:", user.uid, user.email);
             const userRoleData = await getUserRole(user.uid);
+            if (currentUser && currentUser.uid !== user.uid) {
+                clearAuditForm();
+            }
 
             if (userRoleData && userRoleData.role && Object.values(ROLES).includes(userRoleData.role)) {
                 currentUser = {
@@ -239,6 +246,7 @@ function checkAuthState() {
             } else {
                  console.error(`Access Denied: User profile missing, or invalid role ('${userRoleData?.role}') assigned for UID: ${user.uid}.`);
                  alert("Your account is not configured correctly or lacks a valid role. Please contact an administrator.");
+                 clearAuditForm();
                  logout();
             }
         } else {
@@ -490,10 +498,14 @@ function initNewAuditForm() {
                     <label for="ca-no-${item.id}">No</label>
                 </div>
                 ${item.clause === '8.7' ? `
-                <div class="classification-group" id="how-many-needed-group-${item.id}" style="display: none;">
-                    <label for="how-many-needed-${item.id}">How many corrective actions needed?</label>
-                    <select id="how-many-needed-${item.id}">
-                        ${generateNumberOptions(1, 10)}
+                // In the checklist item HTML template in initNewAuditForm:
+                <div class="classification-group">
+                    <label for="classification-${item.id}">Classification:</label>
+                    <select id="classification-${item.id}">
+                        <option value="">Select Classification</option>
+                        <option value="Major">Major</option>
+                        <option value="Minor">Minor</option>
+                        <option value="OFI">OFI (Opportunity for Improvement)</option>
                     </select>
                 </div>
                 ` : ''}
@@ -592,32 +604,36 @@ function collectAuditFormData() {
     if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
 
     // Check if at least one lead auditor is selected
-    const leadAuditorsSelected = Array.from(leadAuditorsSelect?.selectedOptions || []).length > 0;
+    const leadAuditorsSelected = Array.from(document.querySelectorAll('#lead-auditors-options input[type="checkbox"]:checked')).length > 0;
     if (!leadAuditorsSelected) { 
         alert('Select at least one Lead Auditor.'); 
-        leadAuditorsSelect?.focus(); 
+        document.querySelector('#lead-auditors').scrollIntoView({ behavior: 'smooth' });
         return null; 
     }
 
-    // Check if at least one auditor is selected
-    const auditorsSelected = Array.from(auditorsSelect?.selectedOptions || []).length > 0;
+    // Improved auditor selection validation
+    const auditorsSelected = Array.from(document.querySelectorAll('#auditors-options input[type="checkbox"]:checked')).length > 0;
     if (!auditorsSelected) { 
         alert('Select at least one Auditor.'); 
-        auditorsSelect?.focus(); 
+        document.querySelector('#auditors').scrollIntoView({ behavior: 'smooth' });
         return null; 
     }
 
-    const getSelectedAuditorData = (selectElement) => {
-        if (!selectElement) return [];
-        return Array.from(selectElement.selectedOptions).map(opt => ({
-            uid: opt.value,
-            displayName: opt.dataset.displayName || opt.textContent.split(' (')[0],
-            email: opt.dataset.email || ''
-        }));
-    }
+    // Get selected auditors data
+    const getSelectedAuditorData = (optionsId) => {
+        const optionsContainer = document.getElementById(optionsId);
+        if (!optionsContainer) return [];
+        return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(checkbox => ({
+                uid: checkbox.value,
+                displayName: checkbox.parentElement.textContent.trim(),
+                email: '' // You might want to store email if available
+            }));
+    };
 
-    const selectedLeadAuditors = getSelectedAuditorData(leadAuditorsSelect);
-    const selectedAuditors = getSelectedAuditorData(auditorsSelect);
+    const selectedLeadAuditors = getSelectedAuditorData('lead-auditors-options');
+    const selectedAuditors = getSelectedAuditorData('auditors-options');
+
 
     const checklistData = [];
     const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
@@ -634,7 +650,7 @@ function collectAuditFormData() {
             const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemId}"]:checked`);
             const isApplicable = applicableRadio?.value === 'yes';
             
-            // Only collect data for applicable items
+            // Inside the checklistData collection in collectAuditFormData:
             if (isApplicable) {
                 const complianceBtn = itemElement.querySelector('.compliance-btn.active');
                 const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
@@ -642,12 +658,7 @@ function collectAuditFormData() {
                 const evidence = itemElement.querySelector('.evidence-input')?.value.trim() || '';
                 const correctiveActionYes = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
                 let correctiveActionsCount = null;
-                
-                if (correctiveActionYes) {
-                    const howManySelect = itemElement.querySelector(`#how-many-needed-${itemId}`);
-                    correctiveActionsCount = howManySelect ? parseInt(howManySelect.value, 10) : null;
-                }
-                
+                const classification = itemElement.querySelector(`#classification-${itemId}`)?.value || '';
                 const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
                 
                 checklistData.push({
@@ -658,10 +669,13 @@ function collectAuditFormData() {
                     compliance, 
                     objectiveEvidence: evidence, 
                     correctiveActionNeeded: correctiveActionYes,
-                    correctiveActionsCount, 
+                    correctiveActionsCount,
+                    classification, // Add this line
                     comments
                 });
-            } else {
+            }
+            // Only collect data for applicable items
+             else {
                 // Mark as not applicable
                 checklistData.push({
                     id: itemId,
@@ -984,26 +998,48 @@ function renderNonConformanceChart() {
 
 // --- Audit History & Filtering ---
 
-function renderAuditHistory(auditsToDisplay = audits) { // Allow passing filtered list
-     // console.log("Rendering audit history list.");
-     if (!auditHistoryList) return;
-     auditHistoryList.innerHTML = '';
+function renderAuditHistory(auditsToDisplay = audits) {
+    if (!auditHistoryList) return;
+    auditHistoryList.innerHTML = '';
 
     if (auditsToDisplay.length === 0) {
         auditHistoryList.innerHTML = '<p>No audits found matching criteria.</p>';
         return;
     }
-     auditsToDisplay.forEach(audit => {
-        const itemDiv = document.createElement('div'); itemDiv.className = 'audit-item'; itemDiv.dataset.auditId = audit.id;
-        const createdBy = audit.createdByEmail ? `by ${escapeHtml(audit.createdByEmail)}` : '';
-        const submitted = audit.submittedAt ? `• Submitted: ${formatDateTime(audit.submittedAt)}` : '';
-        itemDiv.innerHTML = `<div class="details"><strong>${escapeHtml(audit.directorateUnit || audit.auditedArea) || 'N/A'}</strong><div class="date">${formatDate(audit.date)} ${submitted} ${createdBy}</div><div class="date">Modified: ${formatDateTime(audit.lastModified)}</div></div><span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
+
+    auditsToDisplay.forEach(audit => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'audit-item';
+        itemDiv.dataset.auditId = audit.id;
+
+        // Format lead auditors and auditors
+        const leadAuditorsText = audit.leadAuditors?.map(a => a.displayName || a.email).join(', ') || 'None';
+        const auditorsText = audit.auditors?.map(a => a.displayName || a.email).join(', ') || 'None';
+        
+        // Format dates
+        const createdDate = formatDateTime(audit.createdAt);
+        const modifiedDate = formatDateTime(audit.lastModified);
+        const submittedDate = audit.submittedAt ? formatDateTime(audit.submittedAt) : 'Not submitted';
+
+        itemDiv.innerHTML = `
+            <div class="details">
+                <strong>${escapeHtml(audit.directorateUnit)} (Ref: ${escapeHtml(audit.refNo || 'N/A')})</strong>
+                <div class="meta">
+                    <div><strong>Date:</strong> ${formatDate(audit.date)}</div>
+                    <div><strong>Lead Auditors:</strong> ${escapeHtml(leadAuditorsText)}</div>
+                    <div><strong>Auditors:</strong> ${escapeHtml(auditorsText)}</div>
+                </div>
+                <div class="dates">
+                    <span><strong>Created:</strong> ${createdDate}</span>
+                    <span><strong>Modified:</strong> ${modifiedDate}</span>
+                    <span><strong>Submitted:</strong> ${submittedDate}</span>
+                </div>
+            </div>
+            <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
+
         itemDiv.addEventListener('click', () => openAuditDetails(audit));
         auditHistoryList.appendChild(itemDiv);
     });
-     if (auditsToDisplay === audits) { // Only update filter if showing full list
-         updateAreaFilter();
-     }
 }
 
 function filterAudits() {
@@ -1761,6 +1797,8 @@ document.querySelectorAll('.lead-comment-field').forEach(field => {
 
 // Function to generate a Word document from audit data
 async function generateAuditDocument(auditData) {
+    const auditeeName = auditData.auditeeName || 'Not specified';
+    const auditeePosition = auditData.auditeePosition || 'Not specified';
     // Create a simple HTML template for the document
     const htmlContent = `
         <!DOCTYPE html>
@@ -1770,59 +1808,71 @@ async function generateAuditDocument(auditData) {
             <title>NAFDAC Audit Report - ${auditData.directorateUnit}</title>
             <style>
                 body { font-family: Arial, sans-serif; margin: 2cm; }
-                h1 { color: #005f73; }
-                h2 { color: #0a9396; margin-top: 1.5em; }
+                h1 { color: #005f73; text-align: center; }
+                h2 { color: #0a9396; margin-top: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
                 table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
                 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                 th { background-color: #f2f2f2; }
                 .status-compliant { color: #2a9d8f; }
                 .status-noncompliant { color: #e76f51; }
+                .page-break { page-break-after: always; }
+                .header-logo { text-align: center; margin-bottom: 1rem; }
+                .header-logo img { max-height: 80px; }
             </style>
         </head>
         <body>
-            <h1>NAFDAC QMS Internal Audit Report</h1>
+            <div class="header-logo">
+                <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo">
+            </div>
+            <h1>NAFDAC QMS INTERNAL AUDIT REPORT</h1>
             
-            <h2>Audit Details</h2>
+            <h2>1. AUDIT DETAILS</h2>
             <table>
-                <tr><th>Reference Number:</th><td>${escapeHtml(auditData.refNo || 'N/A')}</td></tr>
-                <tr><th>Date:</th><td>${formatDate(auditData.date)}</td></tr>
-                <tr><th>Directorate/Unit:</th><td>${escapeHtml(auditData.directorateUnit)}</td></tr>
-                <tr><th>Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', '))}</td></tr>
-                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', '))}</td></tr>
-                <tr><th>Status:</th><td>${escapeHtml(auditData.status)}</td></tr>
+                <tr><th width="30%">Reference Number:</th><td>${escapeHtml(auditData.refNo || 'N/A')}</td></tr>
+                <tr><th>Date of Audit:</th><td>${formatDate(auditData.date)}</td></tr>
+                <tr><th>Directorate/Unit Audited:</th><td>${escapeHtml(auditData.directorateUnit)}</td></tr>
+                <tr><th>Auditee Name:</th><td>${escapeHtml(auditeeName)}</td></tr>
+                <tr><th>Auditee Position:</th><td>${escapeHtml(auditeePosition)}</td></tr>
             </table>
             
-            <h2>Objective Evidence</h2>
+            <h2>2. AUDIT TEAM</h2>
+            <table>
+                <tr><th width="30%">Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', ') || 'N/A'}</td></tr>
+                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', ') || 'N/A'}</td></tr>
+            </table>
+            
+            <h2>3. OBJECTIVE EVIDENCE/ASSESSMENT FINDINGS</h2>
             <p>${auditData.objectiveEvidence ? escapeHtml(auditData.objectiveEvidence) : 'No objective evidence provided.'}</p>
             
-            <h2>Checklist Findings</h2>
+            <h2>4. CHECKLIST FINDINGS</h2>
             <table>
                 <tr>
-                    <th>ID</th>
-                    <th>Requirement</th>
-                    <th>Clause</th>
-                    <th>Compliance</th>
-                    <th>Evidence</th>
-                    <th>Correction Needed</th>
-                    <th>Comments</th>
+                    <th width="5%">S/N</th>
+                    <th width="30%">Requirement</th>
+                    <th width="25%">Objective Evidence</th>
+                    <th width="15%">Comments</th>
+                    <th width="10%">Compliance</th>
+                    <th width="15%">Classification</th>
                 </tr>
-                ${auditData.checklist.map(item => `
+                ${auditData.checklist
+                    .filter(item => item.applicable === 'yes') // Only show applicable items
+                    .map((item, index) => `
                     <tr>
-                        <td>${item.id}</td>
-                        <td>${escapeHtml(item.requirement)}</td>
-                        <td>${item.clause || 'N/A'}</td>
-                        <td class="${item.compliance === 'yes' ? 'status-compliant' : 'status-noncompliant'}">
-                            ${item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected'}
-                        </td>
+                        <td>${index + 1}</td>
+                        <td>${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${item.clause})` : ''}</td>
                         <td>${item.objectiveEvidence ? escapeHtml(item.objectiveEvidence) : 'N/A'}</td>
-                        <td>${item.correctiveActionNeeded ? 'Yes' : 'No'}</td>
                         <td>${item.comments ? escapeHtml(item.comments) : 'N/A'}</td>
+                        <td class="${item.compliance === 'yes' ? 'status-compliant' : 'status-noncompliant'}">
+                            ${item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'N/A'}
+                        </td>
+                        <td>${item.classification || 'N/A'}</td>
                     </tr>
                 `).join('')}
             </table>
             
             ${auditData.comments?.length > 0 ? `
-            <h2>Lead Auditor Comments</h2>
+            <div class="page-break"></div>
+            <h2>5. LEAD AUDITOR COMMENTS</h2>
             <ul>
                 ${auditData.comments.map(comment => `
                     <li>
@@ -1833,7 +1883,18 @@ async function generateAuditDocument(auditData) {
             </ul>
             ` : ''}
             
-            <p style="page-break-before: always;">Report generated on ${new Date().toLocaleDateString()} by NAFDAC QMS Internal Audit System</p>
+            <div class="page-break"></div>
+            <h2>6. CONCLUSION</h2>
+            <p>This audit was conducted in accordance with NAFDAC QMS procedures.</p>
+            
+            <p style="margin-top: 3cm;">
+                <strong>Audit Team Leader:</strong> ___________________________<br>
+                <strong>Date:</strong> ___________________________
+            </p>
+            
+            <p style="page-break-before: always; text-align: center; margin-top: 2cm;">
+                Report generated on ${new Date().toLocaleDateString()} by NAFDAC QMS Internal Audit System
+            </p>
         </body>
         </html>
     `;
@@ -1860,6 +1921,130 @@ async function generateAuditDocument(auditData) {
 function redirectToTeamsChannel() {
     const teamsUrl = "https://teams.microsoft.com/l/channel/19%3acxtT91KHzwF9zsBj8vhezXXK8v-CiZJHE2v8HIjGVTE1%40thread.tacv2/AUDIT%20DRAFT?groupId=439a8fed-df14-44b9-9e4f-0a891f88c94c&tenantId=c9a3c7f2-9c4d-4d16-9756-d04bb4a060f5";
     window.open(teamsUrl, '_blank');
+}
+
+function clearAuditForm() {
+    // Reset form fields
+    if (auditForm) auditForm.reset();
+    
+    // Clear checklist items
+    const checklistItems = checklistContainer?.querySelectorAll('.checklist-item');
+    checklistItems?.forEach(item => {
+        const content = item.querySelector('.checklist-content');
+        if (content) {
+            content.style.display = 'none';
+            content.querySelectorAll('textarea').forEach(t => t.value = '');
+            content.querySelectorAll('.compliance-btn').forEach(b => {
+                b.classList.remove('active', 'compliance-yes', 'compliance-no');
+            });
+            const noRadio = content.querySelector(`input[type="radio"][value="no"]`);
+            if (noRadio) noRadio.checked = true;
+        }
+        const notApplicableRadio = item.querySelector(`input[type="radio"][value="no"]`);
+        if (notApplicableRadio) notApplicableRadio.checked = true;
+    });
+    
+    // Clear multiselect displays
+    document.querySelectorAll('.selected-names').forEach(el => {
+        el.textContent = el.dataset.placeholder || 'Select';
+        el.style.color = 'var(--text-muted)';
+    });
+    
+    // Uncheck all multiselect options
+    document.querySelectorAll('.dropdown-options input[type="checkbox"]').forEach(cb => {
+        cb.checked = false;
+    });
+    
+    currentAudit = null;
+}
+
+function showPasswordChangeModal(e) {
+    e.preventDefault();
+    document.getElementById('password-change-modal').classList.remove('hidden');
+}
+
+async function handleLoginPagePasswordChange(e) {
+    e.preventDefault();
+    
+    const currentPassword = document.getElementById('login-current-password').value;
+    const newPassword = document.getElementById('login-new-password').value;
+    const confirmPassword = document.getElementById('login-confirm-password').value;
+    const messageEl = document.getElementById('login-password-message');
+    
+    // Validate
+    if (newPassword !== confirmPassword) {
+        showPasswordMessage('New passwords do not match', 'error');
+        return;
+    }
+    
+    try {
+        const user = auth.currentUser;
+        if (!user) {
+            // For users not logged in, we'll need their email
+            const email = document.getElementById('login-email').value;
+            if (!email) {
+                showPasswordMessage('Please enter your email first', 'error');
+                return;
+            }
+            
+            // This will trigger password reset if not logged in
+            await auth.sendPasswordResetEmail(email);
+            showPasswordMessage('Password reset link sent to your email', 'success');
+            return;
+        }
+        
+        // For logged in users (if they opened login page while still logged in)
+        const credential = firebase.auth.EmailAuthProvider.credential(
+            user.email,
+            currentPassword
+        );
+        
+        await user.reauthenticateWithCredential(credential);
+        await user.updatePassword(newPassword);
+        
+        showPasswordMessage('Password changed successfully!', 'success');
+        document.getElementById('login-page-password-form').reset();
+        setTimeout(() => {
+            document.getElementById('password-change-modal').classList.add('hidden');
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Password change error:', error);
+        let message = 'Failed to change password';
+        if (error.code === 'auth/wrong-password') message = 'Current password is incorrect';
+        if (error.code === 'auth/weak-password') message = 'Password is too weak';
+        if (error.code === 'auth/user-not-found') message = 'Email not registered';
+        showPasswordMessage(message, 'error');
+    }
+}
+
+function showPasswordMessage(message, type) {
+    const messageEl = document.getElementById('login-password-message');
+    messageEl.textContent = message;
+    messageEl.className = `message ${type}`;
+    setTimeout(() => {
+        if (messageEl.textContent === message) {
+            messageEl.textContent = '';
+            messageEl.className = 'message';
+        }
+    }, 5000);
+}
+
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    if (!email) {
+        showPasswordMessage('Please enter your email first', 'error');
+        return;
+    }
+    
+    try {
+        await auth.sendPasswordResetEmail(email);
+        showPasswordMessage('Password reset link sent to your email', 'success');
+    } catch (error) {
+        console.error('Password reset error:', error);
+        showPasswordMessage('Failed to send reset email. Please check your email address.', 'error');
+    }
 }
 
 // --- Run Initialization on Load ---
