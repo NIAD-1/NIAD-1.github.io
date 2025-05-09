@@ -1837,8 +1837,8 @@ async function generateAuditDocument(auditData) {
             
             <h2>2. AUDIT TEAM</h2>
             <table>
-                <tr><th width="30%">Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', ') || 'N/A'}</td></tr>
-                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', ') || 'N/A'}</td></tr>
+                <tr><th width="30%">Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', ') || 'N/A')}</td></tr>
+                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', ') || 'N/A')}</td></tr>
             </table>
             
             <h2>3. OBJECTIVE EVIDENCE/ASSESSMENT FINDINGS</h2>
