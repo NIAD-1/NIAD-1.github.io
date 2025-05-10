@@ -126,7 +126,8 @@ const auditChecklist = [
     { id: 24, requirement: "SOP internal audit -awareness, Audit plan, Audit report", clause: "" },
     { id: 25, requirement: "Management review plan, Agenda and Minutes", clause: "9.3.2" },
     { id: 26, requirement: "SOP corrective action, Awareness, Implementation", clause: "10.2" },
-    { id: 27, requirement: "PROCESS SOP'S, Adequacy and use", clause: "4.4.2, 8.1" }
+    { id: 27, requirement: "PROCESS SOP'S, Adequacy and use", clause: "4.4.2, 8.1" },
+    {id: 28, requirement: "Other Observations", clause:"General"}
 ];
 
 // --- Global Variables ---
@@ -479,8 +480,11 @@ function initNewAuditForm() {
             <div class="checklist-content" style="display:none">
                 ${item.id === 28 ? `
                     <div class="form-group">
-                        <label for="evidence-${item.id}">Observations:</label>
-                        <textarea id="evidence-${item.id}" rows="4" class="evidence-input" placeholder="Enter detailed observations..."></textarea>
+                        <label for="observations-${item.id}">Observations:</label>
+                        <textarea id="observations-${item.id}" 
+                                rows="5" 
+                                class="observation-field" 
+                                placeholder="Enter detailed observations..."></textarea>
                     </div>
                 ` : `
                     <div class="form-group">
@@ -665,16 +669,20 @@ function collectAuditFormData() {
                 const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
                 
                 checklistData.push({
-                    id: itemId, 
-                    requirement: originalItem.requirement, 
+                    id: itemId,
+                    requirement: originalItem.requirement,
                     clause: originalItem.clause,
-                    applicable: 'yes',
-                    compliance, 
-                    objectiveEvidence: evidence, 
-                    correctiveActionNeeded: correctiveActionYes,
-                    correctiveActionsCount,
-                    classification, // Add this line
-                    comments
+                    applicable: isApplicable ? 'yes' : 'no',
+                    ...(itemId === 28 ? {
+                        observations: evidenceEl?.value.trim() || ''
+                    } : {
+                        compliance,
+                        objectiveEvidence: evidenceEl?.value.trim() || '',
+                        correctiveActionNeeded: correctiveActionYes,
+                        correctiveActionsCount,
+                        classification: itemElement.querySelector(`#classification-${itemId}`)?.value || '',
+                        comments: commentsEl?.value.trim() || ''
+                    })
                 });
             }
             // Only collect data for applicable items
