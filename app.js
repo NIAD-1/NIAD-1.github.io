@@ -101,10 +101,10 @@ const submitAuditBtn = document.getElementById('submit-audit-btn');
 // --- Audit Checklist Data ---
 const auditChecklist = [
     { id: 1, requirement: "Identification of interested parties and needs", clause: "4.1" },
-    { id: 2, requirement: "Process flow (interaction)", clause: "4.4" },
-    { id: 3, requirement: "Organogram", clause: "4.4.1" },
-    { id: 4, requirement: "Master list, SOP index, Records list", clause: "4.4.1" },
-    { id: 5, requirement: "Quality manual - awareness", clause: "4.1" },
+    { id: 2, requirement: "Quality manual - awareness", clause: "4.1" },
+    { id: 3, requirement: "Process flow (interaction)", clause: "4.4" },
+    { id: 4, requirement: "Organogram", clause: "4.4.1" },
+    { id: 5, requirement: "Master list, SOP index, Records list", clause: "4.4.1" },
     { id: 6, requirement: "Quality Policy - awareness", clause: "5.2.2" },
     { id: 7, requirement: "JD for Quality manager, Appointment letter /acceptance, Appointment of quality team", clause: "5.3" },
     { id: 8, requirement: "SOP Risk management, Training /awareness, Constitution of RMT, Risk identification, Risk analysis /risk register, Use of annexures", clause: "6.1.1" },
@@ -123,20 +123,20 @@ const auditChecklist = [
     { id: 21, requirement: "SOP Non -conforming output -awareness", clause: "8.7" },
     { id: 22, requirement: "KPI matrix", clause: "9.1" },
     { id: 23, requirement: "Evaluation of measurable output, feedback survey?", clause: "" },
-    { id: 24, requirement: "SOP internal audit -awareness, Audit plan, Audit report", clause: "" }, // Likely 9.2
+    { id: 24, requirement: "SOP internal audit -awareness, Audit plan, Audit report", clause: "" },
     { id: 25, requirement: "Management review plan, Agenda and Minutes", clause: "9.3.2" },
     { id: 26, requirement: "SOP corrective action, Awareness, Implementation", clause: "10.2" },
     { id: 27, requirement: "PROCESS SOP'S, Adequacy and use", clause: "4.4.2, 8.1" }
 ];
 
 // --- Global Variables ---
-let currentUser = null; // Stores { uid, email, displayName, role }
-let audits = [];        // Stores fetched audits locally
-let currentAudit = null; // Stores the audit being viewed/edited in the modal/form
-let complianceChartInstance = null; // To destroy/update charts
+let currentUser = null; 
+let audits = [];        
+let currentAudit = null;
+let complianceChartInstance = null; 
 let ncChartInstance = null;
 let reportChartInstance = null;
-// Store fetched auditors lists globally to avoid refetching constantly
+
 let leadAuditorUsers = [];
 let auditorUsers = [];
 
@@ -461,7 +461,7 @@ function initNewAuditForm() {
         const itemDiv = document.createElement('div');
         itemDiv.className = 'checklist-item';
         itemDiv.dataset.itemId = item.id;
-
+    
         itemDiv.innerHTML = `
             <div class="applicability-toggle">
                 <div class="question-header">
@@ -477,41 +477,44 @@ function initNewAuditForm() {
                 </div>
             </div>
             <div class="checklist-content" style="display:none">
-                <div class="form-group">
-                    <label for="evidence-${item.id}">Objective Evidence:</label>
-                    <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="comments-${item.id}">Comments:</label>
-                    <textarea id="comments-${item.id}" rows="2"></textarea>
-                </div>
-                <div class="compliance-toggle">
-                    <label>Compliance:</label>
-                    <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
-                    <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
-                </div>
-                <div class="corrective-action-group">
-                    <label>Corrective Action Needed?</label>
-                    <input type="radio" id="ca-yes-${item.id}" name="corrective-action-${item.id}" value="yes">
-                    <label for="ca-yes-${item.id}">Yes</label>
-                    <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
-                    <label for="ca-no-${item.id}">No</label>
-                </div>
-                ${item.clause === '8.7' ? `
-                // In the checklist item HTML template in initNewAuditForm:
-                <div class="classification-group">
-                    <label for="classification-${item.id}">Classification:</label>
-                    <select id="classification-${item.id}">
-                        <option value="">Select Classification</option>
-                        <option value="Major">Major</option>
-                        <option value="Minor">Minor</option>
-                        <option value="OFI">OFI (Opportunity for Improvement)</option>
-                    </select>
-                </div>
-                ` : ''}
+                ${item.id === 28 ? `
+                    <div class="form-group">
+                        <label for="evidence-${item.id}">Observations:</label>
+                        <textarea id="evidence-${item.id}" rows="4" class="evidence-input" placeholder="Enter detailed observations..."></textarea>
+                    </div>
+                ` : `
+                    <div class="form-group">
+                        <label for="evidence-${item.id}">Objective Evidence:</label>
+                        <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="comments-${item.id}">Comments:</label>
+                        <textarea id="comments-${item.id}" rows="2"></textarea>
+                    </div>
+                    <div class="compliance-toggle">
+                        <label>Compliance:</label>
+                        <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
+                        <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
+                    </div>
+                    <div class="corrective-action-group">
+                        <label>Corrective Action Needed?</label>
+                        <input type="radio" id="ca-yes-${item.id}" name="corrective-action-${item.id}" value="yes">
+                        <label for="ca-yes-${item.id}">Yes</label>
+                        <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
+                        <label for="ca-no-${item.id}">No</label>
+                    </div>
+                    <div class="classification-group">
+                        <label for="classification-${item.id}">Classification:</label>
+                        <select id="classification-${item.id}">
+                            <option value="">Select Classification</option>
+                            <option value="Major">Major</option>
+                            <option value="Minor">Minor</option>
+                            <option value="OFI">OFI (Opportunity for Improvement)</option>
+                        </select>
+                    </div>
+                `}
             </div>`;
-
-        // Toggle functionality
+    
         itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
             radio.addEventListener('change', (e) => {
                 const content = itemDiv.querySelector('.checklist-content');
