@@ -927,13 +927,14 @@ function renderDepartmentComparison() {
         const deptAudits = audits.filter(a => a.directorateUnit === dept);
         // Calculate department metrics
         return { 
-            compliance: ..., 
-            nonCompliance: ..., 
+            compliance: 0, // Replace with actual calculation
+            nonCompliance: 0, // Replace with actual calculation
             audits: deptAudits.length,
-            correctiveActions: ...
+            correctiveActions: 0 // Replace with actual calculation
         };
     });
 
+}
     const ctx = document.getElementById('department-chart').getContext('2d');
     departmentChartInstance = new Chart(ctx, {
         type: 'radar',
