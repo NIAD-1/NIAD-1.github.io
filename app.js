@@ -1039,24 +1039,50 @@ function updateDashboardMetrics() {
 function renderComplianceChart(compliant, nonCompliant) {
     const ctx = document.getElementById('compliance-chart').getContext('2d');
     
+    // Destroy previous chart instance if it exists
+    if (complianceChartInstance) {
+        complianceChartInstance.destroy();
+    }
+    
     complianceChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Compliant', 'Non-Compliant'],
             datasets: [{
                 data: [compliant, nonCompliant],
-                backgroundColor: ['var(--success-color)', 'var(--danger-color)'],
-                borderWidth: 0
+                backgroundColor: [
+                    '#2a9d8f', 
+                    '#e76f51'  
+                ],
+                borderColor: [
+                    '#ffffff', 
+                    '#ffffff'  
+                ],
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom' },
+                legend: { 
+                    position: 'bottom',
+                    labels: {
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    }
+                },
                 tooltip: { 
                     callbacks: {
-                        label: ctx => `${ctx.label}: ${ctx.raw} items`
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((acc, data) => acc + data, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
                     }
                 }
             },
