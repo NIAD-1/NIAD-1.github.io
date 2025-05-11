@@ -463,7 +463,7 @@ function initNewAuditForm() {
         itemDiv.className = 'checklist-item';
         itemDiv.dataset.itemId = item.id;
 
-        // Fixed: Properly assign the HTML content
+
         itemDiv.innerHTML = `
             <div class="applicability-toggle">
                 <div class="question-header">
@@ -734,7 +734,7 @@ async function submitAudit() {
         return;
     }
     
-    W = formData.data;
+    auditData = formData.data;
     auditData.status = 'submitted';
     auditData.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
     
