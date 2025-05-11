@@ -463,7 +463,7 @@ function initNewAuditForm() {
         itemDiv.className = 'checklist-item';
         itemDiv.dataset.itemId = item.id;
     
-        itemDiv.innerHTML = `
+        HTML = `
             <div class="applicability-toggle">
                 <div class="question-header">
                     <span class="question-number">${item.id}.</span>
@@ -480,13 +480,14 @@ function initNewAuditForm() {
             <div class="checklist-content" style="display:none">
                 ${item.id === 28 ? `
                     <div class="form-group">
-                        <label for="observations-${item.id}">Observations:</label>
+                        <label for="observations-${item.id}">Other Observations:</label>
                         <textarea id="observations-${item.id}" 
                                 rows="5" 
                                 class="observation-field" 
-                                placeholder="Enter detailed observations..."></textarea>
+                                placeholder="Enter any additional observations not covered above..."></textarea>
                     </div>
                 ` : `
+                    <!-- Regular checklist item template -->
                     <div class="form-group">
                         <label for="evidence-${item.id}">Objective Evidence:</label>
                         <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
@@ -543,7 +544,7 @@ function initNewAuditForm() {
         const complianceButtons = itemDiv.querySelectorAll('.compliance-btn');
         complianceButtons.forEach(btn => {
             btn.addEventListener('click', function() {
-                complianceButtons.forEach(b => {
+                complianceButtonsitemDiv.inner.forEach(b => {
                     b.classList.remove('active', 'compliance-yes', 'compliance-no');
                 });
                 this.classList.add('active');
@@ -674,7 +675,7 @@ function collectAuditFormData() {
                     clause: originalItem.clause,
                     applicable: isApplicable ? 'yes' : 'no',
                     ...(itemId === 28 ? {
-                        observations: evidenceEl?.value.trim() || ''
+                        observations: itemElement.querySelector(`#observations-${itemId}`)?.value.trim() || ''
                     } : {
                         compliance,
                         objectiveEvidence: evidenceEl?.value.trim() || '',
@@ -744,7 +745,7 @@ async function submitAudit() {
         return;
     }
     
-    const auditData = formData.data;
+    W = formData.data;
     auditData.status = 'submitted';
     auditData.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
     
@@ -1807,127 +1808,389 @@ document.querySelectorAll('.lead-comment-field').forEach(field => {
 });
 
 // Function to generate a Word document from audit data
+/**
+ * Generates a NAFDAC Internal Audit Summary Report in Word format
+ * @param {Object} auditData - The audit data object containing all audit information
+ */
 async function generateAuditDocument(auditData) {
-    const auditeeName = auditData.auditeeName || 'Not specified';
-    const auditeePosition = auditData.auditeePosition || 'Not specified';
-    // Create a simple HTML template for the document
+    // Get the exact user input for introduction from the form
+    const introductionText = document.querySelector('.evidence-input')?.value || '';
+    
+    // Get other observations (item 28) if they exist
+    const otherObservations = auditData.checklist?.find(item => item.id === 28)?.observations || '';
+
+    // Get auditee information from form inputs
+    const auditeeName = document.getElementById('auditee-name')?.value || 'Not specified';
+    const auditeePosition = document.getElementById('auditee-position')?.value || 'Not specified';
+
+    // Create HTML template with strict NAFDAC format
     const htmlContent = `
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>NAFDAC Audit Report - ${auditData.directorateUnit}</title>
+            <title>NAFDAC INTERNAL AUDIT SUMMARY REPORT - ${auditData.refNo || 'No Reference'}</title>
             <style>
-                body { font-family: Arial, sans-serif; margin: 2cm; }
-                h1 { color: #005f73; text-align: center; }
-                h2 { color: #0a9396; margin-top: 1.5em; border-bottom: 1px solid #eee; padding-bottom: 0.3em; }
-                table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; }
-                .status-compliant { color: #2a9d8f; }
-                .status-noncompliant { color: #e76f51; }
-                .page-break { page-break-after: always; }
-                .header-logo { text-align: center; margin-bottom: 1rem; }
-                .header-logo img { max-height: 80px; }
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 1.5cm; 
+                    line-height: 1.5;
+                    font-size: 11pt;
+                }
+                .header {
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 20px;
+                    border-bottom: 2px solid #005f73;
+                    padding-bottom: 10px;
+                }
+                .logo {
+                    width: 60px;
+                    height: 60px;
+                    margin-right: 15px;
+                }
+                .header-text {
+                    flex: 1;
+                }
+                .agency-name {
+                    font-weight: bold;
+                    font-size: 14pt;
+                    text-align: center;
+                    color: #005f73;
+                }
+                .report-title {
+                    font-weight: bold;
+                    font-size: 12pt;
+                    text-align: center;
+                    margin: 10px 0;
+                    text-decoration: underline;
+                }
+                .section-title {
+                    font-weight: bold;
+                    font-size: 11pt;
+                    margin: 15px 0 5px 0;
+                    color: #0a9396;
+                    border-bottom: 1px solid #eee;
+                    padding-bottom: 3px;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 10px 0 20px 0;
+                    font-size: 10pt;
+                }
+                table, th, td {
+                    border: 1px solid #ddd;
+                }
+                th, td {
+                    padding: 8px;
+                    vertical-align: top;
+                }
+                th {
+                    background-color: #f2f2f2;
+                    text-align: left;
+                    font-weight: bold;
+                }
+                .iso-table {
+                    width: 100%;
+                    margin: 15px 0;
+                }
+                .signature-section {
+                    margin-top: 40px;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                .signature-line {
+                    border-top: 1px solid #000;
+                    width: 200px;
+                    margin-top: 30px;
+                }
+                .compliance-yes {
+                    color: #2a9d8f;
+                    font-weight: bold;
+                }
+                .compliance-no {
+                    color: #e76f51;
+                    font-weight: bold;
+                }
+                .observation {
+                    margin: 10px 0;
+                    white-space: pre-wrap;
+                    line-height: 1.4;
+                }
+                .page-break {
+                    page-break-after: always;
+                }
+                .footer {
+                    text-align: center;
+                    margin-top: 30px;
+                    font-size: 9pt;
+                    color: #666;
+                }
             </style>
         </head>
         <body>
-            <div class="header-logo">
-                <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo">
+            <div class="header">
+                <img src="https://upload.wikimedia.org/wikipedia/en/thumb/0/0d/NAFDAC_logo.svg/1200px-NAFDAC_logo.svg.png" class="logo" alt="NAFDAC Logo">
+                <div class="header-text">
+                    <div class="agency-name">National Agency for Food and Drug Administration and Control</div>
+                    <div class="report-title">INTERNAL AUDIT SUMMARY REPORT (IASR)</div>
+                </div>
             </div>
-            <h1>NAFDAC QMS INTERNAL AUDIT REPORT</h1>
-            
-            <h2>1. AUDIT DETAILS</h2>
-            <table>
-                <tr><th width="30%">Reference Number:</th><td>${escapeHtml(auditData.refNo || 'N/A')}</td></tr>
-                <tr><th>Date of Audit:</th><td>${formatDate(auditData.date)}</td></tr>
-                <tr><th>Directorate/Unit Audited:</th><td>${escapeHtml(auditData.directorateUnit)}</td></tr>
-                <tr><th>Auditee Name:</th><td>${escapeHtml(auditeeName)}</td></tr>
-                <tr><th>Auditee Position:</th><td>${escapeHtml(auditeePosition)}</td></tr>
-            </table>
-            
-            <h2>2. AUDIT TEAM</h2>
-            <table>
-                <tr><th width="30%">Lead Auditor(s):</th><td>${escapeHtml(auditData.leadAuditors.map(a => a.displayName || a.email).join(', ') || 'N/A')}</td></tr>
-                <tr><th>Auditor(s):</th><td>${escapeHtml(auditData.auditors.map(a => a.displayName || a.email).join(', ') || 'N/A')}</td></tr>
-            </table>
-            
-            <h2>3. OBJECTIVE EVIDENCE/ASSESSMENT FINDINGS</h2>
-            <p>${auditData.objectiveEvidence ? escapeHtml(auditData.objectiveEvidence) : 'No objective evidence provided.'}</p>
-            
-            <h2>4. CHECKLIST FINDINGS</h2>
+
             <table>
                 <tr>
-                    <th width="5%">S/N</th>
-                    <th width="30%">Requirement</th>
-                    <th width="25%">Objective Evidence</th>
-                    <th width="15%">Comments</th>
-                    <th width="10%">Compliance</th>
-                    <th width="15%">Classification</th>
+                    <th width="30%">LOCATION/UNIT/DIRECTORATE:</th>
+                    <td>${escapeHtml(auditData.directorateUnit || 'Not specified')}</td>
                 </tr>
-                ${auditData.checklist
-                    .filter(item => item.applicable === 'yes') // Only show applicable items
-                    .map((item, index) => `
-                    <tr>
-                        <td>${index + 1}</td>
-                        <td>${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${item.clause})` : ''}</td>
-                        <td>${item.objectiveEvidence ? escapeHtml(item.objectiveEvidence) : 'N/A'}</td>
-                        <td>${item.comments ? escapeHtml(item.comments) : 'N/A'}</td>
-                        <td class="${item.compliance === 'yes' ? 'status-compliant' : 'status-noncompliant'}">
-                            ${item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'N/A'}
-                        </td>
-                        <td>${item.classification || 'N/A'}</td>
-                    </tr>
-                `).join('')}
+                <tr>
+                    <th>AUDIT REF. No:</th>
+                    <td>${escapeHtml(auditData.refNo || 'Not specified')}</td>
+                </tr>
+                <tr>
+                    <th>DATE:</th>
+                    <td>${formatDate(auditData.date) || 'Not specified'}</td>
+                </tr>
             </table>
-            
-            ${auditData.comments?.length > 0 ? `
-            <div class="page-break"></div>
-            <h2>5. LEAD AUDITOR COMMENTS</h2>
-            <ul>
-                ${auditData.comments.map(comment => `
-                    <li>
-                        <strong>${escapeHtml(comment.authorName || comment.author)}</strong> (${formatDateTime(comment.timestamp)}):
-                        ${escapeHtml(comment.text)}
-                    </li>
-                `).join('')}
-            </ul>
+
+            <div class="section-title">1. AUDITEE:</div>
+            <table>
+                <tr>
+                    <th width="30%">Name:</th>
+                    <td>${escapeHtml(auditeeName)}</td>
+                </tr>
+                <tr>
+                    <th>Position:</th>
+                    <td>${escapeHtml(auditeePosition)}</td>
+                </tr>
+            </table>
+
+            <div class="section-title">2. AUDITORS:</div>
+            <table>
+                <tr>
+                    <th width="30%">Lead Auditor(s):</th>
+                    <td>${escapeHtml(formatAuditors(auditData.leadAuditors))}</td>
+                </tr>
+                <tr>
+                    <th>Auditor(s):</th>
+                    <td>${escapeHtml(formatAuditors(auditData.auditors))}</td>
+                </tr>
+            </table>
+
+            <div class="section-title">3. SCOPE:</div>
+            <p>The scope of this audit covers the Quality Management System processes of the audited unit/directorate against the requirements of ISO 9001:2015 standard and NAFDAC's internal procedures.</p>
+
+            <div class="section-title">4. INTRODUCTION</div>
+            ${introductionText ? `<div class="observation">${escapeHtml(introductionText)}</div>` : '<p>No introduction provided.</p>'}
+
+            <div class="section-title">5. ISO 9001:2015 ALIGNMENT</div>
+            ${generateIsoClauseTable()}
+
+            <div class="section-title">6. AUDIT FINDINGS</div>
+            ${generateChecklistTable(auditData)}
+
+            ${otherObservations ? `
+            <div class="section-title">7. OTHER OBSERVATIONS</div>
+            <div class="observation">${escapeHtml(otherObservations)}</div>
             ` : ''}
-            
-            <div class="page-break"></div>
-            <h2>6. CONCLUSION</h2>
-            <p>This audit was conducted in accordance with NAFDAC QMS procedures.</p>
-            
-            <p style="margin-top: 3cm;">
-                <strong>Audit Team Leader:</strong> ___________________________<br>
-                <strong>Date:</strong> ___________________________
-            </p>
-            
-            <p style="page-break-before: always; text-align: center; margin-top: 2cm;">
-                Report generated on ${new Date().toLocaleDateString()} by NAFDAC QMS Internal Audit System
-            </p>
+
+            <div class="section-title">8. CONCLUSION</div>
+            <p>This audit was conducted in accordance with NAFDAC QMS procedures and the requirements of ISO 9001:2015.</p>
+
+            <div class="signature-section">
+                <div>
+                    <div>Prepared by:</div>
+                    <div class="signature-line"></div>
+                    <div>(Name/Signature): ${escapeHtml(formatLeadAuditor(auditData.leadAuditors))}</div>
+                    <div>Date: ${formatDate(new Date())}</div>
+                </div>
+                <div>
+                    <div>Reviewed by:</div>
+                    <div class="signature-line"></div>
+                    <div>(Name/Signature): _________________________________</div>
+                    <div>Date: _________________________</div>
+                </div>
+            </div>
+
+            <div class="footer">
+                Report generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} by NAFDAC QMS Internal Audit System
+            </div>
         </body>
         </html>
     `;
 
-    // Convert HTML to Word document
+    // Helper functions
+    function generateIsoClauseTable() {
+        return `
+            <table class="iso-table">
+                <thead>
+                    <tr>
+                        <th width="15%">ISO</th>
+                        <th width="15%">Clause No.</th>
+                        <th width="70%">Processes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td rowspan="2">ISO 9001:2015</td>
+                        <td>4.1</td>
+                        <td>Interested parties' identification with needs/expectations</td>
+                    </tr>
+                    <tr>
+                        <td>4.4</td>
+                        <td>Process flow chart and interaction, SOP index</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="2">ISO 9001:2015</td>
+                        <td>5.2</td>
+                        <td>Quality policy- training/awareness, records</td>
+                    </tr>
+                    <tr>
+                        <td>5.3</td>
+                        <td>Appointment of Quality manager, JD for QM, Organizational chart</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="3">ISO 9001:2015</td>
+                        <td>6.1</td>
+                        <td>Risk management SOP, Training/awareness, risk management report/plan, RMT constitution</td>
+                    </tr>
+                    <tr>
+                        <td>6.2</td>
+                        <td>Quality Objectives- development and awareness, action plan for achieving the objectives</td>
+                    </tr>
+                    <tr>
+                        <td>6.3</td>
+                        <td>SOP management of change -- training records</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="2">ISO 9001:2015</td>
+                        <td>7.1.5</td>
+                        <td>SOP monitoring and measurement of resources- training implementation of SOP, records</td>
+                    </tr>
+                    <tr>
+                        <td>7.1.6</td>
+                        <td>SOP Organizational Knowledge- training, records, implementation</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="3">ISO 9001:2015</td>
+                        <td>7.2</td>
+                        <td>Personnel JD's, CV, Training Plan, Training records</td>
+                    </tr>
+                    <tr>
+                        <td>7.4</td>
+                        <td>Communication matrix</td>
+                    </tr>
+                    <tr>
+                        <td>7.5</td>
+                        <td>Process SOP's, approvals, training and records of implementation of SOP</td>
+                    </tr>
+                    <tr>
+                        <td>ISO 9001:2015</td>
+                        <td>8.2</td>
+                        <td>Customer complaint, customer survey/feedback</td>
+                    </tr>
+                    <tr>
+                        <td rowspan="3">ISO 9001:2015</td>
+                        <td>9.1</td>
+                        <td>KPI</td>
+                    </tr>
+                    <tr>
+                        <td>9.1.2</td>
+                        <td>Analysis of customer survey</td>
+                    </tr>
+                    <tr>
+                        <td>9.2</td>
+                        <td>SOP Internal audit -plan, awareness, training records</td>
+                    </tr>
+                    <tr>
+                        <td>ISO 9001:2015</td>
+                        <td>9.3</td>
+                        <td>SOP management review -- training, records, plan</td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    }
+
+    function generateChecklistTable(auditData) {
+        return `
+            <table class="iso-table">
+                <thead>
+                    <tr>
+                        <th width="5%">#</th>
+                        <th width="25%">REQUIREMENT</th>
+                        <th width="30%">OBJECTIVE EVIDENCE</th>
+                        <th width="15%">COMMENTS</th>
+                        <th width="10%">COMPLIANCE</th>
+                        <th width="15%">CLASSIFICATION</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(auditData.checklist || [])
+                        .filter(item => item.applicable === 'yes' && item.id !== 28) // Exclude observations item
+                        .map((item, index) => `
+                            <tr>
+                                <td>${index + 1}</td>
+                                <td>${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${item.clause})` : ''}</td>
+                                <td>${escapeHtml(item.objectiveEvidence || 'N/A')}</td>
+                                <td>${escapeHtml(item.comments || 'N/A')}</td>
+                                <td class="${item.compliance === 'yes' ? 'compliance-yes' : 'compliance-no'}">
+                                    ${item.compliance === 'yes' ? 'Compliant' : item.compliance === 'no' ? 'Non-Compliant' : 'N/A'}
+                                </td>
+                                <td>${escapeHtml(item.classification || 'N/A')}</td>
+                            </tr>
+                        `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function formatAuditors(auditors) {
+        if (!auditors || auditors.length === 0) return 'Not specified';
+        return auditors.map(a => a.displayName || a.email).join(', ');
+    }
+
+    function formatLeadAuditor(leadAuditors) {
+        if (!leadAuditors || leadAuditors.length === 0) return 'LEAD AUDITOR';
+        return leadAuditors[0].displayName || leadAuditors[0].email || 'LEAD AUDITOR';
+    }
+
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return unsafe.toString()
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function formatDate(dateString) {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (e) {
+            return dateString;
+        }
+    }
+
+    // Convert HTML to Word document and download
     const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     
-    // Create download link
     const a = document.createElement('a');
     a.href = url;
-    a.download = `NAFDAC_Audit_${auditData.refNo || auditData.directorateUnit.replace(/[^a-z0-9]/gi, '_')}_${auditData.date}.doc`;
+    const fileName = `NAFDAC_IASR_${auditData.refNo || 'NoRef'}_${auditData.date || 'NoDate'}.doc`;
+    a.download = fileName.replace(/[^a-zA-Z0-9_\-.]/g, '_');
     document.body.appendChild(a);
     a.click();
     
-    // Clean up
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 100);
 }
-
 // Function to redirect to Teams channel
 function redirectToTeamsChannel() {
     const teamsUrl = "https://teams.microsoft.com/l/channel/19%3acxtT91KHzwF9zsBj8vhezXXK8v-CiZJHE2v8HIjGVTE1%40thread.tacv2/AUDIT%20DRAFT?groupId=439a8fed-df14-44b9-9e4f-0a891f88c94c&tenantId=c9a3c7f2-9c4d-4d16-9756-d04bb4a060f5";
