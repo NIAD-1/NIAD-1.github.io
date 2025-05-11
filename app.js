@@ -667,11 +667,11 @@ function collectAuditFormData() {
                         observations: itemElement.querySelector(`#observations-${itemId}`)?.value.trim() || ''
                     } : {
                         compliance,
-                        objectiveEvidence: evidenceEl?.value.trim() || '',
+                        objectiveEvidence: evidence,
                         correctiveActionNeeded: correctiveActionYes,
                         correctiveActionsCount,
                         classification: itemElement.querySelector(`#classification-${itemId}`)?.value || '',
-                        comments: commentsEl?.value.trim() || ''
+                        comments: comments
                     })
                 });
             }
@@ -722,7 +722,8 @@ async function saveAuditAsDraft() {
     const auditData = collectAuditFormData();
     auditData.status = 'draft';
     await saveAuditToFirestore(auditData);
-    loadAudits(); // Refresh the audit history
+    loadAudits();
+    clearAuditForm();
 }
 
 async function submitAudit() {
@@ -746,6 +747,7 @@ async function submitAudit() {
         }
         
         await generateAuditDocument(auditData);
+        clearAuditForm();
         
         // Redirect to Teams channel
         redirectToTeamsChannel();
