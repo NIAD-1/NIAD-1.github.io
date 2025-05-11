@@ -962,7 +962,7 @@ function renderDepartmentComparison() {
             }
         }
     });
-}
+
 
 // Helper function for chart colors
 function getChartColor(index) {
