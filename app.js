@@ -556,15 +556,6 @@ function initNewAuditForm() {
 }
 
 // Helper function to generate number options
-function generateNumberOptions(start, end) {
-    let options = '';
-    for (let i = start; i <= end; i++) {
-        options += `<option value="${i}">${i}</option>`;
-    }
-    return options;
-}
-
-// Data collection function (simplified)//
 
 function populateAuditorSelect(selectElement, users, typeLabel) {
      if (!selectElement) return;
@@ -821,7 +812,7 @@ function renderDashboard() {
 }
 
 // Add new chart instances
-let trendChartInstance, ncChartInstance, departmentChartInstance;
+let trendChartInstance, departmentChartInstance;
 
 function updateDashboardMetrics() {
     const selectedDirectorate = document.getElementById('directorate-filter').value;
@@ -1094,6 +1085,7 @@ function renderNonConformanceChart() {
     if (!ncChartCanvas) return;
     const ctx = ncChartCanvas.getContext('2d');
      if (ncChartInstance) ncChartInstance.destroy();
+     ncChartInsttance = new Chart(); 
     const ncByArea = {}; let hasNcData = false;
     audits.forEach(audit => {
         if (audit.checklist && (audit.directorateUnit || audit.auditedArea)) {
