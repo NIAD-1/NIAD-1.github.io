@@ -934,7 +934,6 @@ function renderDepartmentComparison() {
         };
     });
 
-}
     const ctx = document.getElementById('department-chart').getContext('2d');
     departmentChartInstance = new Chart(ctx, {
         type: 'radar',
@@ -962,8 +961,7 @@ function renderDepartmentComparison() {
             }
         }
     });
-
-
+}
 // Helper function for chart colors
 function getChartColor(index) {
     const colors = ['var(--primary-color)', 'var(--secondary-color)', 'var(--accent-color)', 'var(--success-color)'];
