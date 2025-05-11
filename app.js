@@ -1133,7 +1133,6 @@ function renderNonConformanceChart() {
 }
 
 // --- Audit History & Filtering ---
-
 function renderAuditHistory(auditsToDisplay = audits) {
     if (!auditHistoryList) return;
     auditHistoryList.innerHTML = '';
@@ -1217,28 +1216,15 @@ function updateAreaFilter() {
 // --- Modal Functionality ---
 
 function openAuditDetails(audit) {
-    if (!modal || !modalTitle || !modalBody || !audit) return;
-    
     currentAudit = audit;
     modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
     
-    // Format lead auditors and auditors
-    const leadAuditorsText = audit.leadAuditors?.join(', ') || 'None';
-    const auditorsText = audit.auditors?.join(', ') || 'None';
-    
-    // Build modal content
+    // Build modal content without comments section
     let bodyContent = `
         <div class="audit-meta">
             <p><strong>Ref No:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
             <p><strong>Audit Date:</strong> ${formatDate(audit.date)}</p>
-            <p><strong>Lead Auditor(s):</strong> ${leadAuditorsText}</p>
-            <p><strong>Auditor(s):</strong> ${auditorsText}</p>
             <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
-        </div>
-        
-        <div class="evidence-summary">
-            <h3>Objective Evidence</h3>
-            <div class="evidence-content">${audit.objectiveEvidence ? `<pre>${escapeHtml(audit.objectiveEvidence)}</pre>` : '<p>No objective evidence provided.</p>'}</div>
         </div>
         
         <h3>Checklist Findings</h3>
@@ -1247,63 +1233,46 @@ function openAuditDetails(audit) {
     // Add checklist items
     if (audit.checklist?.length > 0) {
         audit.checklist.forEach(item => {
-            const compClass = item.compliance === 'yes' ? 'compliant' : 
-                            item.compliance === 'no' ? 'non-compliant' : '';
-            const compText = item.compliance === 'yes' ? 'Compliant' : 
-                            item.compliance === 'no' ? 'Non-Compliant' : 'Not Selected';
-            
-            bodyContent += `
-                <div class="checklist-item-summary">
-                    <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Cl ${item.clause})` : ''}</h4>
-                    <p><strong>Compliance:</strong> <span class="${compClass}">${compText}</span></p>
-                    ${item.objectiveEvidence ? `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>` : ''}
-                    <p><strong>Correction Needed:</strong> ${item.correctiveActionNeeded ? 'Yes' : 'No'}</p>
-                    ${item.comments ? `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>` : ''}
-                </div>`;
+            if (item.applicable === 'yes') {
+                const compClass = item.compliance === 'yes' ? 'compliant' : 'non-compliant';
+                const compText = item.compliance === 'yes' ? 'Compliant' : 'Non-Compliant';
+                
+                bodyContent += `
+                    <div class="checklist-item-summary">
+                        <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Cl ${item.clause})` : ''}</h4>
+                        <p><strong>Compliance:</strong> <span class="${compClass}">${compText}</span></p>
+                        ${item.objectiveEvidence ? `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>` : ''}
+                        <p><strong>Correction Needed:</strong> ${item.correctiveActionNeeded ? 'Yes' : 'No'}</p>
+                        ${item.comments ? `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>` : ''}
+                    </div>`;
+            }
         });
     } else {
         bodyContent += '<p>No checklist data available.</p>';
     }
-    let commentsSection = '';
-    if (hasPermission('manage_users') || hasPermission('lead_auditor')) {
-        commentsSection = `
-            <div class="comments-section">
-                <h3>Lead Auditor Comments</h3>
-                ${renderComments(audit.comments || [])}
-                <textarea id="new-comment" placeholder="Add your comment..."></textarea>
-                <button onclick="addComment()" class="btn-primary">Add Comment</button>
-                ${audit.status === 'submitted' ? `
-                    <div class="approval-section">
-                        <button onclick="approveAudit()" class="btn-success">Approve Audit</button>
-                    </div>
-                ` : ''}
-            </div>
-        `;
-        if (hasPermission('view_comments')) {
-            bodyContent += `
-                <div class="comment-section">
-                    <h3>Lead Auditor Comments</h3>
-                    <div class="comments-list">
-                        ${renderComments(audit.comments || [])}
-                    </div>
-                    ${hasPermission('add_comments') ? `
-                        <textarea id="new-comment" placeholder="Add internal comment..."></textarea>
-                        <button onclick="postComment()" class="btn btn-primary">Post Comment</button>
-                    ` : ''}
-                    ${audit.status === 'submitted' && hasPermission('approve_audits') ? `
-                        <div class="approval-section">
-                            <button onclick="approveAudit()" class="btn btn-success">Approve Audit</button>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-    }
 
     modalBody.innerHTML = bodyContent;
-    updateModalEditButtonVisibility();
+    
+    // Update modal actions
+    modalActions.innerHTML = `
+        <button id="export-audit-btn" class="btn btn-primary">Export as Document</button>
+        <button id="close-modal-btn" class="btn btn-secondary">Close</button>
+        ${currentUser?.role === 'admin' ? `<button id="delete-audit-btn" class="btn btn-danger">Delete Audit</button>` : ''}
+    `;
+    
+    document.getElementById('export-audit-btn').addEventListener('click', exportCurrentAuditAsDocument);
+    document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+    
+    if (currentUser?.role === 'admin') {
+        document.getElementById('delete-audit-btn').addEventListener('click', deleteCurrentAudit);
+    }
+    
     modal.classList.remove('hidden');
+}
 
+function exportCurrentAuditAsDocument() {
+    if (!currentAudit) return;
+    generateAuditDocument(currentAudit);
 }
 
 function closeModal() {
