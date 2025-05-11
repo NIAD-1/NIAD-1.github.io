@@ -100,37 +100,55 @@
         <!-- Main Content -->
         <main class="container app-main">
             <!-- Dashboard Section -->
+            <!-- Add this to your dashboard section -->
             <section id="dashboard-section" class="content-section" data-permission="view_dashboard">
-                <h2>Compliance Dashboard</h2>
-                <div class="dashboard-grid" id="dashboard-charts">
-                    <div class="dashboard-card">
-                        <h3>Overall Compliance</h3>
+                <div class="dashboard-header">
+                    <h2>Compliance Overview</h2>
+                    <div class="dashboard-controls">
+                        <select id="directorate-filter" class="dashboard-filter">
+                            <option value="">All Directorates</option>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Key Metrics -->
+                    <div class="metrics-container">
+                        <div class="metric-card">
+                            <div class="metric-value" id="compliance-rate">-</div>
+                            <div class="metric-label">Compliance Rate</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="non-compliance-rate">-</div>
+                            <div class="metric-label">Non-Compliance Rate</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="total-audits">-</div>
+                            <div class="metric-label">Total Audits</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="avg-corrective">-</div>
+                            <div class="metric-label">Avg. Corrective Actions</div>
+                        </div>
+                    </div>
+
+                    <!-- Compliance Chart -->
+                    <div class="dashboard-card chart-card">
+                        <h3>Compliance Distribution</h3>
                         <div class="chart-container">
-                           <canvas id="compliance-chart"></canvas>
+                            <canvas id="compliance-chart"></canvas>
                         </div>
                     </div>
+
+                    <!-- Recent Audits -->
                     <div class="dashboard-card">
-                        <h3>Recent Audits</h3>
-                        <div id="recent-audits-list" class="audit-list styled-list">
-                            <p>Loading recent audits...</p>
+                        <div class="recent-audits-header">
+                            <h3>Recent Audit Activities</h3>
+                            <a href="#audit-history" class="view-all">View All →</a>
                         </div>
-                    </div>
-                     <div class="dashboard-card">
-                        <h3>Non-Conformance Areas</h3>
-                         <div class="chart-container">
-                            <canvas id="nc-chart"></canvas>
-                         </div>
-                    </div>
-                    <div class="dashboard-card">
-                        <h3>Quick Actions</h3>
-                        <div class="quick-actions">
-                            <!-- Buttons hidden/shown via JS permission checks -->
-                            <button id="quick-new-audit" class="btn btn-secondary action-btn permission-hidden" data-permission="create_audit">
-                                <i class="fas fa-plus"></i> New Audit
-                            </button>
-                            <button id="quick-export" class="btn btn-outline action-btn permission-hidden" data-permission="export_data">
-                                <i class="fas fa-file-export"></i> Export All Data
-                            </button>
+                        <div id="recent-audits-list" class="audit-list styled-list compact-list">
+                            <!-- Loading message will be replaced -->
                         </div>
                     </div>
                 </div>

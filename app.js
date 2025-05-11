@@ -142,7 +142,6 @@ let leadAuditorUsers = [];
 let auditorUsers = [];
 
 
-// In your auth state handler
 auth.onAuthStateChanged(async user => {
     console.log("Auth state changed - User:", user);
     
@@ -801,177 +800,294 @@ function loadAudits() {
 }
 
 // --- Dashboard Rendering ---
-
 function renderDashboard() {
-    if (!isSectionVisible('dashboard') || !hasPermission('view_dashboard')) return;
+    if (!isSectionVisible('dashboard')) return;
 
     // Clear existing charts
-    if (complianceChartInstance) complianceChartInstance.destroy();
-    if (ncChartInstance) ncChartInstance.destroy();
+    [complianceChartInstance, trendChartInstance, ncChartInstance, departmentChartInstance].forEach(
+        chart => chart && chart.destroy()
+    );
 
-    // Group audits by directorate
-    const directorateData = audits.reduce((acc, audit) => {
-        const directorate = audit.directorateUnit;
-        if (!acc[directorate]) {
-            acc[directorate] = {
-                audits: [],
-                totalItems: 0,
-                compliantItems: 0,
-                nonCompliantItems: 0,
-                correctiveActions: 0
-            };
-        }
-        acc[directorate].audits.push(audit);
-        
-        audit.checklist.forEach(item => {
-            if (item.applicable === 'yes') {
-                acc[directorate].totalItems++;
-                if (item.compliance === 'yes') {
-                    acc[directorate].compliantItems++;
-                } else {
-                    acc[directorate].nonCompliantItems++;
-                    if (item.correctiveAction === 'yes') {
-                        acc[directorate].correctiveActions++;
-                    }
-                }
+    // Populate directorate filter
+    const directorates = [...new Set(audits.map(a => a.directorateUnit))];
+    const filterSelect = document.getElementById('directorate-filter');
+    filterSelect.innerHTML = `<option value="">All Directorates</option>${
+        directorates.map(d => `<option value="${d}">${d}</option>`).join('')
+    }`;
+
+    // Set up filter handler
+    filterSelect.addEventListener('change', updateDashboardMetrics);
+    updateDashboardMetrics();
+}
+
+// Add new chart instances
+let trendChartInstance, ncChartInstance, departmentChartInstance;
+
+function updateDashboardMetrics() {
+    const selectedDirectorate = document.getElementById('directorate-filter').value;
+    const filteredAudits = selectedDirectorate ? 
+        audits.filter(a => a.directorateUnit === selectedDirectorate) : 
+        audits;
+
+    // Calculate metrics
+    const { complianceRate, nonComplianceRate, totalAudits, avgCorrective, trendData, ncData } = 
+        calculateMetrics(filteredAudits);
+    
+    // Update metrics display
+    document.getElementById('compliance-rate').textContent = `${complianceRate}%`;
+    document.getElementById('non-compliance-rate').textContent = `${nonComplianceRate}%`;
+    document.getElementById('total-audits').textContent = totalAudits;
+    document.getElementById('avg-corrective').textContent = avgCorrective;
+
+    // Update charts
+    renderComplianceChart(complianceRate, nonComplianceRate);
+    renderTrendChart(trendData);
+    renderNCChart(ncData);
+    renderDepartmentComparison();
+}
+
+function calculateMetrics(audits) {
+    // Existing calculations...
+    
+    // Trend data (last 6 months)
+    const months = Array.from({ length: 6 }, (_, i) => {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }).reverse();
+
+    const trendData = months.map(month => {
+        const monthAudits = audits.filter(a => a.date.startsWith(month));
+        // ... calculate monthly compliance
+        return { month, compliance: 0 }; // Placeholder for your actual calculation
+    });
+
+    // Top non-conformance
+    const ncCounts = {};
+    audits.forEach(a => {
+        a.checklist.forEach(item => {
+            if (item.compliance === 'no') {
+                ncCounts[item.requirement] = (ncCounts[item.requirement] || 0) + 1;
             }
         });
-        
-        return acc;
-    }, {});
+    });
+    const ncData = Object.entries(ncCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
-    // Create dashboard elements
-    const dashboardCharts = document.getElementById('dashboard-charts');
-    if (!dashboardCharts) return;
-    
-    dashboardCharts.innerHTML = `
-        <div class="dashboard-row">
-            <div class="dashboard-card">
-                <h3>Overall Compliance</h3>
-                <div class="chart-container">
-                    <canvas id="compliance-chart"></canvas>
-                </div>
-            </div>
-            <div class="dashboard-card">
-                <h3>Non-Conformance Areas</h3>
-                <div class="chart-container">
-                    <canvas id="nc-chart"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="dashboard-card">
-            <h3>Recent Audits</h3>
-            <div id="recent-audits-list" class="audit-list styled-list"></div>
-        </div>
-    `;
+    return { trendData, ncData }; 
+}
 
-    // Render compliance pie chart
-    const complianceCtx = document.getElementById('compliance-chart').getContext('2d');
-    const complianceRate = audits.reduce((acc, audit) => {
-        const total = audit.checklist.length;
-        const compliant = audit.checklist.filter(i => i.compliance === 'yes').length;
-        return total > 0 ? acc + (compliant / total) : acc;
-    }, 0) / (audits.length || 1) * 100;
 
-    complianceChartInstance = new Chart(complianceCtx, {
-        type: 'pie',
+function renderComplianceChart(data) {
+    const ctx = document.getElementById('compliance-chart').getContext('2d');
+    complianceChartInstance = new Chart(ctx, {
+        type: 'doughnut',
         data: {
             labels: ['Compliant', 'Non-Compliant'],
             datasets: [{
-                data: [complianceRate, 100 - complianceRate],
-                backgroundColor: ['#2a9d8f', '#e76f51'],
-                borderWidth: 1
+                data: [data.compliant, data.total - data.compliant],
+                backgroundColor: ['#2a9d8f', '#e76f51']
             }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.label}: ${context.raw.toFixed(1)}%`;
-                        }
-                    }
-                }
-            }
         }
     });
-
-    // Render non-conformance doughnut chart
-    const ncCtx = document.getElementById('nc-chart').getContext('2d');
-    const ncByArea = {};
-    
-    audits.forEach(audit => {
-        if (audit.checklist && audit.directorateUnit) {
-            const ncCount = audit.checklist.filter(item => item.compliance === 'no').length;
-            if (ncCount > 0) {
-                ncByArea[audit.directorateUnit] = (ncByArea[audit.directorateUnit] || 0) + ncCount;
-            }
-        }
-    });
-
-    const sortedAreas = Object.entries(ncByArea).sort((a, b) => b[1] - a[1]);
-    const topAreas = sortedAreas.slice(0, 5); // Limit to top 5 for pie chart
-    
-    ncChartInstance = new Chart(ncCtx, {
-        type: 'doughnut',
-        data: {
-            labels: topAreas.map(([area]) => area),
-            datasets: [{
-                data: topAreas.map(([, count]) => count),
-                backgroundColor: ['#e76f51', '#f4a261', '#ee9b00', '#e9c46a', '#2a9d8f'],
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            }
-        }
-    });
-
-    renderRecentAudits();
 }
 
-function renderComplianceChart() {
-     if (!complianceChartCanvas) return;
-    const ctx = complianceChartCanvas.getContext('2d');
-    if (complianceChartInstance) complianceChartInstance.destroy();
-    let totalItems = 0, compliantItems = 0;
-    audits.forEach(audit => {
-        if (audit.checklist) {
-             totalItems += audit.checklist.length;
-             compliantItems += audit.checklist.filter(item => item.compliance === 'yes').length;
+function renderTrendChart(data) {
+    const ctx = document.getElementById('trend-chart').getContext('2d');
+    trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.month),
+            datasets: [{
+                label: 'Compliance Rate',
+                data: data.map(d => d.rate),
+                borderColor: '#0a9396',
+                tension: 0.3
+            }]
+        },
+        options: {
+            scales: {
+                y: { max: 100 }
+            }
         }
     });
-    const complianceRate = totalItems > 0 ? Math.round((compliantItems / totalItems) * 100) : 0;
+}
+
+function renderNCChart(data) {
+    const ctx = document.getElementById('nc-chart').getContext('2d');
+    ncChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d[0]),
+            datasets: [{
+                label: 'Non-Conformances',
+                data: data.map(d => d[1]),
+                backgroundColor: '#e76f51'
+            }]
+        },
+        options: {
+            indexAxis: 'y'
+        }
+    });
+}
+
+function renderDepartmentComparison() {
+    const departments = [...new Set(audits.map(a => a.directorateUnit))];
+    const metrics = departments.map(dept => {
+        const deptAudits = audits.filter(a => a.directorateUnit === dept);
+        // Calculate department metrics
+        return { 
+            compliance: ..., 
+            nonCompliance: ..., 
+            audits: deptAudits.length,
+            correctiveActions: ...
+        };
+    });
+
+    const ctx = document.getElementById('department-chart').getContext('2d');
+    departmentChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Compliance', 'Non-Compliance', 'Audits', 'Corrective Actions'],
+            datasets: departments.map((dept, i) => ({
+                label: dept,
+                data: [
+                    metrics[i].compliance,
+                    metrics[i].nonCompliance,
+                    metrics[i].audits,
+                    metrics[i].correctiveActions
+                ],
+                borderColor: getChartColor(i),
+                pointBackgroundColor: getChartColor(i),
+                tension: 0.3
+            }))
+        },
+        options: {
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    max: Math.max(...metrics.flatMap(m => [m.compliance, m.nonCompliance]))
+                }
+            }
+        }
+    });
+}
+
+// Helper function for chart colors
+function getChartColor(index) {
+    const colors = ['var(--primary-color)', 'var(--secondary-color)', 'var(--accent-color)', 'var(--success-color)'];
+    return colors[index % colors.length];
+}
+
+function renderDeptChart(data) {
+    const ctx = document.getElementById('department-chart').getContext('2d');
+    deptChartInstance = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Compliance Rate', 'Total Audits', 'Avg. Corrective Actions'],
+            datasets: data.map((dept, i) => ({
+                label: dept.dept,
+                data: [dept.compliance, dept.audits, dept.avgCorrective],
+                backgroundColor: `hsla(${i * 90}, 70%, 50%, 0.2)`,
+                borderColor: `hsl(${i * 90}, 70%, 50%)`
+            }))
+        },
+        options: {
+            scales: {
+                r: {
+                    beginAtZero: true,
+                    pointLabels: { font: { size: 12 } }
+                }
+            }
+        }
+    });
+}
+
+function updateDashboardMetrics() {
+    const selectedDirectorate = document.getElementById('directorate-filter').value;
+    const filteredAudits = selectedDirectorate ? 
+        audits.filter(a => a.directorateUnit === selectedDirectorate) : 
+        audits;
+
+    // Calculate metrics
+    let totalItems = 0;
+    let compliantItems = 0;
+    let nonCompliantItems = 0;
+    let correctiveActions = 0;
+
+    filteredAudits.forEach(audit => {
+        audit.checklist.forEach(item => {
+            if (item.applicable === 'yes') {
+                totalItems++;
+                if (item.compliance === 'yes') compliantItems++;
+                else {
+                    nonCompliantItems++;
+                    if (item.correctiveActionNeeded) correctiveActions++;
+                }
+            }
+        });
+    });
+
+    // Update metrics display
+    const complianceRate = totalItems > 0 ? 
+        Math.round((compliantItems / totalItems) * 100) : 0;
+    const nonComplianceRate = totalItems > 0 ? 
+        Math.round((nonCompliantItems / totalItems) * 100) : 0;
+    const avgCorrective = filteredAudits.length > 0 ? 
+        Math.round(correctiveActions / filteredAudits.length) : 0;
+
+    document.getElementById('compliance-rate').textContent = `${complianceRate}%`;
+    document.getElementById('non-compliance-rate').textContent = `${nonComplianceRate}%`;
+    document.getElementById('total-audits').textContent = filteredAudits.length;
+    document.getElementById('avg-corrective').textContent = avgCorrective;
+
+    // Update chart
+    renderComplianceChart(compliantItems, nonCompliantItems);
+    renderRecentAudits(filteredAudits);
+}
+
+
+function renderComplianceChart(compliant, nonCompliant) {
+    const ctx = document.getElementById('compliance-chart').getContext('2d');
+    
     complianceChartInstance = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: ['Compliant', 'Non-Compliant'], datasets: [{ data: [complianceRate, 100 - complianceRate], backgroundColor: ['#2a9d8f', '#e76f51'], borderWidth: 2 }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.label}: ${c.raw}%` } } } }
+        data: {
+            labels: ['Compliant', 'Non-Compliant'],
+            datasets: [{
+                data: [compliant, nonCompliant],
+                backgroundColor: ['var(--success-color)', 'var(--danger-color)'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { 
+                    callbacks: {
+                        label: ctx => `${ctx.label}: ${ctx.raw} items`
+                    }
+                }
+            },
+            cutout: '65%'
+        }
     });
 }
 
-function renderRecentAudits() {
-     if (!recentAuditsList) return;
-     recentAuditsList.innerHTML = '';
-    const recent = audits.slice(0, 5);
-    if (recent.length === 0) { recentAuditsList.innerHTML = '<p>No recent audits.</p>'; return; }
-     recent.forEach(audit => {
-        const itemDiv = document.createElement('div'); itemDiv.className = 'audit-item'; itemDiv.dataset.auditId = audit.id;
-        const createdBy = audit.createdByEmail ? `by ${escapeHtml(audit.createdByEmail)}` : '';
-        itemDiv.innerHTML = `<div class="details"><strong>${escapeHtml(audit.directorateUnit || audit.auditedArea) || 'N/A'}</strong><div class="date">${formatDate(audit.date)} ${createdBy}</div></div><span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
-        itemDiv.addEventListener('click', () => openAuditDetails(audit));
-        recentAuditsList.appendChild(itemDiv);
-    });
+function renderRecentAudits(audits) {
+    const recentList = document.getElementById('recent-audits-list');
+    recentList.innerHTML = audits.slice(0, 5).map(audit => `
+        <div class="audit-item" data-audit-id="${audit.id}">
+            <div class="details">
+                <strong>${audit.directorateUnit}</strong>
+                <div class="meta">
+                    <span class="date">${formatDate(audit.date)}</span>
+                    <span class="status status-${audit.status}">${audit.status}</span>
+                </div>
+            </div>
+        </div>
+    `).join('') || '<p class="text-muted">No recent audits found</p>';
 }
 
 function renderNonConformanceChart() {
