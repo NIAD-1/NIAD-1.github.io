@@ -2422,7 +2422,7 @@ async function generateAuditDocument(auditData) {
                 <h2>National Agency for Food and Drug Administration and Control</h2>
                 <h3>INTERNAL AUDIT SUMMARY REPORT (IASR)</h3>
                 <div class="location">
-                    LOCATION: ${escapeHtml(location)}<br>
+                    LOCATION: ${escapeHtml(auditData.location)}<br>
                     UNIT/DIRECTORATE: ${escapeHtml(auditData.directorateUnit)}
                 </div>
             </div>
