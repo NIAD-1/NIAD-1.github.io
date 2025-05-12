@@ -775,14 +775,14 @@ function collectAuditFormData() {
     }
 
     const baseData = {
-        date: auditDate, 
-        directorateUnit, 
-        refNo, 
-        leadAuditors: selectedLeadAuditors, 
+        date: auditDate,
+        directorateUnit,
+        refNo,
+        leadAuditors: selectedLeadAuditors,
         auditors: selectedAuditors,
-        checklist: checklistData, 
+        checklist: checklistData,
         lastModified: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'draft' // Default status, will be updated when submitted
+        status: 'draft' // Default status
     };
 
     if (!currentAudit) {
@@ -796,7 +796,7 @@ function collectAuditFormData() {
         baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     }
 
-    return { data: baseData, location:location};
+    return { data: baseData, location: locationInput.value};
 }
 
 async function saveAuditAsDraft() {
@@ -2715,5 +2715,50 @@ async function handleForgotPassword(e) {
     }
 }
 
+async function saveAuditAsDraft() {
+    try {
+        // Collect form data
+        const formResult = collectAuditFormData();
+        if (!formResult) return; // Validation failed
+        
+        // Prepare audit data with draft status
+        const auditData = {
+            ...formResult.data,
+            location: formResult.location,
+            status: 'draft',
+            lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Show loading state
+        saveDraftBtn.disabled = true;
+        saveDraftBtn.textContent = 'Saving...';
+        
+        // Save to Firestore
+        if (currentAudit?.id) {
+            // Update existing draft
+            await db.collection('audits').doc(currentAudit.id).update(auditData);
+            showMessage('Draft updated successfully!', 'success');
+        } else {
+            // Create new draft
+            auditData.createdBy = currentUser.uid;
+            auditData.createdByEmail = currentUser.email;
+            auditData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            
+            await db.collection('audits').add(auditData);
+            showMessage('Draft saved successfully!', 'success');
+        }
+        
+        // Refresh audits list
+        loadAudits();
+        
+    } catch (error) {
+        console.error('Error saving draft:', error);
+        showMessage('Failed to save draft: ' + error.message, 'error');
+    } finally {
+        // Reset button state
+        saveDraftBtn.disabled = false;
+        saveDraftBtn.textContent = 'Save Draft';
+    }
+}
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
