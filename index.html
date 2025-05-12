@@ -99,19 +99,15 @@
 
         <!-- Main Content -->
         <main class="container app-main">
-            <!-- Dashboard Section -->
-            <!-- Add this to your dashboard section -->
             <section id="dashboard-section" class="content-section" data-permission="view_dashboard">
                 <div class="dashboard-header">
                     <h2>Compliance Overview</h2>
                     <div class="dashboard-controls">
                         <select id="directorate-filter" class="dashboard-filter">
                             <option value="">All Directorates</option>
-                            <!-- Options will be populated dynamically -->
                         </select>
                     </div>
                 </div>
-
                 <div class="dashboard-grid">
                     <!-- Key Metrics -->
                     <div class="metrics-container">
@@ -140,7 +136,28 @@
                             <canvas id="compliance-chart"></canvas>
                         </div>
                     </div>
-
+                    <div class="dashboard-card chart-card">
+                        <h3>Compliance Trend (Last 6 Months)</h3>
+                        <div class="chart-container">
+                            <canvas id="trend-chart"></canvas>
+                        </div>
+                    </div>
+                
+                    <!-- Top Non-Conformance -->
+                    <div class="dashboard-card chart-card">
+                        <h3>Top Non-Conformance Areas</h3>
+                        <div class="chart-container">
+                            <canvas id="nc-chart"></canvas>
+                        </div>
+                    </div>
+                
+                    <!-- Department Comparison -->
+                    <div class="dashboard-card chart-card">
+                        <h3>Department Comparison</h3>
+                        <div class="chart-container">
+                            <canvas id="department-chart"></canvas>
+                        </div>
+                    </div>
                     <!-- Recent Audits -->
                     <div class="dashboard-card">
                         <div class="recent-audits-header">
@@ -148,7 +165,6 @@
                             <a href="#audit-history" class="view-all">View All →</a>
                         </div>
                         <div id="recent-audits-list" class="audit-list styled-list compact-list">
-                            <!-- Loading message will be replaced -->
                         </div>
                     </div>
                 </div>
@@ -178,9 +194,12 @@
                             <label for="directorate-unit">Directorate / Unit:</label>
                             <select id="directorate-unit" required>
                                 <option value="">Select Directorate/Unit</option>
-                                <option value="Registration and Regulatory Affairs (R&R)">Registration and Regulatory Affairs (R&R)</option>
-                                <option value="Laboratory Services (Food)">Laboratory Services (Food)</option>
-                                <option value="Laboratory Services (Drug)">Laboratory Services (Drug)</option>
+                                <option value="(DRUG R&RA)">Drug Registration and Regulatory Affairs (DRUG R&RA)</option>
+                                <option value="(FOOD R&RA)">Food Registration and Regulatory Affairs (FOOD R&RA)</option>
+                                <option value="Laboratory Services (LS-Food)">Laboratory Services (Food)</option>
+                                <option value="Laboratory Services (LS-Drugs)">Laboratory Services (Drug)</option>
+                                <option value="Laboratory Services (LS-VBM)">Laboratory Services (Vaccines, Biologics & Medical Devices)</option>
+                                <option value="Vaccine, Biologics & Medical Devices R&R">Vaccine, Biologics & Medical Devices R&R</option>
                                 <option value="Chemical Evaluation and Research (CER)">Chemical Evaluation and Research (CER)</option>
                                 <option value="Food Safety and Applied Nutrition (FSAN)">Food Safety and Applied Nutrition (FSAN)</option>
                                 <option value="Pharmacovigilance (PV)">Pharmacovigilance (PV)</option>
@@ -191,10 +210,21 @@
                                 <option value="Planning, Research and Statistics (PRS)">Planning, Research and Statistics (PRS)</option>
                                 <option value="Administration and Human Resources (HRM)">Human Resource management (AHRM)</option>
                                 <option value="Finance and Accounts (F&A)">Finance and Accounts (F&A)</option>
-                                <option value="Legal Services">Legal Services</option>
+                                <option value="Legal (Lagos)">Legal (Lagos)</option>
+                                <option value="Legal (Abuja)">Legal (Abuja)</option>
+                                <option value="Narcotics & Controlled Substances (NCS)">Narcotics & Controlled Substances (NCS)</option>
 
                             </select>
                         </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="location">Location:</label>
+                        <select id="location" class="enhanced-select" required>
+                            <option value="">Select Location</option>
+                            <option value="Lagos">Lagos</option>
+                            <option value="Abuja">Abuja</option>
+                        </select>
                     </div>
             
                     <!-- Lead Auditors Multi-Select -->
@@ -206,19 +236,23 @@
                                 <span class="arrow">▼</span>
                             </div>
                             <div class="dropdown-options" id="lead-auditors-options">
-                                <label><input type="checkbox" value="Fatoki Sa"> Fatoki Samson</label>
-                                <label><input type="checkbox" value="Biyama Kalang"> Biyama Kalang</label>
-                                <label><input type="checkbox" value="Bolanle Ikusagba"> Bolanle Ikusagba</label>
+                                <label><input type="checkbox" value="Fatoki Samson"> Fatoki Samson</label>
+                                <label><input type="checkbox" value="Adesanya Oluwaseun"> Adesanya Oluwaseun</label>
+                                <label><input type="checkbox" value="Abubakar Fatima"> Abubakar Fatima</label>
                                 <label><input type="checkbox" value="Chinyelu Danga"> Chinyelu Danga</label>
-                                <label><input type="checkbox" value="Folashade Osho"> Folashade Osho</label>
-                                <label><input type="checkbox" value="Ifudu N"> Ifudu Nkem</label>
-                                <label><input type="checkbox" value="Kem Ashibuogwu"> Kema Ashibuogwu</label>
+                                <label><input type="checkbox" value="Osho Folashade">Osho Folashade</label>
+                                <label><input type="checkbox" value="Ifudu Nkem"> Ifudu Nkem</label>
+                                <label><input type="checkbox" value="Kema Ashibuogwu"> Kema Ashibuogwu</label>
                                 <label><input type="checkbox" value="Khadijah Ade-Abolade"> Khadijah Ade-Abolade</label>
                                 <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
                                 <label><input type="checkbox" value="Stephanie Adeoye"> Stephanie Adeoye</label>
                                 <label><input type="checkbox" value="Sunday Adown"> Sunday Adown</label>
                                 <label><input type="checkbox" value="Vivien Ibeh"> Vivien Ibeh</label>
-                                <label><input type="checkbox" value="Wendy Ndugbu"> Wendy Ndugbu</label>
+                                <label><input type="checkbox" value="Wendy Ndugbu Muoneke"> Wendy Ndugbu Muoneke</label>
+                                <label><input type="checkbox" value="Ikusagba Bola"> Ikusagba Bola</label>
+                                <label><input type="checkbox" value="Biyama Kalang"> Biyama Kalang</label>
+                                <label><input type="checkbox" value="Bolanle Ikusagba"> Ikusagba Bola</label>
+                                <label><input type="checkbox" value="Uche Rose"> Uche Rose</label>
                             </div>
                         </div>
                     </div>
@@ -233,26 +267,33 @@
                             </div>
                             <div class="dropdown-options" id="auditors-options">
                                 <label><input type="checkbox" value="Omoru Emmanuel"> Omoru Emmanuel</label>
-                                <label><input type="checkbox" value="Mrs. Offor Adaku F."> Mrs. Offor Adaku F.</label>
-                                <label><input type="checkbox" value="Onwualu Rosemary N."> Onwualu Rosemary N.</label>
-                                <label><input type="checkbox" value="MARIAN.I. BOJUWOYE"> MARIAN.I. BOJUWOYE</label>
-                                <label><input type="checkbox" value="Ms. Azogini Ebosie"> Ms. Azogini Ebosie</label>
-                                <label><input type="checkbox" value="Mrs. Bolanle Ikusagba"> Mrs. Bolanle Ikusagba</label>
-                                <label><input type="checkbox" value="IBEH, Vivien Ify"> IBEH, Vivien Ify</label>
+                                <label><input type="checkbox" value="Offor Adaku"> Offor Adaku</label>
+                                <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
+                                <label><input type="checkbox" value="Marian Bojuwoye"> Marian Bojuwoye</label>
+                                <label><input type="checkbox" value="Azogini Ebosie"> Azogini Ebosie</label>
+                                <label><input type="checkbox" value="Bolanle Ikusagba">Bolanle Ikusagba</label>
+                                <label><input type="checkbox" value="Ibeh Vivien Ify"> Ibeh Vivien Ify</label>
                                 <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
                                 <label><input type="checkbox" value="Tabitha Bukar"> Tabitha Bukar</label>
-                                <label><input type="checkbox" value="AKINYEMI, S. O"> AKINYEMI, S. O</label>
-                                <label><input type="checkbox" value="Mrs. Anulika Princess Nwosu"> Mrs. Anulika Princess Nwosu</label>
-                                <label><input type="checkbox" value="Oriade-Shabi Olabisi A"> Oriade-Shabi Olabisi A</label>
-                                <label><input type="checkbox" value="Mrs. Akinyemi Julianah"> Mrs. Akinyemi Julianah</label>
-                                <label><input type="checkbox" value="Mr. Adewale Muniru"> Mr. Adewale Muniru</label>
-                                <label><input type="checkbox" value="Mr. Salihu Bello"> Mr. Salihu Bello</label>
-                                <label><input type="checkbox" value="Alex Tanko, Joyce"> Alex Tanko, Joyce</label>
-                                <label><input type="checkbox" value="Mr. Shallwanga Sunday"> Mr. Shallwanga Sunday</label>
-                                <label><input type="checkbox" value="Mr. Umar Mala Bukar"> Mr. Umar Mala Bukar</label>
-                                <label><input type="checkbox" value="Mrs. Ekwealor Chinenye"> Mrs. Ekwealor Chinenye</label>
+                                <label><input type="checkbox" value="Omonike Oluyide "> Omonike Oluyide</label>
+                                <label><input type="checkbox" value="Akinyemi Sidikat"> Akinyemi Sidikat</label>
+                                <label><input type="checkbox" value="Anulika Princess Nwosu"> Anulika Princess Nwosu</label>
+                                <label><input type="checkbox" value="Oriade-Shabi Olabisi "> Oriade-Shabi Olabisi </label>
+                                <label><input type="checkbox" value="Akinyemi Julianah"> Akinyemi Julianah</label>
+                                <label><input type="checkbox" value="Adewale Muniru">Adewale Muniru</label>
+                                <label><input type="checkbox" value="Salihu Bello">Salihu Bello</label>
+                                <label><input type="checkbox" value="Alex Tanko Joyce"> Alex Tanko Joyce</label>
+                                <label><input type="checkbox" value="Shallwanga Sunday">Shallwanga Sunday</label>
+                                <label><input type="checkbox" value="Umar Mala Bukar">Umar Mala Bukar</label>
+                                <label><input type="checkbox" value="Ekwealor Chinenye"> Ekwealor Chinenye</label>
                                 <label><input type="checkbox" value="Yunusa Hadizah Ibrahim"> Yunusa Hadizah Ibrahim</label>
                                 <label><input type="checkbox" value="Ojo Ayodeji Olukunle"> Ojo Ayodeji Olukunle</label>
+                                <label><input type="checkbox" value="Odekunle Hannatu"> Odekunle Hannatu</label>
+                                <label><input type="checkbox" value="QM ICT"> QM ICT</label>
+                                <label><input type="checkbox" value="QM Public Affairs"> QM Public Affairs</label>
+                                <label><input type="checkbox" value="Hulugh Terhemen"> Hulugh Terhemen</label>
+                                <label><input type="checkbox" value="Joan Abaagu"> Joan Abaagu</label>
+                                <label><input type="checkbox" value="Hassan Tanko">Hassan Tanko</label>
                             </div>
                         </div>
                     </div>

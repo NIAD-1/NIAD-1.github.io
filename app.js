@@ -94,7 +94,7 @@ const refNoInput = document.getElementById('ref-no');                   // New I
 const checklistContainer = document.getElementById('checklist-container');
 const saveDraftBtn = document.getElementById('save-draft-btn');
 const submitAuditBtn = document.getElementById('submit-audit-btn');
-
+const locationInput = document.getElementById('location');
 // AUDIT STATUS //
 
 
@@ -584,11 +584,13 @@ function collectAuditFormData() {
     const auditDate = auditDateInput?.value;
     const directorateUnit = directorateUnitInput?.value.trim();
     const refNo = refNoInput?.value.trim();
+    const location = locationInput?.value;
 
     // Basic required field validation
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
     if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
     if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
+    if (!locauon) {alert('Select Location.'); locationInput?.focus(); returnnull; }
 
     // Check if at least one lead auditor is selected
     const leadAuditorsSelected = Array.from(document.querySelectorAll('#lead-auditors-options input[type="checkbox"]:checked')).length > 0;
@@ -705,7 +707,7 @@ function collectAuditFormData() {
         baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
     }
 
-    return { data: baseData };
+    return { data: baseData, location:location};
 }
 
 async function saveAuditAsDraft() {
@@ -1282,51 +1284,178 @@ function closeModal() {
     // console.log("Modal closed.");
 }
 
-async function editAudit() { // Made async
-    if (!currentAudit) { console.error("No audit selected."); return; }
-    if (!canEditAudit(currentAudit)) { alert("Permission Denied."); return; }
-
-    await initNewAuditForm(); // Wait for form init (includes user fetch)
-
-    const auditToEdit = audits.find(a => a.id === currentAudit.id);
-     if (!auditToEdit) { alert("Error loading audit data."); switchSection('audit-history'); return; }
-    currentAudit = { ...auditToEdit }; // Restore context
-
-    console.log(`Loading audit ${currentAudit.id} for editing.`);
-    if(directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || currentAudit.auditedArea || '';
-    if(refNoInput) refNoInput.value = currentAudit.refNo || '';
-    if(auditDateInput) auditDateInput.value = currentAudit.date || '';
-
-    setSelectedOptions(leadAuditorsSelect, currentAudit.leadAuditors || []);
-    setSelectedOptions(auditorsSelect, currentAudit.auditors || []);
-
-    const checklistElements = checklistContainer?.querySelectorAll('.checklist-item');
-    if (currentAudit.checklist && checklistElements?.length === currentAudit.checklist.length) {
-        checklistElements.forEach((itemElement, index) => {
-            const itemData = currentAudit.checklist[index]; if (!itemData) return;
-            const itemId = itemData.id;
-            // Set compliance
-            itemElement.querySelectorAll('.compliance-btn').forEach(btn => {
-                btn.classList.remove('active', 'compliance-yes', 'compliance-no');
-                if (btn.dataset.compliance === itemData.compliance) btn.classList.add('active', itemData.compliance === 'yes' ? 'compliance-yes' : 'compliance-no');
-            });
-            // Set evidence
-            const evidenceEl = itemElement.querySelector('.evidence-input'); if (evidenceEl) evidenceEl.value = itemData.objectiveEvidence || '';
-            // Set Correction Needed radio and count
-            const yesRadio = itemElement.querySelector(`#ca-yes-${itemId}`); const noRadio = itemElement.querySelector(`#ca-no-${itemId}`);
-            const howManyGrp = itemElement.querySelector(`#how-many-needed-group-${itemId}`); const howManySel = itemElement.querySelector(`#how-many-needed-${itemId}`);
-            if (itemData.correctiveActionNeeded) {
-                if(yesRadio) yesRadio.checked = true; if(howManyGrp) howManyGrp.classList.remove('hidden-conditional');
-                if(howManySel && itemData.correctiveActionsCount) howManySel.value = itemData.correctiveActionsCount;
-            } else { if(noRadio) noRadio.checked = true; if(howManyGrp) howManyGrp.classList.add('hidden-conditional'); }
-            // Set Comments
-            const commentsEl = itemElement.querySelector(`#comments-${itemId}`); if (commentsEl) commentsEl.value = itemData.comments || '';
-        });
-    } else console.warn("Checklist mismatch on edit load for audit:", currentAudit.id);
-
-    closeModal();
-    switchSection('new-audit');
+function addSearchToAuditHistory() {
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search audits...';
+    searchInput.className = 'search-input';
+    searchInput.addEventListener('input', (e) => {
+        const searchTerm = e.target.value.toLowerCase();
+        const filtered = audits.filter(audit => 
+            audit.directorateUnit.toLowerCase().includes(searchTerm) ||
+            (audit.refNo && audit.refNo.toLowerCase().includes(searchTerm)) ||
+            audit.status.toLowerCase().includes(searchTerm)
+        );
+        renderAuditHistory(filtered);
+    });
+    
+    const filterControls = document.querySelector('.filter-controls');
+    if (filterControls) {
+        filterControls.prepend(searchInput);
+    }
 }
+
+function addSortingToAuditHistory() {
+    const sortSelect = document.createElement('select');
+    sortSelect.className = 'sort-select';
+    
+    const options = [
+        { value: 'date-desc', text: 'Date (Newest First)' },
+        { value: 'date-asc', text: 'Date (Oldest First)' },
+        { value: 'directorate', text: 'Directorate/Unit' },
+        { value: 'status', text: 'Status' }
+    ];
+    
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.text;
+        sortSelect.appendChild(option);
+    });
+    
+    sortSelect.addEventListener('change', (e) => {
+        const value = e.target.value;
+        let sorted = [...audits];
+        
+        switch(value) {
+            case 'date-desc':
+                sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+                break;
+            case 'date-asc':
+                sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+                break;
+            case 'directorate':
+                sorted.sort((a, b) => a.directorateUnit.localeCompare(b.directorateUnit));
+                break;
+            case 'status':
+                sorted.sort((a, b) => a.status.localeCompare(b.status));
+                break;
+        }
+        
+        renderAuditHistory(sorted);
+    });
+    
+    const filterControls = document.querySelector('.filter-controls');
+    if (filterControls) {
+        filterControls.appendChild(sortSelect);
+    }
+}
+
+function addSortingToAuditHistory() {
+    const sortSelect = document.createElement('select');
+    sortSelect.className = 'sort-select';
+    
+    const options = [
+        { value: 'date-desc', text: 'Date (Newest First)' },
+        { value: 'date-asc', text: 'Date (Oldest First)' },
+        { value: 'directorate', text: 'Directorate/Unit' },
+        { value: 'status', text: 'Status' }
+    ];
+    
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.text;
+        sortSelect.appendChild(option);
+    });
+    
+    sortSelect.addEventListener('change', (e) => {
+        const value = e.target.value;
+        let sorted = [...audits];
+        
+        switch(value) {
+            case 'date-desc':
+                sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+                break;
+            case 'date-asc':
+                sorted.sort((a, b) => new Date(a.date) - new Date(b.date));
+                break;
+            case 'directorate':
+                sorted.sort((a, b) => a.directorateUnit.localeCompare(b.directorateUnit));
+                break;
+            case 'status':
+                sorted.sort((a, b) => a.status.localeCompare(b.status));
+                break;
+        }
+        
+        renderAuditHistory(sorted);
+    });
+    
+    const filterControls = document.querySelector('.filter-controls');
+    if (filterControls) {
+        filterControls.appendChild(sortSelect);
+    }
+}
+
+function addStatusFilter() {
+    const statusFilter = document.createElement('select');
+    statusFilter.className = 'status-filter';
+    
+    const options = [
+        { value: '', text: 'All Statuses' },
+        { value: 'draft', text: 'Draft' },
+        { value: 'submitted', text: 'Submitted' }
+    ];
+    
+    options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.text;
+        statusFilter.appendChild(option);
+    });
+    
+    statusFilter.addEventListener('change', (e) => {
+        const status = e.target.value;
+        const filtered = status ? audits.filter(audit => audit.status === status) : audits;
+        renderAuditHistory(filtered);
+    });
+    
+    const filterControls = document.querySelector('.filter-controls');
+    if (filterControls) {
+        filterControls.appendChild(statusFilter);
+    }
+}
+
+async function deleteCurrentAudit() {
+    if (!currentAudit || currentUser?.role !== 'admin') return;
+    
+    if (!confirm(`Are you sure you want to permanently delete this audit (${currentAudit.refNo})?`)) {
+        return;
+    }
+    
+    try {
+        await db.collection('audits').doc(currentAudit.id).delete();
+        loadAudits();
+        closeModal();
+        showMessage('Audit deleted successfully', 'success');
+    } catch (error) {
+        console.error('Error deleting audit:', error);
+        showMessage('Failed to delete audit', 'error');
+    }
+}
+
+function showMessage(message, type) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${type}`;
+    messageDiv.textContent = message;
+    
+    document.body.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.remove();
+    }, 3000);
+}
+
 
 function setSelectedOptions(selectElement, selectedArray) {
     if (!selectElement || !selectedArray) return;
@@ -1389,75 +1518,276 @@ function toggleCustomDateRange() {
 }
 
 
-function generateReport() {
-    if (!hasPermission('generate_reports')) { alert("Permission Denied."); return; }
-     const reportType = document.getElementById('report-type').value;
-     const period = document.getElementById('report-period').value;
-     if (reportChartInstance) reportChartInstance.destroy();
-     if(reportTableContainer) reportTableContainer.innerHTML = '<p>Generating report...</p>';
-     if(reportChartContainer) reportChartContainer.style.display = 'none';
 
-     let fromDate, toDate; const today = new Date();
-     if (period === 'custom') {
-         fromDate = document.getElementById('report-from').value;
-         toDate = document.getElementById('report-to').value;
-         if (!fromDate || !toDate) {
-             alert("Select custom date range.");
-             if(reportTableContainer) reportTableContainer.innerHTML = '<p class="error-message">Custom date range incomplete.</p>'; // Use error class
-             return;
-         }
-     } else {
-         const toDateObj = new Date(today); toDate = toDateObj.toISOString().split('T')[0];
-         const fromDateObj = new Date(today);
-         if (period === 'last-month') fromDateObj.setMonth(fromDateObj.getMonth() - 1);
-         else if (period === 'last-quarter') fromDateObj.setMonth(fromDateObj.getMonth() - 3);
-         else if (period === 'last-year') fromDateObj.setFullYear(fromDateObj.getFullYear() - 1);
-         fromDate = fromDateObj.toISOString().split('T')[0];
-     }
-     console.log(`Generating report: ${reportType} from ${fromDate} to ${toDate}`);
-     const reportAudits = audits.filter(a => a.date >= fromDate && a.date <= toDate && a.status === 'submitted');
-     if (reportAudits.length === 0) {
-         if(reportTableContainer) reportTableContainer.innerHTML = '<p>No submitted audits found for period.</p>';
-         return;
-      }
-     console.log(`Using ${reportAudits.length} audits.`);
-
-     try {
-         if(reportChartContainer) reportChartContainer.style.display = 'block';
-         if (reportType === 'compliance') generateComplianceReport(reportAudits, fromDate, toDate);
-         else if (reportType === 'non-conformance') generateNonConformanceReport(reportAudits, fromDate, toDate);
-         else if (reportType === 'trend') generateTrendReport(reportAudits, fromDate, toDate);
-         else throw new Error(`Unknown type: ${reportType}`);
-     } catch (e) {
-         console.error("Report gen error:", e);
-         if(reportTableContainer) reportTableContainer.innerHTML = `<p class="error-message">Error: ${e.message}</p>`; // Use error class
-         if(reportChartContainer) reportChartContainer.style.display = 'none';
+async function generateReport() {
+    const reportType = document.getElementById('report-type').value;
+    const period = document.getElementById('report-period').value;
+    
+    let fromDate, toDate;
+    const today = new Date();
+    
+    if (period === 'custom') {
+        fromDate = document.getElementById('report-from').value;
+        toDate = document.getElementById('report-to').value;
+        
+        if (!fromDate || !toDate) {
+            showMessage('Please select a custom date range', 'error');
+            return;
         }
+    } else {
+        const toDateObj = new Date(today);
+        toDate = toDateObj.toISOString().split('T')[0];
+        
+        const fromDateObj = new Date(today);
+        if (period === 'last-month') fromDateObj.setMonth(fromDateObj.getMonth() - 1);
+        else if (period === 'last-quarter') fromDateObj.setMonth(fromDateObj.getMonth() - 3);
+        else if (period === 'last-year') fromDateObj.setFullYear(fromDateObj.getFullYear() - 1);
+        
+        fromDate = fromDateObj.toISOString().split('T')[0];
+    }
+    
+    const reportAudits = audits.filter(a => a.date >= fromDate && a.date <= toDate && a.status === 'submitted');
+    
+    if (reportAudits.length === 0) {
+        showMessage('No submitted audits found for selected period', 'warning');
+        return;
+    }
+    
+    try {
+        switch(reportType) {
+            case 'compliance':
+                generateComplianceReport(reportAudits, fromDate, toDate);
+                break;
+            case 'non-conformance':
+                generateNonConformanceReport(reportAudits, fromDate, toDate);
+                break;
+            case 'trend':
+                generateTrendReport(reportAudits, fromDate, toDate);
+                break;
+            case 'department':
+                generateDepartmentReport(reportAudits, fromDate, toDate);
+                break;
+        }
+    } catch (error) {
+        console.error('Error generating report:', error);
+        showMessage('Failed to generate report', 'error');
+    }
+}
+
+function renderReportsDashboard() {
+    const reportsSection = document.getElementById('reports-section');
+    if (!reportsSection) return;
+    
+    reportsSection.innerHTML = `
+        <div class="reports-header">
+            <h2>Reports & Analysis</h2>
+            <div class="report-controls">
+                <select id="report-period" class="form-control">
+                    <option value="last-month">Last Month</option>
+                    <option value="last-quarter">Last Quarter</option>
+                    <option value="last-year">Last Year</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+                
+                <div id="custom-date-range" class="hidden">
+                    <input type="date" id="report-from" class="form-control">
+                    <input type="date" id="report-to" class="form-control">
+                </div>
+                
+                <select id="report-type" class="form-control">
+                    <option value="compliance">Compliance Overview</option>
+                    <option value="non-conformance">Non-Conformance Analysis</option>
+                    <option value="trend">Trend Analysis</option>
+                    <option value="department">Department Comparison</option>
+                </select>
+                
+                <button id="generate-report-btn" class="btn btn-primary">Generate Report</button>
+                <button id="export-pdf-btn" class="btn btn-secondary">Export as PDF</button>
+            </div>
+        </div>
+        
+        <div class="reports-grid">
+            <div class="report-card">
+                <h3>Compliance Overview</h3>
+                <div class="chart-container">
+                    <canvas id="compliance-chart"></canvas>
+                </div>
+                <div class="report-summary" id="compliance-summary"></div>
+            </div>
+            
+            <div class="report-card">
+                <h3>Non-Conformance Analysis</h3>
+                <div class="chart-container">
+                    <canvas id="nc-chart"></canvas>
+                </div>
+                <div class="report-summary" id="nc-summary"></div>
+            </div>
+            
+            <div class="report-card">
+                <h3>Trend Analysis</h3>
+                <div class="chart-container">
+                    <canvas id="trend-chart"></canvas>
+                </div>
+                <div class="report-summary" id="trend-summary"></div>
+            </div>
+            
+            <div class="report-card">
+                <h3>Department Comparison</h3>
+                <div class="chart-container">
+                    <canvas id="department-chart"></canvas>
+                </div>
+                <div class="report-summary" id="department-summary"></div>
+            </div>
+        </div>
+    `;
+    
+    // Add event listeners
+    document.getElementById('report-period').addEventListener('change', toggleCustomDateRange);
+    document.getElementById('generate-report-btn').addEventListener('click', generateReport);
+    document.getElementById('export-pdf-btn').addEventListener('click', exportReportAsPDF);
+    
+    // Initialize default reports
+    generateComplianceReport(audits);
 }
 
 function generateComplianceReport(reportAudits, from, to) {
-    console.log("Generating Compliance Report");
-    if (!reportChartCanvas || !reportTableContainer) return;
-    const ctx = reportChartCanvas.getContext('2d');
-    const compByArea = {}; let totalAudits = 0;
-    reportAudits.forEach(a => {
-        const area = a.directorateUnit || a.auditedArea;
-        if (a.checklist?.length > 0 && area) {
-             totalAudits++; const total = a.checklist.length;
-             const compliant = a.checklist.filter(i => i.compliance === 'yes').length;
-             const rate = Math.round((compliant / total) * 100);
-             if (compByArea[area]) { compByArea[area].totalRate += rate; compByArea[area].count++; }
-             else { compByArea[area] = { totalRate: rate, count: 1 }; }
+    const ctx = document.getElementById('compliance-chart').getContext('2d');
+    
+    // Calculate compliance metrics
+    let totalItems = 0;
+    let compliantItems = 0;
+    let nonCompliantItems = 0;
+    
+    reportAudits.forEach(audit => {
+        audit.checklist.forEach(item => {
+            if (item.applicable === 'yes') {
+                totalItems++;
+                if (item.compliance === 'yes') compliantItems++;
+                else nonCompliantItems++;
+            }
+        });
+    });
+    
+    const complianceRate = totalItems > 0 ? Math.round((compliantItems / totalItems) * 100) : 0;
+    
+    // Update chart
+    if (complianceChartInstance) complianceChartInstance.destroy();
+    
+    complianceChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Compliant', 'Non-Compliant'],
+            datasets: [{
+                data: [compliantItems, nonCompliantItems],
+                backgroundColor: ['#2a9d8f', '#e76f51'],
+                borderColor: ['#ffffff', '#ffffff'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((acc, data) => acc + data, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} items (${percentage}%)`;
+                        }
+                    }
+                }
+            },
+            cutout: '65%'
         }
     });
-    const areas = Object.keys(compByArea).sort();
-    if (areas.length === 0) { reportTableContainer.innerHTML = '<p>No compliance data.</p>'; if(reportChartContainer) reportChartContainer.style.display = 'none'; return; }
-    const avgRates = areas.map(a => Math.round(compByArea[a].totalRate / compByArea[a].count));
-    if (reportChartInstance) reportChartInstance.destroy(); // Destroy previous before creating new
-    reportChartInstance = new Chart(ctx, { type: 'bar', data: { labels: areas, datasets: [{ label: 'Avg Compliance (%)', data: avgRates, backgroundColor: avgRates.map(getComplianceColor) }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'Avg Rate (%)' } } } } });
-    let table = `<h3>Compliance (${formatDate(from)} to ${formatDate(to)}) - ${totalAudits} Audits</h3><table class="report-table"><thead><tr><th>Area</th><th>Avg Rate</th><th>Status</th></tr></thead><tbody>`;
-    areas.forEach((a, i) => { const r = avgRates[i]; const { statusClass, statusText } = getComplianceStatus(r); table += `<tr><td>${escapeHtml(a)}</td><td>${r}%</td><td class="${statusClass}">${statusText}</td></tr>`; });
-    table += `</tbody></table>`; reportTableContainer.innerHTML = table;
+    
+    // Update summary
+    const summaryEl = document.getElementById('compliance-summary');
+    if (summaryEl) {
+        summaryEl.innerHTML = `
+            <div class="metric">
+                <div class="metric-value">${complianceRate}%</div>
+                <div class="metric-label">Overall Compliance Rate</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${reportAudits.length}</div>
+                <div class="metric-label">Audits Analyzed</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value">${totalItems}</div>
+                <div class="metric-label">Items Checked</div>
+            </div>
+            <div class="time-period">${formatDate(from)} to ${formatDate(to)}</div>
+        `;
+    }
+}
+
+function exportReportAsPDF() {
+
+    
+    const reportType = document.getElementById('report-type').value;
+    const title = `NAFDAC Audit Report - ${reportType.charAt(0).toUpperCase() + reportType.slice(1)}`;
+    
+
+    const reportDiv = document.createElement('div');
+    reportDiv.className = 'pdf-report';
+    reportDiv.innerHTML = `
+        <h1>${title}</h1>
+        <div class="report-period">${getReportPeriodText()}</div>
+        <div class="report-content">
+            ${getReportContentForPDF(reportType)}
+        </div>
+        <div class="footer">
+            Generated on ${formatDate(new Date())} by ${currentUser?.email || 'System'}
+        </div>
+    `;
+    
+    document.body.appendChild(reportDiv);
+    
+
+    const opt = {
+        margin: 10,
+        filename: `NAFDAC_Report_${reportType}_${new Date().toISOString().split('T')[0]}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+
+    html2pdf().from(reportDiv).set(opt).save();
+
+    setTimeout(() => {
+        reportDiv.remove();
+    }, 1000);
+}
+
+function getReportPeriodText() {
+    const period = document.getElementById('report-period').value;
+    
+    if (period === 'custom') {
+        const from = document.getElementById('report-from').value;
+        const to = document.getElementById('report-to').value;
+        return `Period: ${formatDate(from)} to ${formatDate(to)}`;
+    }
+    
+    return `Period: Last ${period.replace('last-', '')}`;
+}
+
+function getReportContentForPDF(reportType) {
+   
+    switch(reportType) {
+        case 'compliance':
+            return document.getElementById('compliance-summary').outerHTML;
+        case 'non-conformance':
+            return document.getElementById('nc-summary').outerHTML;
+        // Add other cases
+        default:
+            return '';
+    }
 }
 
 function generateNonConformanceReport(reportAudits, from, to) {
@@ -1908,6 +2238,7 @@ async function generateAuditDocument(auditData) {
     const auditeeName = document.getElementById('auditee-name')?.value || 'Not specified';
     const auditeePosition = document.getElementById('auditee-position')?.value || 'Not specified';
     const logoUrl = 'data:image/png;base64,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';
+    const location = auditData.location || 'Not specified';
     // Generate HTML
     const htmlContent = `
     <!DOCTYPE html>
@@ -2002,7 +2333,8 @@ async function generateAuditDocument(auditData) {
                 <h2>National Agency for Food and Drug Administration and Control</h2>
                 <h3>INTERNAL AUDIT SUMMARY REPORT (IASR)</h3>
                 <div class="location">
-                    LOCATION/UNIT/DIRECTORATE: ${escapeHtml(auditData.directorateUnit)}
+                    LOCATION: ${escapeHtml(location)}<br>
+                    UNIT/DIRECTORATE: ${escapeHtml(auditData.directorateUnit)}
                 </div>
             </div>
             <div style="clear: both;"></div>
@@ -2172,6 +2504,7 @@ function redirectToTeamsChannel() {
 function clearAuditForm() {
     // Reset form fields
     if (auditForm) auditForm.reset();
+    if (locationInput) locationInput.value = '';
     
     // Clear checklist items
     const checklistItems = checklistContainer?.querySelectorAll('.checklist-item');
