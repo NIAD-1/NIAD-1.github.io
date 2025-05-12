@@ -205,8 +205,8 @@ function setupEventListeners() {
     document.getElementById('export-csv-btn')?.addEventListener('click', exportReportToCSV);
     document.getElementById('report-period')?.addEventListener('change', toggleCustomDateRange);
     document.getElementById('change-password-link')?.addEventListener('click', showPasswordChangeModal);
-document.getElementById('login-page-password-form')?.addEventListener('submit', handleLoginPagePasswordChange);
-document.getElementById('forgot-password-link')?.addEventListener('click', handleForgotPassword);
+    document.getElementById('login-page-password-form')?.addEventListener('submit', handleLoginPagePasswordChange);
+    document.getElementById('forgot-password-link')?.addEventListener('click', handleForgotPassword);
 
     // Modal events
     closeModalButton?.addEventListener('click', closeModal);
@@ -345,6 +345,94 @@ function updateUIForRole() {
         }
     });
     updateModalEditButtonVisibility();
+}
+
+function editAudit() {
+    if (!currentAudit || !canEditAudit(currentAudit)) {
+        alert("You don't have permission to edit this audit.");
+        return;
+    }
+    
+    // Switch to the new-audit section
+    switchSection('new-audit');
+    
+    // Populate the form with the current audit data
+    if (auditDateInput) auditDateInput.value = currentAudit.date || '';
+    if (directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || '';
+    if (refNoInput) refNoInput.value = currentAudit.refNo || '';
+    if (locationInput) locationInput.value = currentAudit.location || '';
+    
+    // Populate lead auditors and auditors (you'll need to implement this)
+    populateAuditorSelections(currentAudit.leadAuditors, currentAudit.auditors);
+    
+    // Populate checklist items
+    if (currentAudit.checklist && checklistContainer) {
+        currentAudit.checklist.forEach(item => {
+            const itemElement = checklistContainer.querySelector(`[data-item-id="${item.id}"]`);
+            if (itemElement) {
+                // Set applicability
+                const applicableRadio = itemElement.querySelector(`input[name="applicable-${item.id}"][value="${item.applicable}"]`);
+                if (applicableRadio) applicableRadio.checked = true;
+                
+                // Show/hide content based on applicability
+                const content = itemElement.querySelector('.checklist-content');
+                if (content) {
+                    content.style.display = item.applicable === 'yes' ? 'block' : 'none';
+                    
+                    // Populate fields for applicable items
+                    if (item.applicable === 'yes') {
+                        if (item.id === 28) {
+                            const observations = content.querySelector(`#observations-${item.id}`);
+                            if (observations) observations.value = item.observations || '';
+                        } else {
+                            const evidence = content.querySelector(`#evidence-${item.id}`);
+                            if (evidence) evidence.value = item.objectiveEvidence || '';
+                            
+                            const comments = content.querySelector(`#comments-${item.id}`);
+                            if (comments) comments.value = item.comments || '';
+                            
+                            // Set compliance
+                            if (item.compliance) {
+                                const complianceBtn = content.querySelector(`.compliance-btn[data-compliance="${item.compliance}"]`);
+                                if (complianceBtn) {
+                                    complianceBtn.classList.add('active', `compliance-${item.compliance}`);
+                                }
+                            }
+                            
+                            // Set corrective action
+                            const correctiveActionRadio = content.querySelector(`input[name="corrective-action-${item.id}"][value="${item.correctiveActionNeeded ? 'yes' : 'no'}"]`);
+                            if (correctiveActionRadio) correctiveActionRadio.checked = true;
+                            
+                            // Set classification
+                            const classificationSelect = content.querySelector(`#classification-${item.id}`);
+                            if (classificationSelect) classificationSelect.value = item.classification || '';
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function populateAuditorSelections(leadAuditors, auditors) {
+    // Implement this based on how your multi-select works
+    // This is just a placeholder implementation
+    if (leadAuditorsSelect && leadAuditors) {
+        leadAuditors.forEach(auditor => {
+            const option = leadAuditorsSelect.querySelector(`option[value="${auditor.uid}"]`);
+            if (option) option.selected = true;
+        });
+    }
+    
+    if (auditorsSelect && auditors) {
+        auditors.forEach(auditor => {
+            const option = auditorsSelect.querySelector(`option[value="${auditor.uid}"]`);
+            if (option) option.selected = true;
+        });
+    }
+    
+    // Update the display of selected names if using custom multi-select
+    updateSelectedAuditorsDisplay();
 }
 
 function updateModalEditButtonVisibility() {
