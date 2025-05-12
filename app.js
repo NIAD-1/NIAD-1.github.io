@@ -68,7 +68,6 @@ const userListContainer = document.getElementById('user-list-container');
 const modal = document.getElementById('audit-detail-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalBody = document.getElementById('modal-body');
-const editAuditBtn = document.getElementById('edit-audit-btn');
 const exportAuditBtn = document.getElementById('export-audit-btn');
 const closeModalButton = document.querySelector('.close-modal');
 const closeModalBtnFooter = document.getElementById('close-modal-btn');
@@ -212,7 +211,6 @@ document.getElementById('forgot-password-link')?.addEventListener('click', handl
     closeModalButton?.addEventListener('click', closeModal);
     closeModalBtnFooter?.addEventListener('click', closeModal);
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
-    editAuditBtn?.addEventListener('click', editAudit);
 }
 
 // --- Authentication & Role Management ---
