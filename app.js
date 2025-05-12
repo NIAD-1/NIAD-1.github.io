@@ -68,6 +68,7 @@ const userListContainer = document.getElementById('user-list-container');
 const modal = document.getElementById('audit-detail-modal');
 const modalTitle = document.getElementById('modal-title');
 const modalBody = document.getElementById('modal-body');
+const editAuditBtn = document.getElementById('edit-audit-btn');
 const exportAuditBtn = document.getElementById('export-audit-btn');
 const closeModalButton = document.querySelector('.close-modal');
 const closeModalBtnFooter = document.getElementById('close-modal-btn');
@@ -211,6 +212,7 @@ document.getElementById('forgot-password-link')?.addEventListener('click', handl
     closeModalButton?.addEventListener('click', closeModal);
     closeModalBtnFooter?.addEventListener('click', closeModal);
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
+    editAuditBtn?.addEventListener('click', editAudit);
 }
 
 // --- Authentication & Role Management ---
@@ -349,7 +351,7 @@ function updateModalEditButtonVisibility() {
      if (editAuditBtn) {
          const canUserEdit = canEditAudit(currentAudit);
          editAuditBtn.classList.toggle('permission-hidden', !canUserEdit);
-         editAuditBtn.disabled = !canUserEdit; // Also disable
+         editAuditBtn.disabled = !canUserEdit;
      }
      if (exportAuditBtn){
         const canExport = hasPermission('export_data');
@@ -363,6 +365,7 @@ function canEditAudit(audit) {
     if (currentUser.role === ROLES.ADMIN) return true;
     if (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft') return true;
     if (currentUser.role === ROLES.AUDITOR && audit.createdBy === currentUser.uid && audit.status === 'draft') return true;
+    if(locationInput) locationInput.value = currentAudit.location || '';
     return false;
 }
 
@@ -588,7 +591,7 @@ function collectAuditFormData() {
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
     if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
     if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
-    if (!locauon) {alert('Select Location.'); locationInput?.focus(); returnnull; }
+    if (!location) {alert('Select Location.'); locationInput?.focus(); return null; }
 
     // Check if at least one lead auditor is selected
     const leadAuditorsSelected = Array.from(document.querySelectorAll('#lead-auditors-options input[type="checkbox"]:checked')).length > 0;
@@ -2502,7 +2505,7 @@ function redirectToTeamsChannel() {
 function clearAuditForm() {
     // Reset form fields
     if (auditForm) auditForm.reset();
-    if (locationInput) locationInput.value = '';
+    
     
     // Clear checklist items
     const checklistItems = checklistContainer?.querySelectorAll('.checklist-item');
