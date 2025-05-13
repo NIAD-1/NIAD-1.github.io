@@ -213,6 +213,8 @@ function setupEventListeners() {
     closeModalBtnFooter?.addEventListener('click', closeModal);
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
     editAuditBtn?.addEventListener('click', editAudit);
+    // Add status filter change listener
+document.getElementById('status-filter')?.addEventListener('change', filterAudits);
 }
 
 // --- Authentication & Role Management ---
@@ -1260,28 +1262,84 @@ function renderAuditHistory(auditsToDisplay = audits) {
                     <span><strong>Modified:</strong> ${modifiedDate}</span>
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
+                ${audit.status === 'draft' ? 
+                    `<button class="btn btn-primary submit-draft-btn" data-audit-id="${audit.id}">Submit Draft</button>` : 
+                    ''}
             </div>
             <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
 
-        itemDiv.addEventListener('click', () => openAuditDetails(audit));
+        itemDiv.addEventListener('click', (e) => {
+            // Don't open details if clicking the submit button
+            if (!e.target.classList.contains('submit-draft-btn')) {
+                openAuditDetails(audit);
+            }
+        });
+        
+        // Add event listener for submit draft button
+        const submitBtn = itemDiv.querySelector('.submit-draft-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                submitAuditFromHistory(audit.id);
+            });
+        }
+
         auditHistoryList.appendChild(itemDiv);
     });
+}
+async function submitAuditFromHistory(auditId) {
+    try {
+        // Get the audit document
+        const auditDoc = await db.collection('audits').doc(auditId).get();
+        if (!auditDoc.exists) {
+            throw new Error('Audit not found');
+        }
+        
+        const auditData = auditDoc.data();
+        
+        // Confirm submission
+        if (!confirm(`Are you ready to submit this audit (${auditData.refNo})? Once submitted, you won't be able to edit it unless you're an admin.`)) {
+            return;
+        }
+        
+        // Update audit status
+        await db.collection('audits').doc(auditId).update({
+            status: 'submitted',
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Generate document and redirect
+        await generateAuditDocument({ ...auditData, id: auditId });
+        redirectToTeamsChannel();
+        
+        // Refresh the audit history
+        loadAudits();
+        
+    } catch (error) {
+        console.error('Error submitting audit from history:', error);
+        alert('Failed to submit audit: ' + error.message);
+    }
 }
 
 function filterAudits() {
     const fromDate = document.getElementById('date-from').value;
     const toDate = document.getElementById('date-to').value;
-    const areaFilter = areaFilterHistory.value;
-    // console.log(`Filtering history: From=${fromDate}, To=${toDate}, Area=${areaFilter}`);
+    const areaFilter = document.getElementById('audit-area-filter').value;
+    const statusFilter = document.getElementById('status-filter').value;
+    
     const filtered = audits.filter(audit => {
-        const area = audit.directorateUnit || audit.auditedArea; // Check both fields
+        const area = audit.directorateUnit || audit.auditedArea;
         let match = true;
+        
         if (fromDate && audit.date < fromDate) match = false;
         if (toDate && audit.date > toDate) match = false;
         if (areaFilter && area !== areaFilter) match = false;
+        if (statusFilter && audit.status !== statusFilter) match = false;
+        
         return match;
     });
-    renderAuditHistory(filtered); // Render using the filtered subset
+    
+    renderAuditHistory(filtered);
 }
 
 function updateAreaFilter() {
