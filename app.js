@@ -346,6 +346,10 @@ function updateUIForRole() {
             el.disabled = !hasPerm; // Disable elements if no permission too
         }
     });
+    // Add this to ensure buttons are visible
+    document.querySelectorAll('[data-permission="lead_auditor"]').forEach(el => {
+        el.classList.toggle('permission-hidden', !hasPermission('lead_auditor'));
+    });
     updateModalEditButtonVisibility();
 }
 
@@ -455,10 +459,58 @@ function canEditAudit(audit) {
     if (currentUser.role === ROLES.ADMIN) return true;
     if (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft') return true;
     if (currentUser.role === ROLES.AUDITOR && audit.createdBy === currentUser.uid && audit.status === 'draft') return true;
-    if(locationInput) locationInput.value = currentAudit.location || '';
     return false;
 }
 
+
+function populateAuditForm(audit) {
+    // Basic fields
+    auditDateInput.value = audit.date;
+    directorateUnitInput.value = audit.directorateUnit;
+    refNoInput.value = audit.refNo;
+    locationInput.value = audit.location;
+  
+    // Populate multi-selects
+    const updateSelect = (containerId, items) => {
+      const container = document.getElementById(containerId);
+      container.querySelectorAll('input').forEach(checkbox => {
+        checkbox.checked = items.some(item => item.displayName === checkbox.value);
+      });
+      const selectedNames = items.map(item => item.displayName).join(', ');
+      container.previousElementSibling.querySelector('.selected-names').textContent = selectedNames;
+    };
+  
+    updateSelect('lead-auditors-options', audit.leadAuditors);
+    updateSelect('auditors-options', audit.auditors);
+  
+    // Populate checklist
+    audit.checklist.forEach(item => {
+      const itemEl = checklistContainer.querySelector(`[data-item-id="${item.id}"]`);
+      if (!itemEl) return;
+  
+      // Applicability
+      itemEl.querySelector(`input[value="${item.applicable}"]`).checked = true;
+      
+      if (item.applicable === 'yes') {
+        const content = itemEl.querySelector('.checklist-content');
+        content.style.display = 'block';
+        
+        // Compliance
+        if (item.compliance) {
+          content.querySelector(`.compliance-btn[data-compliance="${item.compliance}"]`)
+            .classList.add('active');
+        }
+        
+        // Evidence/Comments
+        if (item.objectiveEvidence) {
+          content.querySelector('.evidence-input').value = item.objectiveEvidence;
+        }
+        if (item.comments) {
+          content.querySelector('textarea').value = item.comments;
+        }
+      }
+    });
+  }
 // --- Navigation ---
 
 function switchSection(sectionId) {
@@ -1262,12 +1314,23 @@ function renderAuditHistory(auditsToDisplay = audits) {
                     <span><strong>Modified:</strong> ${modifiedDate}</span>
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
-                ${audit.status === 'draft' ? 
-                    `<button class="btn btn-primary submit-draft-btn" data-audit-id="${audit.id}">Submit Draft</button>` : 
-                    ''}
+                ${audit.status === 'draft' ? `
+                    <div class="draft-actions">
+                        <button class="btn btn-sm btn-edit permission-hidden" 
+                                data-permission="lead_auditor" 
+                                data-audit-id="${audit.id}">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-submit permission-hidden" 
+                                data-permission="lead_auditor" 
+                                data-audit-id="${audit.id}">
+                            <i class="fas fa-check"></i> Submit
+                        </button>
+                    </div>
+                ` : ''}
             </div>
-            <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
-
+            <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>
+`;
         itemDiv.addEventListener('click', (e) => {
             // Don't open details if clicking the submit button
             if (!e.target.classList.contains('submit-draft-btn')) {
@@ -1287,6 +1350,25 @@ function renderAuditHistory(auditsToDisplay = audits) {
         auditHistoryList.appendChild(itemDiv);
     });
 }
+
+// Add to setupEventListeners()
+document.addEventListener('click', async (e) => {
+    if (e.target.closest('.btn-edit')) {
+      const auditId = e.target.closest('.btn-edit').dataset.auditId;
+      const audit = audits.find(a => a.id === auditId);
+      if (audit && canEditAudit(audit)) {
+        currentAudit = audit;
+        switchSection('new-audit');
+        populateAuditForm(audit);
+      }
+    }
+    
+    if (e.target.closest('.btn-submit')) {
+      const auditId = e.target.closest('.btn-submit').dataset.auditId;
+      submitAuditFromHistory(auditId);
+    }
+  });
+
 async function submitAuditFromHistory(auditId) {
     try {
         // Get the audit document
