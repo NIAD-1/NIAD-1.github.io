@@ -95,6 +95,9 @@ const checklistContainer = document.getElementById('checklist-container');
 const saveDraftBtn = document.getElementById('save-draft-btn');
 const submitAuditBtn = document.getElementById('submit-audit-btn');
 const locationInput = document.getElementById('location');
+
+// Add with other DOM element declarations at top
+const modalActions = document.getElementById('modal-actions');
 // AUDIT STATUS //
 
 
@@ -214,7 +217,16 @@ function setupEventListeners() {
     exportAuditBtn?.addEventListener('click', exportCurrentAudit);
     editAuditBtn?.addEventListener('click', editAudit);
     // Add status filter change listener
-document.getElementById('status-filter')?.addEventListener('change', filterAudits);
+    document.getElementById('status-filter')?.addEventListener('change', filterAudits);
+    // Add this in setupEventListeners()
+    document.addEventListener('click', (e) => {
+        if (e.target.closest('#edit-audit-btn')) {
+        editAudit();
+        }
+        if (e.target.closest('#export-audit-btn')) {
+        exportCurrentAudit();
+        }
+    });
 }
 
 // --- Authentication & Role Management ---
@@ -1447,58 +1459,96 @@ function updateAreaFilter() {
 // --- Modal Functionality ---
 
 function openAuditDetails(audit) {
-    currentAudit = audit;
-    modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
-    
-    // Build modal content without comments section
-    let bodyContent = `
-        <div class="audit-meta">
-            <p><strong>Ref No:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
-            <p><strong>Audit Date:</strong> ${formatDate(audit.date)}</p>
-            <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
-        </div>
+    try {
+        // Get modal elements
+        const modal = document.getElementById('audit-detail-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalActions = document.getElementById('modal-actions');
         
-        <h3>Checklist Findings</h3>
-        <div class="checklist-summary">`;
-    
-    // Add checklist items
-    if (audit.checklist?.length > 0) {
-        audit.checklist.forEach(item => {
-            if (item.applicable === 'yes') {
-                const compClass = item.compliance === 'yes' ? 'compliant' : 'non-compliant';
-                const compText = item.compliance === 'yes' ? 'Compliant' : 'Non-Compliant';
-                
-                bodyContent += `
-                    <div class="checklist-item-summary">
-                        <h4>${item.id}. ${escapeHtml(item.requirement)} ${item.clause ? `(Cl ${item.clause})` : ''}</h4>
-                        <p><strong>Compliance:</strong> <span class="${compClass}">${compText}</span></p>
-                        ${item.objectiveEvidence ? `<p><strong>Evidence:</strong><br><pre>${escapeHtml(item.objectiveEvidence)}</pre></p>` : ''}
-                        <p><strong>Correction Needed:</strong> ${item.correctiveActionNeeded ? 'Yes' : 'No'}</p>
-                        ${item.comments ? `<p><strong>Comments:</strong><br><pre>${escapeHtml(item.comments)}</pre></p>` : ''}
-                    </div>`;
-            }
-        });
-    } else {
-        bodyContent += '<p>No checklist data available.</p>';
-    }
+        if (!modal || !modalTitle || !modalBody || !modalActions) {
+            throw new Error('Modal elements not found');
+        }
 
-    modalBody.innerHTML = bodyContent;
-    
-    // Update modal actions
-    modalActions.innerHTML = `
-        <button id="export-audit-btn" class="btn btn-primary">Export as Document</button>
-        <button id="close-modal-btn" class="btn btn-secondary">Close</button>
-        ${currentUser?.role === 'admin' ? `<button id="delete-audit-btn" class="btn btn-danger">Delete Audit</button>` : ''}
-    `;
-    
-    document.getElementById('export-audit-btn').addEventListener('click', exportCurrentAuditAsDocument);
-    document.getElementById('close-modal-btn').addEventListener('click', closeModal);
-    
-    if (currentUser?.role === 'admin') {
-        document.getElementById('delete-audit-btn').addEventListener('click', deleteCurrentAudit);
+        // Clear previous content
+        modalBody.innerHTML = '';
+        modalActions.innerHTML = '';
+
+        // Set modal title
+        modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
+
+        // Build modal content
+        const auditMeta = document.createElement('div');
+        auditMeta.className = 'audit-meta';
+        auditMeta.innerHTML = `
+            <p><strong>Ref No.:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
+            <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
+            <p><strong>Created By:</strong> ${escapeHtml(audit.createdByEmail || audit.createdBy)}</p>
+            <p><strong>Last Modified:</strong> ${formatDateTime(audit.lastModified)}</p>
+        `;
+
+        const checklistSection = document.createElement('div');
+        checklistSection.innerHTML = '<h3>Checklist Findings</h3>';
+        
+        if (audit.checklist?.length > 0) {
+            audit.checklist.forEach(item => {
+                if (item.applicable === 'yes') {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'checklist-item';
+                    itemDiv.innerHTML = `
+                        <h4>${item.id}. ${escapeHtml(item.requirement)}</h4>
+                        <p><strong>Compliance:</strong> <span class="${item.compliance === 'yes' ? 'compliant' : 'non-compliant'}">
+                            ${item.compliance === 'yes' ? 'Compliant' : 'Non-Compliant'}
+                        </span></p>
+                        ${item.objectiveEvidence ? `<p><strong>Evidence:</strong> ${escapeHtml(item.objectiveEvidence)}</p>` : ''}
+                    `;
+                    checklistSection.appendChild(itemDiv);
+                }
+            });
+        } else {
+            checklistSection.innerHTML += '<p>No checklist data available</p>';
+        }
+
+        // Add elements to modal
+        modalBody.appendChild(auditMeta);
+        modalBody.appendChild(checklistSection);
+
+        // Create action buttons
+        const editBtn = document.createElement('button');
+        editBtn.id = 'edit-audit-btn';
+        editBtn.className = 'btn btn-secondary permission-hidden';
+        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+        editBtn.addEventListener('click', editAudit);
+
+        const exportBtn = document.createElement('button');
+        exportBtn.id = 'export-audit-btn';
+        exportBtn.className = 'btn btn-success permission-hidden';
+        exportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export';
+        exportBtn.addEventListener('click', exportCurrentAudit);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.id = 'close-modal-btn';
+        closeBtn.className = 'btn btn-outline';
+        closeBtn.textContent = 'Close';
+        closeBtn.addEventListener('click', closeModal);
+
+        // Append buttons based on permissions
+        modalActions.appendChild(editBtn);
+        modalActions.appendChild(exportBtn);
+        modalActions.appendChild(closeBtn);
+
+        // Update button visibility
+        editBtn.classList.toggle('permission-hidden', !canEditAudit(audit));
+        exportBtn.classList.toggle('permission-hidden', !hasPermission('export_data'));
+
+        // Show modal
+        modal.classList.remove('hidden');
+        updateUIForRole();
+
+    } catch (error) {
+        console.error('Error opening audit details:', error);
+        alert('Failed to load audit details: ' + error.message);
     }
-    
-    modal.classList.remove('hidden');
 }
 
 function exportCurrentAuditAsDocument() {
