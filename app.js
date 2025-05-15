@@ -468,10 +468,10 @@ function updateModalEditButtonVisibility() {
 
 function canEditAudit(audit) {
     if (!audit || !currentUser) return false;
-    if (currentUser.role === ROLES.ADMIN) return true;
-    if (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft') return true;
-    if (currentUser.role === ROLES.AUDITOR && audit.createdBy === currentUser.uid && audit.status === 'draft') return true;
-    return false;
+    return (
+        currentUser.role === ROLES.ADMIN ||
+        (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft')
+    );
 }
 
 
@@ -1516,15 +1516,45 @@ function openAuditDetails(audit) {
         // Create action buttons
         const editBtn = document.createElement('button');
         editBtn.id = 'edit-audit-btn';
-        editBtn.className = 'btn btn-secondary permission-hidden';
+        editBtn.className = 'btn btn-secondary';
         editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
-        editBtn.addEventListener('click', editAudit);
+        editBtn.addEventListener('click', () => {
+            if (canEditAudit(audit)) {
+                currentAudit = audit;
+                switchSection('new-audit');
+                populateAuditForm(audit);
+            } else {
+                alert('You have permission to edit this draft');
+            }
+        });
 
-        const exportBtn = document.createElement('button');
-        exportBtn.id = 'export-audit-btn';
-        exportBtn.className = 'btn btn-success permission-hidden';
-        exportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export';
-        exportBtn.addEventListener('click', exportCurrentAudit);
+        const submitDraftBtn = document.createElement('button');
+        submitDraftBtn.id = 'submit-draft-btn';
+        submitDraftBtn.className = 'btn btn-success';
+        submitDraftBtn.innerHTML = '<i class="fas fa-file-export"></i> Submit Draft';
+        submitDraftBtn.addEventListener('click', async () => {
+            try {
+                // Update status to submitted
+                await db.collection('audits').doc(audit.id).update({
+                    status: 'submitted',
+                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Generate and download document
+                await generateAuditDocument(audit);
+                
+                // Redirect to Teams
+                redirectToTeamsChannel();
+                
+                // Refresh audits
+                loadAudits();
+                closeModal();
+                
+            } catch (error) {
+                console.error('Submit draft error:', error);
+                alert('Error submitting draft: ' + error.message);
+            }
+        });
 
         const closeBtn = document.createElement('button');
         closeBtn.id = 'close-modal-btn';
@@ -1532,18 +1562,17 @@ function openAuditDetails(audit) {
         closeBtn.textContent = 'Close';
         closeBtn.addEventListener('click', closeModal);
 
-        // Append buttons based on permissions
+        // Append buttons
         modalActions.appendChild(editBtn);
-        modalActions.appendChild(exportBtn);
+        modalActions.appendChild(submitDraftBtn);
         modalActions.appendChild(closeBtn);
 
         // Update button visibility
-        editBtn.classList.toggle('permission-hidden', !canEditAudit(audit));
-        exportBtn.classList.toggle('permission-hidden', !hasPermission('export_data'));
-
+        editBtn.classList.toggle('hidden', !canEditAudit(audit));
+        submitDraftBtn.classList.toggle('hidden', audit.status !== 'draft');
+        
         // Show modal
         modal.classList.remove('hidden');
-        updateUIForRole();
 
     } catch (error) {
         console.error('Error opening audit details:', error);
