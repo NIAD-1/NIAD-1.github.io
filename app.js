@@ -1340,6 +1340,12 @@ function renderAuditHistory(auditsToDisplay = audits) {
                         </button>
                     </div>
                 ` : ''}
+                ${hasPermission('admin') ? `
+                    <button class="btn btn-danger btn-sm delete-audit" 
+                            data-audit-id="${audit.id}">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                ` : ''}
             </div>
             <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>
 `;
@@ -1363,6 +1369,19 @@ function renderAuditHistory(auditsToDisplay = audits) {
     });
 }
 
+async function deleteAudit(auditId) {
+    if (!confirm('Are you sure you want to permanently delete this audit?')) return;
+    
+    try {
+        await db.collection('audits').doc(auditId).delete();
+        loadAudits(); // Refresh the list
+        showMessage('Audit deleted successfully', 'success');
+    } catch (error) {
+        console.error('Delete error:', error);
+        showMessage('Failed to delete audit: ' + error.message, 'error');
+    }
+}
+
 // Add to setupEventListeners()
 document.addEventListener('click', async (e) => {
     if (e.target.closest('.btn-edit')) {
@@ -1381,6 +1400,12 @@ document.addEventListener('click', async (e) => {
     }
   });
 
+document.addEventListener('click', (e) => {
+    if (e.target.closest('.delete-audit')) {
+        const auditId = e.target.closest('.delete-audit').dataset.auditId;
+        deleteAudit(auditId);
+    }
+});
 async function submitAuditFromHistory(auditId) {
     try {
         // Get the audit document

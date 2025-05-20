@@ -681,6 +681,15 @@ select {
 /* Add other statuses if needed */
 /* .status-completed { background-color: var(--success-color); color: white; } */
 
+.audit-item .submit-draft-btn {
+    margin-top: 10px;
+    padding: 5px 10px;
+    font-size: 0.9em;
+}
+
+.audit-item .submit-draft-btn:hover {
+    background-color: #0056b3;
+}
 
 .quick-actions {
     display: flex;
