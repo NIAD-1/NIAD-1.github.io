@@ -71,8 +71,7 @@ const modalTitle = document.getElementById('modal-title');
 const modalBody = document.getElementById('modal-body');
 const editAuditBtn = document.getElementById('edit-audit-btn');
 const exportAuditBtn = document.getElementById('export-audit-btn');
-const closeModalButton = document.querySelector('.close-modal');
-const closeModalBtnFooter = document.getElementById('close-modal-btn');
+
 // Report elements
 const reportResults = document.getElementById('report-results');
 const reportChartContainer = document.querySelector('.report-chart-container');
@@ -99,6 +98,8 @@ const locationInput = document.getElementById('location');
 
 // Add with other DOM element declarations at top
 const modalActions = document.getElementById('modal-actions');
+const closeModalButton = document.querySelector('#audit-detail-modal .close-modal'); // Ensure this targets the correct modal
+const closeModalBtnFooter = document.getElementById('close-modal-btn'); // The button in the footer
 // AUDIT STATUS //
 
 
@@ -186,6 +187,11 @@ function setupEventListeners() {
                 console.warn(`User lacks permission '${permission}' to navigate to section '${item.dataset.section}'.`);
                 alert("You do not have permission to access this section.");
             }
+            if (sectionId === 'new-audit') {
+                console.log("New Audit section explicitly selected from nav. Clearing form and currentAudit.");
+                currentAudit = null;     // VERY IMPORTANT FOR "TRULY NEW" AUDIT
+                clearAuditForm();        // This will call initNewAuditForm()
+            }
         });
     });
 
@@ -233,6 +239,31 @@ function setupEventListeners() {
         if (e.target.closest('.delete-audit')) {
             const auditId = e.target.closest('.delete-audit').dataset.auditId;
             deleteAudit(auditId);
+        }
+    });
+    if (closeModalButton) { // Check if the element exists
+        closeModalButton.addEventListener('click', closeModal);
+    } else {
+        console.warn("Modal's 'x' close button not found.");
+    }
+    if (closeModalBtnFooter) { // Check if the element exists
+        closeModalBtnFooter.addEventListener('click', closeModal);
+    } else {
+        console.warn("Modal's footer close button not found.");
+    }
+
+    // Ensure the generic delegated click handler for .close-modal is also present
+    // if you have multiple modals or dynamically added close buttons.
+    document.addEventListener('click', (e) => {
+        if (e.target.matches('.close-modal') || e.target.closest('.close-modal')) {
+             // Find the closest modal parent and hide it
+            const modalToClose = e.target.closest('.modal');
+            if (modalToClose) {
+                modalToClose.classList.add('hidden');
+                if (modalToClose.id === 'audit-detail-modal') {
+                    currentAudit = null; // Reset currentAudit if it's the audit detail modal
+                }
+            }
         }
     });
 }
@@ -381,6 +412,8 @@ function editAudit() {
     
     // Switch to the new-audit section
     switchSection('new-audit');
+
+
     
     // Populate the form with the current audit data
     if (auditDateInput) auditDateInput.value = currentAudit.date || '';
@@ -389,6 +422,7 @@ function editAudit() {
     if (locationInput) locationInput.value = currentAudit.location || '';
     
     // Populate lead auditors and auditors (you'll need to implement this)
+    populateAuditForm(currentAudit);
     populateAuditorSelections(currentAudit.leadAuditors, currentAudit.auditors);
     
     // Populate checklist items
@@ -438,6 +472,7 @@ function editAudit() {
             }
         });
     }
+    closeModal();
 }
 
 function populateAuditorSelections(leadAuditors, auditors) {
@@ -483,54 +518,148 @@ function canEditAudit(audit) {
 }
 
 
+// app.js
+
+// ... (other existing code) ...
+
 function populateAuditForm(audit) {
-    // Basic fields
-    auditDateInput.value = audit.date;
-    directorateUnitInput.value = audit.directorateUnit;
-    refNoInput.value = audit.refNo;
-    locationInput.value = audit.location;
-  
-    // Populate multi-selects
-    const updateSelect = (containerId, items) => {
-      const container = document.getElementById(containerId);
-      container.querySelectorAll('input').forEach(checkbox => {
-        checkbox.checked = items.some(item => item.displayName === checkbox.value);
-      });
-      const selectedNames = items.map(item => item.displayName).join(', ');
-      container.previousElementSibling.querySelector('.selected-names').textContent = selectedNames;
+    if (!audit) {
+        console.error("populateAuditForm called with no audit data. Clearing form.");
+        clearAuditForm(); // Good practice to clear if no audit is provided
+        return;
+    }
+    console.log("Populating form for EDIT with audit ID:", audit.id, audit); // Log the audit object
+
+    // 1. Populate Basic Fields (Date, Directorate, RefNo, Location, Auditee Name/Position)
+    if (auditDateInput) auditDateInput.value = audit.date || '';
+    if (directorateUnitInput) directorateUnitInput.value = audit.directorateUnit || '';
+    if (refNoInput) refNoInput.value = audit.refNo || '';
+    if (locationInput) locationInput.value = audit.location || '';
+
+    const auditeeNameEl = document.getElementById('auditee-name');
+    if (auditeeNameEl) auditeeNameEl.value = audit.auditeeName || '';
+
+    const auditeePositionEl = document.getElementById('auditee-position');
+    if (auditeePositionEl) auditeePositionEl.value = audit.auditeePosition || '';
+
+    // 2. Populate Introduction Text
+    const introductionTextarea = document.querySelector('#new-audit-section .evidence-container .evidence-input');
+    if (introductionTextarea) {
+        introductionTextarea.value = audit.introduction || '';
+        console.log("Populated introduction with:", audit.introduction); // Verify
+    } else {
+        console.warn("Introduction textarea not found during populate.");
+    }
+
+    // 3. Populate Lead Auditors and Auditors Multi-Selects
+    // (Your existing populateMultiSelect logic here - ensure it correctly checks based on displayName or UID)
+    const populateMultiSelect = (optionsContainerId, selectedAuditorsArray) => {
+        const optionsContainer = document.getElementById(optionsContainerId);
+        if (!optionsContainer || !Array.isArray(selectedAuditorsArray)) return;
+        const selectedDisplayNames = [];
+        optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            const isSelected = selectedAuditorsArray.some(auditor =>
+                auditor.displayName === checkbox.value || (auditor.uid && auditor.uid === checkbox.value)
+            );
+            checkbox.checked = isSelected;
+            if (isSelected) {
+                selectedDisplayNames.push(checkbox.parentElement.textContent.trim());
+            }
+        });
+        const displayElementId = optionsContainerId.replace('-options', '-selected');
+        const displayElement = document.getElementById(displayElementId);
+        if (displayElement) {
+            const placeholder = displayElement.dataset.placeholder || 'Select...';
+            displayElement.textContent = selectedDisplayNames.length > 0 ? selectedDisplayNames.join(', ') : placeholder;
+            displayElement.style.color = selectedDisplayNames.length > 0 ? 'var(--dark-color)' : 'var(--text-muted)';
+        }
     };
-  
-    updateSelect('lead-auditors-options', audit.leadAuditors);
-    updateSelect('auditors-options', audit.auditors);
-  
-    // Populate checklist
-    audit.checklist.forEach(item => {
-      const itemEl = checklistContainer.querySelector(`[data-item-id="${item.id}"]`);
-      if (!itemEl) return;
-  
-      // Applicability
-      itemEl.querySelector(`input[value="${item.applicable}"]`).checked = true;
-      
-      if (item.applicable === 'yes') {
-        const content = itemEl.querySelector('.checklist-content');
-        content.style.display = 'block';
-        
-        // Compliance
-        if (item.compliance) {
-          content.querySelector(`.compliance-btn[data-compliance="${item.compliance}"]`)
-            .classList.add('active');
-        }
-        
-        // Evidence/Comments
-        if (item.objectiveEvidence) {
-          content.querySelector('.evidence-input').value = item.objectiveEvidence;
-        }
-        if (item.comments) {
-          content.querySelector('textarea').value = item.comments;
-        }
-      }
-    });
-  }
+    populateMultiSelect('lead-auditors-options', audit.leadAuditors || []);
+    populateMultiSelect('auditors-options', audit.auditors || []);
+
+
+    // 4. Rebuild and Populate Checklist
+    // FIRST, ensure the checklist structure is present (initNewAuditForm does this)
+    initNewAuditForm(); // This re-renders the empty checklist structure with default states.
+
+    if (audit.checklist && checklistContainer && Array.isArray(audit.checklist)) {
+        console.log("Attempting to populate checklist items. Saved checklist data:", JSON.stringify(audit.checklist, null, 2));
+
+        audit.checklist.forEach(itemFromDb => {
+            const itemElement = checklistContainer.querySelector(`.checklist-item[data-item-id="${itemFromDb.id}"]`);
+            if (!itemElement) {
+                console.warn(`Checklist item element NOT FOUND for ID: ${itemFromDb.id}`);
+                return; // Skip if element not found
+            }
+
+            // a. Set Applicability Radio
+            const applicabilityValue = itemFromDb.applicable || 'no'; // Default to 'no' if undefined
+            const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemFromDb.id}"][value="${applicabilityValue}"]`);
+            if (applicableRadio) {
+                applicableRadio.checked = true;
+                // console.log(`Item ${itemFromDb.id}: Applicability set to '${applicabilityValue}'`);
+            } else {
+                console.warn(`Item ${itemFromDb.id}: Applicability radio for value '${applicabilityValue}' not found.`);
+            }
+
+            // b. Show/Hide Content Div based on Applicability
+            const contentDiv = itemElement.querySelector('.checklist-content');
+            if (contentDiv) {
+                contentDiv.style.display = (applicabilityValue === 'yes') ? 'block' : 'none';
+
+                // c. Populate fields *only if* applicable and content is visible
+                if (applicabilityValue === 'yes') {
+                    if (itemFromDb.id === 28) { // Special "Other Observations" item
+                        const obsTextarea = contentDiv.querySelector(`#observations-${itemFromDb.id}`);
+                        if (obsTextarea) obsTextarea.value = itemFromDb.observations || '';
+                    } else {
+                        // Objective Evidence
+                        const evidenceTextarea = contentDiv.querySelector(`#evidence-${itemFromDb.id}`);
+                        if (evidenceTextarea) evidenceTextarea.value = itemFromDb.objectiveEvidence || '';
+
+                        // Comments
+                        const commentsTextarea = contentDiv.querySelector(`#comments-${itemFromDb.id}`);
+                        if (commentsTextarea) commentsTextarea.value = itemFromDb.comments || '';
+
+                        // Compliance Button
+                        itemElement.querySelectorAll('.compliance-btn').forEach(btn => btn.classList.remove('active', 'compliance-yes', 'compliance-no')); // Reset first
+                        if (itemFromDb.compliance) {
+                            const complianceBtn = contentDiv.querySelector(`.compliance-btn[data-compliance="${itemFromDb.compliance}"]`);
+                            if (complianceBtn) {
+                                complianceBtn.classList.add('active');
+                                complianceBtn.classList.add(`compliance-${itemFromDb.compliance}`);
+                            } else {
+                                // console.warn(`Item ${itemFromDb.id}: Compliance button for '${itemFromDb.compliance}' not found.`);
+                            }
+                        }
+
+                        // Corrective Action Radio
+                        const caNeeded = itemFromDb.correctiveActionNeeded === true || itemFromDb.correctiveActionNeeded === 'yes'; // Handle boolean or string 'yes'
+                        const caRadioValue = caNeeded ? 'yes' : 'no';
+                        const caRadio = contentDiv.querySelector(`input[name="corrective-action-${itemFromDb.id}"][value="${caRadioValue}"]`);
+                        if (caRadio) {
+                            caRadio.checked = true;
+                        } else {
+                            // console.warn(`Item ${itemFromDb.id}: Corrective action radio for '${caRadioValue}' not found.`);
+                        }
+
+                        // Classification Select
+                        const classificationSelect = contentDiv.querySelector(`#classification-${itemFromDb.id}`);
+                        if (classificationSelect) {
+                            classificationSelect.value = itemFromDb.classification || '';
+                        }
+                    }
+                }
+            } else {
+                console.warn(`Item ${itemFromDb.id}: Content div (.checklist-content) not found.`);
+            }
+        });
+        console.log("Checklist population attempt finished.");
+    } else {
+        console.log("No audit.checklist data to populate, or checklistContainer is missing.");
+    }
+}
+
 // --- Navigation ---
 
 function switchSection(sectionId) {
