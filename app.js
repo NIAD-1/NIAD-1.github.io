@@ -45,7 +45,8 @@ const PERMISSIONS = {
     final_approval: [ROLES.ADMIN],
     change_password: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     view_lead_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
-    delete_audit: [ROLES.ADMIN]
+    delete_audit: [ROLES.ADMIN],
+
 };
 
 // --- DOM Elements ---
@@ -170,7 +171,7 @@ function init() {
     checkAuthState();
 }
 
-// --- Setup Event Listeners ---
+
 function setupEventListeners() {
     // Auth events
     loginBtn?.addEventListener('click', loginWithEmail);
@@ -180,32 +181,40 @@ function setupEventListeners() {
     // Navigation events
     navItems.forEach(item => {
         item.addEventListener('click', () => {
+            const sectionId = item.dataset.section; // Defined here
             const permission = item.dataset.permission;
+
             if (!permission || hasPermission(permission)) {
-                 switchSection(item.dataset.section);
+                if (sectionId === 'new-audit') {
+                    // This is for starting a BRAND NEW audit from the navigation
+                    console.log("New Audit section clicked from nav. Clearing form and currentAudit.");
+                    currentAudit = null; // Explicitly clear currentAudit
+                    clearAuditForm();    // Call the comprehensive form clearing function
+                }
+                switchSection(sectionId);
             } else {
-                console.warn(`User lacks permission '${permission}' to navigate to section '${item.dataset.section}'.`);
+                console.warn(`User lacks permission '${permission}' to navigate to section '${sectionId}'.`);
                 alert("You do not have permission to access this section.");
-            }
-            if (sectionId === 'new-audit') {
-                console.log("New Audit section explicitly selected from nav. Clearing form and currentAudit.");
-                currentAudit = null;     // VERY IMPORTANT FOR "TRULY NEW" AUDIT
-                clearAuditForm();        // This will call initNewAuditForm()
             }
         });
     });
 
     // Quick actions
     quickNewAuditBtn?.addEventListener('click', () => {
-        if (hasPermission('create_audit')) switchSection('new-audit');
+        if (hasPermission('create_audit')) {
+            console.log("Quick New Audit clicked. Clearing form and currentAudit.");
+            currentAudit = null; // Ensure quick action also clears state
+            clearAuditForm();
+            switchSection('new-audit');
+        }
     });
     quickExportBtn?.addEventListener('click', exportDashboardData);
 
     // New audit form events
     saveDraftBtn?.addEventListener('click', saveAuditAsDraft);
-    submitAuditBtn?.addEventListener('click', submitAudit);
-
+    // submitAuditBtn is the main submit button on the form
     document.getElementById('submit-audit-btn')?.addEventListener('click', submitAudit);
+
 
     // Audit history events
     document.getElementById('filter-btn')?.addEventListener('click', filterAudits);
@@ -218,52 +227,50 @@ function setupEventListeners() {
     document.getElementById('login-page-password-form')?.addEventListener('submit', handleLoginPagePasswordChange);
     document.getElementById('forgot-password-link')?.addEventListener('click', handleForgotPassword);
 
-    // Modal events
-    closeModalButton?.addEventListener('click', closeModal);
-    closeModalBtnFooter?.addEventListener('click', closeModal);
-    exportAuditBtn?.addEventListener('click', exportCurrentAudit);
-    editAuditBtn?.addEventListener('click', editAudit);
-    // Add status filter change listener
-    document.getElementById('status-filter')?.addEventListener('change', filterAudits);
-    // Add this in setupEventListeners()
+    // Modal events (specific button listeners for modal are best handled within openAuditDetails
+    // or if buttons are static, then global variables like closeModalButton can be used)
+
+    // Generic close modal delegated listener
     document.addEventListener('click', (e) => {
-        if (e.target.closest('#edit-audit-btn')) {
-        editAudit();
-        }
-        if (e.target.closest('#export-audit-btn')) {
-        exportCurrentAudit();
+        if (e.target.matches('.close-modal') || e.target.closest('.close-modal')) {
+            const modalToClose = e.target.closest('.modal');
+            if (modalToClose) {
+                modalToClose.classList.add('hidden');
+                if (modalToClose.id === 'audit-detail-modal') {
+                    currentAudit = null;
+                }
+            }
         }
     });
+
+
+    // Delegated listener for dynamically created buttons IF NEEDED,
+    // but direct listeners in openAuditDetails are often cleaner.
+    // For example, the #edit-audit-btn and #export-audit-btn are now created
+    // INSIDE openAuditDetails, so their listeners are attached there.
+    // The global editAuditBtn and exportAuditBtn variables are no longer strictly necessary
+    // if they only ever exist inside the modal.
 
     document.addEventListener('click', (e) => {
         if (e.target.closest('.delete-audit')) {
             const auditId = e.target.closest('.delete-audit').dataset.auditId;
             deleteAudit(auditId);
         }
-    });
-    if (closeModalButton) { // Check if the element exists
-        closeModalButton.addEventListener('click', closeModal);
-    } else {
-        console.warn("Modal's 'x' close button not found.");
-    }
-    if (closeModalBtnFooter) { // Check if the element exists
-        closeModalBtnFooter.addEventListener('click', closeModal);
-    } else {
-        console.warn("Modal's footer close button not found.");
-    }
-
-    // Ensure the generic delegated click handler for .close-modal is also present
-    // if you have multiple modals or dynamically added close buttons.
-    document.addEventListener('click', (e) => {
-        if (e.target.matches('.close-modal') || e.target.closest('.close-modal')) {
-             // Find the closest modal parent and hide it
-            const modalToClose = e.target.closest('.modal');
-            if (modalToClose) {
-                modalToClose.classList.add('hidden');
-                if (modalToClose.id === 'audit-detail-modal') {
-                    currentAudit = null; // Reset currentAudit if it's the audit detail modal
-                }
+        // Handling for edit/submit from audit history list items
+        if (e.target.closest('.btn-edit[data-audit-id]')) { // from history list
+            const auditId = e.target.closest('.btn-edit').dataset.auditId;
+            const auditToEdit = audits.find(a => a.id === auditId);
+            if (auditToEdit && canEditAudit(auditToEdit)) {
+                currentAudit = auditToEdit; // Set currentAudit
+                switchSection('new-audit');
+                populateAuditForm(auditToEdit);
+            } else {
+                alert("Cannot edit this audit or audit not found.");
             }
+        }
+        if (e.target.closest('.btn-submit[data-audit-id]')) { // from history list
+            const auditId = e.target.closest('.btn-submit').dataset.auditId;
+            submitAuditFromHistory(auditId);
         }
     });
 }
@@ -404,74 +411,22 @@ function updateUIForRole() {
     updateModalEditButtonVisibility();
 }
 
+
 function editAudit() {
-    if (!currentAudit || !canEditAudit(currentAudit)) {
-        alert("You don't have permission to edit this audit.");
+    if (!currentAudit) { // currentAudit should be set when the modal is opened
+        alert("Error: No audit is currently selected for editing.");
+        console.error("editAudit called but currentAudit is null or undefined.");
         return;
     }
-    
-    // Switch to the new-audit section
-    switchSection('new-audit');
 
-
-    
-    // Populate the form with the current audit data
-    if (auditDateInput) auditDateInput.value = currentAudit.date || '';
-    if (directorateUnitInput) directorateUnitInput.value = currentAudit.directorateUnit || '';
-    if (refNoInput) refNoInput.value = currentAudit.refNo || '';
-    if (locationInput) locationInput.value = currentAudit.location || '';
-    
-    // Populate lead auditors and auditors (you'll need to implement this)
-    populateAuditForm(currentAudit);
-    populateAuditorSelections(currentAudit.leadAuditors, currentAudit.auditors);
-    
-    // Populate checklist items
-    if (currentAudit.checklist && checklistContainer) {
-        currentAudit.checklist.forEach(item => {
-            const itemElement = checklistContainer.querySelector(`[data-item-id="${item.id}"]`);
-            if (itemElement) {
-                // Set applicability
-                const applicableRadio = itemElement.querySelector(`input[name="applicable-${item.id}"][value="${item.applicable}"]`);
-                if (applicableRadio) applicableRadio.checked = true;
-                
-                // Show/hide content based on applicability
-                const content = itemElement.querySelector('.checklist-content');
-                if (content) {
-                    content.style.display = item.applicable === 'yes' ? 'block' : 'none';
-                    
-                    // Populate fields for applicable items
-                    if (item.applicable === 'yes') {
-                        if (item.id === 28) {
-                            const observations = content.querySelector(`#observations-${item.id}`);
-                            if (observations) observations.value = item.observations || '';
-                        } else {
-                            const evidence = content.querySelector(`#evidence-${item.id}`);
-                            if (evidence) evidence.value = item.objectiveEvidence || '';
-                            
-                            const comments = content.querySelector(`#comments-${item.id}`);
-                            if (comments) comments.value = item.comments || '';
-                            
-                            // Set compliance
-                            if (item.compliance) {
-                                const complianceBtn = content.querySelector(`.compliance-btn[data-compliance="${item.compliance}"]`);
-                                if (complianceBtn) {
-                                    complianceBtn.classList.add('active', `compliance-${item.compliance}`);
-                                }
-                            }
-                            
-                            // Set corrective action
-                            const correctiveActionRadio = content.querySelector(`input[name="corrective-action-${item.id}"][value="${item.correctiveActionNeeded ? 'yes' : 'no'}"]`);
-                            if (correctiveActionRadio) correctiveActionRadio.checked = true;
-                            
-                            // Set classification
-                            const classificationSelect = content.querySelector(`#classification-${item.id}`);
-                            if (classificationSelect) classificationSelect.value = item.classification || '';
-                        }
-                    }
-                }
-            }
-        });
+    if (!canEditAudit(currentAudit)) { // Ensure canEditAudit function exists and is correct
+        alert("You don't have permission to edit this audit in its current state.");
+        return;
     }
+
+    console.log("Starting edit for audit ID:", currentAudit.id);
+    switchSection('new-audit');
+    populateAuditForm(currentAudit);
     closeModal();
 }
 
@@ -552,10 +507,12 @@ function populateAuditForm(audit) {
     }
 
     // 3. Populate Lead Auditors and Auditors Multi-Selects
-    // (Your existing populateMultiSelect logic here - ensure it correctly checks based on displayName or UID)
     const populateMultiSelect = (optionsContainerId, selectedAuditorsArray) => {
         const optionsContainer = document.getElementById(optionsContainerId);
-        if (!optionsContainer || !Array.isArray(selectedAuditorsArray)) return;
+        if (!optionsContainer || !Array.isArray(selectedAuditorsArray)) {
+            console.warn(`Multi-select container ${optionsContainerId} not found or invalid selectedAuditorsArray.`);
+            return;
+        }
         const selectedDisplayNames = [];
         optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
             const isSelected = selectedAuditorsArray.some(auditor =>
@@ -563,7 +520,14 @@ function populateAuditForm(audit) {
             );
             checkbox.checked = isSelected;
             if (isSelected) {
-                selectedDisplayNames.push(checkbox.parentElement.textContent.trim());
+                // Get the text from the label associated with the checkbox for display
+                let labelText = checkbox.parentElement?.textContent?.trim();
+                if (!labelText && checkbox.nextElementSibling && checkbox.nextElementSibling.tagName === 'LABEL') {
+                     labelText = checkbox.nextElementSibling.textContent.trim();
+                } else if (!labelText) {
+                    labelText = checkbox.value; // Fallback to checkbox value
+                }
+                selectedDisplayNames.push(labelText);
             }
         });
         const displayElementId = optionsContainerId.replace('-options', '-selected');
@@ -572,6 +536,8 @@ function populateAuditForm(audit) {
             const placeholder = displayElement.dataset.placeholder || 'Select...';
             displayElement.textContent = selectedDisplayNames.length > 0 ? selectedDisplayNames.join(', ') : placeholder;
             displayElement.style.color = selectedDisplayNames.length > 0 ? 'var(--dark-color)' : 'var(--text-muted)';
+        } else {
+            console.warn(`Display element for multi-select ${displayElementId} not found.`);
         }
     };
     populateMultiSelect('lead-auditors-options', audit.leadAuditors || []);
@@ -579,7 +545,6 @@ function populateAuditForm(audit) {
 
 
     // 4. Rebuild and Populate Checklist
-    // FIRST, ensure the checklist structure is present (initNewAuditForm does this)
     initNewAuditForm(); // This re-renders the empty checklist structure with default states.
 
     if (audit.checklist && checklistContainer && Array.isArray(audit.checklist)) {
@@ -589,65 +554,46 @@ function populateAuditForm(audit) {
             const itemElement = checklistContainer.querySelector(`.checklist-item[data-item-id="${itemFromDb.id}"]`);
             if (!itemElement) {
                 console.warn(`Checklist item element NOT FOUND for ID: ${itemFromDb.id}`);
-                return; // Skip if element not found
+                return;
             }
 
-            // a. Set Applicability Radio
-            const applicabilityValue = itemFromDb.applicable || 'no'; // Default to 'no' if undefined
+            const applicabilityValue = itemFromDb.applicable || 'no';
             const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemFromDb.id}"][value="${applicabilityValue}"]`);
             if (applicableRadio) {
                 applicableRadio.checked = true;
-                // console.log(`Item ${itemFromDb.id}: Applicability set to '${applicabilityValue}'`);
             } else {
                 console.warn(`Item ${itemFromDb.id}: Applicability radio for value '${applicabilityValue}' not found.`);
             }
 
-            // b. Show/Hide Content Div based on Applicability
             const contentDiv = itemElement.querySelector('.checklist-content');
             if (contentDiv) {
                 contentDiv.style.display = (applicabilityValue === 'yes') ? 'block' : 'none';
 
-                // c. Populate fields *only if* applicable and content is visible
                 if (applicabilityValue === 'yes') {
-                    if (itemFromDb.id === 28) { // Special "Other Observations" item
+                    if (String(itemFromDb.id) === '28') { // Ensure comparison is robust (string vs number)
                         const obsTextarea = contentDiv.querySelector(`#observations-${itemFromDb.id}`);
                         if (obsTextarea) obsTextarea.value = itemFromDb.observations || '';
                     } else {
-                        // Objective Evidence
                         const evidenceTextarea = contentDiv.querySelector(`#evidence-${itemFromDb.id}`);
                         if (evidenceTextarea) evidenceTextarea.value = itemFromDb.objectiveEvidence || '';
 
-                        // Comments
                         const commentsTextarea = contentDiv.querySelector(`#comments-${itemFromDb.id}`);
                         if (commentsTextarea) commentsTextarea.value = itemFromDb.comments || '';
 
-                        // Compliance Button
-                        itemElement.querySelectorAll('.compliance-btn').forEach(btn => btn.classList.remove('active', 'compliance-yes', 'compliance-no')); // Reset first
+                        itemElement.querySelectorAll('.compliance-btn').forEach(btn => btn.classList.remove('active', 'compliance-yes', 'compliance-no'));
                         if (itemFromDb.compliance) {
                             const complianceBtn = contentDiv.querySelector(`.compliance-btn[data-compliance="${itemFromDb.compliance}"]`);
                             if (complianceBtn) {
-                                complianceBtn.classList.add('active');
-                                complianceBtn.classList.add(`compliance-${itemFromDb.compliance}`);
-                            } else {
-                                // console.warn(`Item ${itemFromDb.id}: Compliance button for '${itemFromDb.compliance}' not found.`);
+                                complianceBtn.classList.add('active', `compliance-${itemFromDb.compliance}`);
                             }
                         }
-
-                        // Corrective Action Radio
-                        const caNeeded = itemFromDb.correctiveActionNeeded === true || itemFromDb.correctiveActionNeeded === 'yes'; // Handle boolean or string 'yes'
+                        const caNeeded = itemFromDb.correctiveActionNeeded === true || String(itemFromDb.correctiveActionNeeded).toLowerCase() === 'yes';
                         const caRadioValue = caNeeded ? 'yes' : 'no';
                         const caRadio = contentDiv.querySelector(`input[name="corrective-action-${itemFromDb.id}"][value="${caRadioValue}"]`);
-                        if (caRadio) {
-                            caRadio.checked = true;
-                        } else {
-                            // console.warn(`Item ${itemFromDb.id}: Corrective action radio for '${caRadioValue}' not found.`);
-                        }
+                        if (caRadio) caRadio.checked = true;
 
-                        // Classification Select
                         const classificationSelect = contentDiv.querySelector(`#classification-${itemFromDb.id}`);
-                        if (classificationSelect) {
-                            classificationSelect.value = itemFromDb.classification || '';
-                        }
+                        if (classificationSelect) classificationSelect.value = itemFromDb.classification || '';
                     }
                 }
             } else {
@@ -656,7 +602,7 @@ function populateAuditForm(audit) {
         });
         console.log("Checklist population attempt finished.");
     } else {
-        console.log("No audit.checklist data to populate, or checklistContainer is missing.");
+        console.log("No audit.checklist data to populate, or checklistContainer/audit.checklist is missing/invalid.");
     }
 }
 
@@ -872,108 +818,77 @@ function generateNumberOptions(start, end) {
     return options;
 }
 
-function collectAuditFormData() {
+ffunction collectAuditFormData() {
     const auditDate = auditDateInput?.value;
     const directorateUnit = directorateUnitInput?.value.trim();
     const refNo = refNoInput?.value.trim();
-    const location = locationInput?.value;
+    const locationValue = locationInput?.value;
+    const introductionText = document.querySelector('#new-audit-section .evidence-container .evidence-input')?.value.trim() || '';
+    const auditeeName = document.getElementById('auditee-name')?.value.trim() || '';
+    const auditeePosition = document.getElementById('auditee-position')?.value.trim() || '';
 
-    // Basic required field validation
+    // Basic required field validation (keep your existing checks)
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
     if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
     if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
-    if (!location) {alert('Select Location.'); locationInput?.focus(); return null; }
+    if (!locationValue) {alert('Select Location.'); locationInput?.focus(); return null; }
 
-    // Check if at least one lead auditor is selected
-    const leadAuditorsSelected = Array.from(document.querySelectorAll('#lead-auditors-options input[type="checkbox"]:checked')).length > 0;
-    if (!leadAuditorsSelected) { 
-        alert('Select at least one Lead Auditor.'); 
-        document.querySelector('#lead-auditors').scrollIntoView({ behavior: 'smooth' });
-        return null; 
-    }
-
-    // Improved auditor selection validation
-    const auditorsSelected = Array.from(document.querySelectorAll('#auditors-options input[type="checkbox"]:checked')).length > 0;
-    if (!auditorsSelected) { 
-        alert('Select at least one Auditor.'); 
-        document.querySelector('#auditors').scrollIntoView({ behavior: 'smooth' });
-        return null; 
-    }
-
-    // Get selected auditors data
     const getSelectedAuditorData = (optionsId) => {
         const optionsContainer = document.getElementById(optionsId);
         if (!optionsContainer) return [];
         return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
             .map(checkbox => ({
-                uid: checkbox.value,
+                uid: checkbox.value, // Assuming checkbox.value is a unique ID or the name itself
                 displayName: checkbox.parentElement.textContent.trim(),
-                email: '' // You might want to store email if available
+                // email: checkbox.dataset.email || '' // If you store email in data attribute
             }));
     };
 
     const selectedLeadAuditors = getSelectedAuditorData('lead-auditors-options');
     const selectedAuditors = getSelectedAuditorData('auditors-options');
+     if (selectedLeadAuditors.length === 0) { alert('Select at least one Lead Auditor.'); return null;}
+     if (selectedAuditors.length === 0) { alert('Select at least one Auditor.'); return null;}
 
 
     const checklistData = [];
     const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
-    
     if (checklistItemElements) {
-        checklistItemElements.forEach((itemElement, index) => {
-            const originalItem = auditChecklist[index];
-            const itemId = originalItem.id;
-            
-            // Reset any error highlighting
-            itemElement.style.border = '';
-            
-            // Get applicability selection
+        checklistItemElements.forEach((itemElement) => {
+            const itemId = parseInt(itemElement.dataset.itemId); // Ensure ID is a number if auditChecklist uses numbers
+            const originalItem = auditChecklist.find(ci => ci.id === itemId);
+            if (!originalItem) {
+                console.warn(`Original checklist item not found for ID: ${itemId}`);
+                return;
+            }
+
             const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemId}"]:checked`);
             const isApplicable = applicableRadio?.value === 'yes';
-            
-            // Inside the checklistData collection in collectAuditFormData:
+            let itemEntry = {
+                id: itemId,
+                requirement: originalItem.requirement,
+                clause: originalItem.clause,
+                applicable: isApplicable ? 'yes' : 'no',
+            };
+
             if (isApplicable) {
-                const complianceBtn = itemElement.querySelector('.compliance-btn.active');
-                const compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
-                
-                const evidence = itemElement.querySelector('.evidence-input')?.value.trim() || '';
-                const correctiveActionYes = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
-                let correctiveActionsCount = null;
-                const classification = itemElement.querySelector(`#classification-${itemId}`)?.value || '';
-                const comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
-                
-                checklistData.push({
-                    id: itemId,
-                    requirement: originalItem.requirement,
-                    clause: originalItem.clause,
-                    applicable: isApplicable ? 'yes' : 'no',
-                    ...(itemId === 28 ? {
-                        observations: itemElement.querySelector(`#observations-${itemId}`)?.value.trim() || ''
-                    } : {
-                        compliance,
-                        objectiveEvidence: evidence,
-                        correctiveActionNeeded: correctiveActionYes,
-                        correctiveActionsCount,
-                        classification: itemElement.querySelector(`#classification-${itemId}`)?.value || '',
-                        comments: comments
-                    })
-                });
+                if (itemId === 28) { // Other Observations
+                    itemEntry.observations = itemElement.querySelector(`#observations-${itemId}`)?.value.trim() || '';
+                } else {
+                    const complianceBtn = itemElement.querySelector('.compliance-btn.active');
+                    itemEntry.compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
+                    itemEntry.objectiveEvidence = itemElement.querySelector(`#evidence-${itemId}`)?.value.trim() || '';
+                    itemEntry.comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
+                    itemEntry.correctiveActionNeeded = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
+                    itemEntry.classification = itemElement.querySelector(`#classification-${itemId}`)?.value || '';
+                }
+            } else { // Not applicable, still add basic info
+                 if (itemId === 28) itemEntry.observations = '';
+                 else {
+                    itemEntry.compliance = ''; itemEntry.objectiveEvidence = ''; itemEntry.comments = '';
+                    itemEntry.correctiveActionNeeded = false; itemEntry.classification = '';
+                 }
             }
-            // Only collect data for applicable items
-             else {
-                // Mark as not applicable
-                checklistData.push({
-                    id: itemId,
-                    requirement: originalItem.requirement,
-                    clause: originalItem.clause,
-                    applicable: 'no',
-                    compliance: '',
-                    objectiveEvidence: '',
-                    correctiveActionNeeded: false,
-                    correctiveActionsCount: null,
-                    comments: ''
-                });
-            }
+            checklistData.push(itemEntry);
         });
     }
 
@@ -981,25 +896,37 @@ function collectAuditFormData() {
         date: auditDate,
         directorateUnit,
         refNo,
+        location: locationValue,
+        introduction: introductionText,
+        auditeeName,
+        auditeePosition,
         leadAuditors: selectedLeadAuditors,
         auditors: selectedAuditors,
         checklist: checklistData,
-        lastModified: firebase.firestore.FieldValue.serverTimestamp(),
-        status: 'draft' // Default status
+        // lastModified will be set by saveAuditToFirestore
     };
 
-    if (!currentAudit) {
-        if (!currentUser) { 
-            console.error("No currentUser."); 
-            alert("Error: User session lost."); 
-            return null; 
+    if (currentAudit && currentAudit.id) {
+        // If editing, preserve original createdBy, createdAt, and status (unless explicitly changed by submit action)
+        baseData.createdBy = currentAudit.createdBy;
+        baseData.createdByEmail = currentAudit.createdByEmail;
+        baseData.createdAt = currentAudit.createdAt; // This should be a Firestore Timestamp object or compatible
+        baseData.status = currentAudit.status; // Preserve status, submit/saveDraft will override if necessary
+        if(currentAudit.submittedAt) baseData.submittedAt = currentAudit.submittedAt; // Preserve if exists
+    } else {
+        // New audit
+        if (!currentUser) {
+            console.error("No currentUser for new audit.");
+            alert("Error: User session lost. Please log in again.");
+            return null;
         }
         baseData.createdBy = currentUser.uid;
         baseData.createdByEmail = currentUser.email;
-        baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        baseData.createdAt = firebase.firestore.FieldValue.serverTimestamp(); // Set for new
+        baseData.status = 'draft'; // Default for new
     }
 
-    return { data: baseData, location: locationInput.value};
+    return baseData; // Return the complete object
 }
 
 async function saveAuditAsDraft() {
@@ -1011,53 +938,93 @@ async function saveAuditAsDraft() {
 }
 
 async function submitAudit() {
-    const formData = collectAuditFormData();
-    if (!formData) return; // Basic validation failed
-    
-    // Confirm submission
-    if (!confirm("Are you ready to submit this audit? Once submitted, you won't be able to edit it unless you're an admin.")) {
+    const collectedData = collectAuditFormData();
+    if (!collectedData) return;
+
+    const auditDataToSave = { ...collectedData }; // Make a copy
+
+    if (!confirm("Are you sure you want to submit this audit?")) {
         return;
     }
-    
-    auditData = formData.data;
-    auditData.status = 'submitted';
-    auditData.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
-    
+
+    submitAuditBtn.disabled = true;
+    submitAuditBtn.textContent = 'Submitting...';
+
     try {
-        if (currentAudit?.id) {
-            await db.collection('audits').doc(currentAudit.id).update(auditData);
-        } else {
-            await db.collection('audits').add(auditData);
-        }
-        
-        await generateAuditDocument(auditData);
-        clearAuditForm();
-        
-        // Redirect to Teams channel
-        redirectToTeamsChannel();
-        
-        loadAudits(); // Refresh the audit history
-        switchSection('audit-history'); // Redirect to history view
+        // `saveAuditToFirestore` will set status to 'submitted'
+        await saveAuditToFirestore(auditDataToSave, true); // true means submitting
     } catch (error) {
-        console.error("Error submitting audit:", error);
-        alert("Failed to submit audit: " + error.message);
+        // Error already handled by saveAuditToFirestore
+        console.error("Error during submitAudit:", error);
+    } finally {
+        submitAuditBtn.disabled = false;
+        submitAuditBtn.textContent = 'Submit Audit';
     }
 }
 
-async function saveAuditToFirestore(auditData) {
+
+async function saveAuditToFirestore(auditDataToSave, isSubmitting = false) {
+    // auditDataToSave is the object from collectAuditFormData
+    // It should already have lastModified timestamp (added by collectAuditFormData)
+
+    if (isSubmitting) {
+        auditDataToSave.status = 'submitted';
+        auditDataToSave.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
+    } else {
+        // If just saving draft, ensure status is 'draft' if it was new,
+        // or preserve its existing status if we are re-saving an existing draft.
+        if (!auditDataToSave.status || auditDataToSave.status === 'new_placeholder') { // 'new_placeholder' if you used it
+            auditDataToSave.status = 'draft';
+        }
+    }
+    // Always update lastModified
+    auditDataToSave.lastModified = firebase.firestore.FieldValue.serverTimestamp();
+
+
     try {
-        if (currentAudit?.id) {
-            // Update existing audit
-            await db.collection('audits').doc(currentAudit.id).update(auditData);
+        if (currentAudit && currentAudit.id) {
+            // ----- UPDATING EXISTING AUDIT -----
+            console.log("Updating existing audit ID:", currentAudit.id);
+            // Make sure not to overwrite createdBy and createdAt
+            const { createdBy, createdAt, ...dataToUpdate } = auditDataToSave; // Destructure to exclude them for update
+            await db.collection('audits').doc(currentAudit.id).update(dataToUpdate);
+
+            // Update the local currentAudit object with the latest saved data
+            currentAudit = { ...currentAudit, ...dataToUpdate };
+
+            showMessage(isSubmitting ? 'Audit updated and submitted!' : 'Draft updated successfully!', 'success');
         } else {
-            // Create new audit
-            auditData.createdBy = currentUser.uid;
-            auditData.createdByEmail = currentUser.email;
-            await db.collection('audits').add(auditData);
+            // ----- CREATING NEW AUDIT -----
+            // createdBy, createdAt should be in auditDataToSave from collectAuditFormData
+            if (!auditDataToSave.createdBy && currentUser) { // Safety check / ensure for new
+                auditDataToSave.createdBy = currentUser.uid;
+                auditDataToSave.createdByEmail = currentUser.email;
+                auditDataToSave.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+            }
+            console.log("Adding new audit with data:", auditDataToSave);
+            const docRef = await db.collection('audits').add(auditDataToSave);
+            // After adding, set currentAudit to this new audit so subsequent saves update it
+            currentAudit = { id: docRef.id, ...auditDataToSave };
+            showMessage(isSubmitting ? 'Audit submitted successfully!' : 'Draft saved successfully!', 'success');
+        }
+
+        loadAudits(); // Refresh lists
+
+        if (isSubmitting) {
+            await generateAuditDocument(currentAudit); // Use the potentially updated currentAudit
+            redirectToTeamsChannel();
+            clearAuditForm(); // Also clears currentAudit to null
+            switchSection('audit-history');
+        } else {
+            // If only saving a draft, currentAudit is now set/updated.
+            // The user might want to continue editing this draft.
+            // So, we don't clear the form or switch sections here.
+            // populateAuditForm(currentAudit); // Optionally re-populate if server timestamps changed things
         }
     } catch (error) {
-        console.error("Error saving audit:", error);
-        alert("Failed to save audit: " + error.message);
+        console.error("Error in saveAuditToFirestore:", error);
+        showMessage("Failed to save/submit audit: " + error.message, 'error');
+        throw error; // Re-throw to be caught by caller if needed
     }
 }
 
@@ -1616,123 +1583,143 @@ function updateAreaFilter() {
 // --- Modal Functionality ---
 
 function openAuditDetails(audit) {
+    currentAudit = audit; // Set currentAudit first
+
     try {
-        // Get modal elements
         const modal = document.getElementById('audit-detail-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalBody = document.getElementById('modal-body');
-        const modalActions = document.getElementById('modal-actions');
-        
-        if (!modal || !modalTitle || !modalBody || !modalActions) {
-            throw new Error('Modal elements not found');
+        const modalTitleEl = document.getElementById('modal-title'); // Renamed for clarity
+        const modalBodyEl = document.getElementById('modal-body');   // Renamed for clarity
+        const modalActionsContainer = document.getElementById('modal-actions');
+
+        if (!modal || !modalTitleEl || !modalBodyEl || !modalActionsContainer) {
+            console.error('Essential modal elements not found in openAuditDetails.');
+            return;
         }
 
         // Clear previous content
-        modalBody.innerHTML = '';
-        modalActions.innerHTML = '';
+        modalBodyEl.innerHTML = '';
+        modalActionsContainer.innerHTML = ''; // Clear previous buttons
 
-        // Set modal title
-        modalTitle.textContent = `Audit: ${escapeHtml(audit.directorateUnit)} (${formatDate(audit.date)})`;
+        modalTitleEl.textContent = `Audit: ${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date)})`;
 
-        // Build modal content
+        // Build modal body content
         const auditMeta = document.createElement('div');
         auditMeta.className = 'audit-meta';
         auditMeta.innerHTML = `
             <p><strong>Ref No.:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
             <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
-            <p><strong>Created By:</strong> ${escapeHtml(audit.createdByEmail || audit.createdBy)}</p>
+            <p><strong>Location:</strong> ${escapeHtml(audit.location || 'N/A')}</p>
+            <p><strong>Auditee Name:</strong> ${escapeHtml(audit.auditeeName || 'N/A')}</p>
+            <p><strong>Auditee Position:</strong> ${escapeHtml(audit.auditeePosition || 'N/A')}</p>
+            <p><strong>Lead Auditor(s):</strong> ${audit.leadAuditors?.map(a => escapeHtml(a.displayName)).join(', ') || 'N/A'}</p>
+            <p><strong>Auditor(s):</strong> ${audit.auditors?.map(a => escapeHtml(a.displayName)).join(', ') || 'N/A'}</p>
+            <p><strong>Created By:</strong> ${escapeHtml(audit.createdByEmail || audit.createdBy || 'N/A')}</p>
+            <p><strong>Created At:</strong> ${formatDateTime(audit.createdAt)}</p>
             <p><strong>Last Modified:</strong> ${formatDateTime(audit.lastModified)}</p>
+            ${audit.submittedAt ? `<p><strong>Submitted At:</strong> ${formatDateTime(audit.submittedAt)}</p>` : ''}
         `;
+        modalBodyEl.appendChild(auditMeta);
 
-        const checklistSection = document.createElement('div');
-        checklistSection.innerHTML = '<h3>Checklist Findings</h3>';
-        
-        if (audit.checklist?.length > 0) {
-            audit.checklist.forEach(item => {
-                if (item.applicable === 'yes') {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'checklist-item';
-                    itemDiv.innerHTML = `
-                        <h4>${item.id}. ${escapeHtml(item.requirement)}</h4>
-                        <p><strong>Compliance:</strong> <span class="${item.compliance === 'yes' ? 'compliant' : 'non-compliant'}">
-                            ${item.compliance === 'yes' ? 'Compliant' : 'Non-Compliant'}
-                        </span></p>
-                        ${item.objectiveEvidence ? `<p><strong>Evidence:</strong> ${escapeHtml(item.objectiveEvidence)}</p>` : ''}
-                    `;
-                    checklistSection.appendChild(itemDiv);
-                }
-            });
-        } else {
-            checklistSection.innerHTML += '<p>No checklist data available</p>';
+        if (audit.introduction) {
+            const introSection = document.createElement('div');
+            introSection.innerHTML = '<h4>Introduction</h4>';
+            const introP = document.createElement('p');
+            introP.style.whiteSpace = 'pre-wrap'; // Preserve formatting
+            introP.textContent = audit.introduction;
+            introSection.appendChild(introP);
+            modalBodyEl.appendChild(introSection);
         }
 
-        // Add elements to modal
-        modalBody.appendChild(auditMeta);
-        modalBody.appendChild(checklistSection);
 
-        // Create action buttons
-        const editBtn = document.createElement('button');
-        editBtn.id = 'edit-audit-btn';
-        editBtn.className = 'btn btn-secondary';
-        editBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
-        editBtn.addEventListener('click', () => {
-            if (canEditAudit(audit)) {
-                currentAudit = audit;
-                switchSection('new-audit');
-                populateAuditForm(audit);
-            } else {
-                alert('You have permission to edit this draft');
-            }
-        });
+        const checklistSection = document.createElement('div');
+        checklistSection.innerHTML = '<h4>Checklist Findings Summary</h4>';
+        if (audit.checklist?.length > 0) {
+            const summaryTable = document.createElement('table');
+            summaryTable.className = 'report-table'; // Use existing table style
+            summaryTable.innerHTML = `<thead><tr><th>ID</th><th>Requirement</th><th>Compliance</th><th>Evidence Snippet</th></tr></thead><tbody></tbody>`;
+            const tbody = summaryTable.querySelector('tbody');
 
-        const submitDraftBtn = document.createElement('button');
-        submitDraftBtn.id = 'submit-draft-btn';
-        submitDraftBtn.className = 'btn btn-success';
-        submitDraftBtn.innerHTML = '<i class="fas fa-file-export"></i> Submit Draft';
-        submitDraftBtn.addEventListener('click', async () => {
-            try {
-                // Update status to submitted
-                await db.collection('audits').doc(audit.id).update({
-                    status: 'submitted',
-                    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // Generate and download document
-                await generateAuditDocument(audit);
-                
-                // Redirect to Teams
-                redirectToTeamsChannel();
-                
-                // Refresh audits
-                loadAudits();
-                closeModal();
-                
-            } catch (error) {
-                console.error('Submit draft error:', error);
-                alert('Error submitting draft: ' + error.message);
-            }
-        });
+            audit.checklist.forEach(item => {
+                if (item.applicable === 'yes') {
+                    const row = tbody.insertRow();
+                    row.insertCell().textContent = item.id;
+                    row.insertCell().textContent = escapeHtml(item.requirement);
 
-        const closeBtn = document.createElement('button');
-        closeBtn.id = 'close-modal-btn';
-        closeBtn.className = 'btn btn-outline';
-        closeBtn.textContent = 'Close';
-        closeBtn.addEventListener('click', closeModal);
+                    let complianceText = 'N/A';
+                    let complianceClass = '';
+                    if (item.compliance === 'yes') {
+                        complianceText = 'Compliant';
+                        complianceClass = 'compliant';
+                    } else if (item.compliance === 'no') {
+                        complianceText = 'Non-Compliant';
+                        complianceClass = 'non-compliant';
+                    }
+                    const complianceCell = row.insertCell();
+                    complianceCell.innerHTML = `<span class="${complianceClass}">${complianceText}</span>`;
 
-        // Append buttons
-        modalActions.appendChild(editBtn);
-        modalActions.appendChild(submitDraftBtn);
-        modalActions.appendChild(closeBtn);
+                    let evidenceSnippet = item.objectiveEvidence ? escapeHtml(item.objectiveEvidence.substring(0, 70)) + '...' : 'N/A';
+                    if (String(item.id) === '28' && item.observations) { // For "Other Observations"
+                        evidenceSnippet = escapeHtml(item.observations.substring(0,70)) + '...';
+                    }
+                    row.insertCell().textContent = evidenceSnippet;
+                }
+            });
+            checklistSection.appendChild(summaryTable);
+        } else {
+            checklistSection.innerHTML += '<p>No checklist data available or no items marked applicable.</p>';
+        }
+        modalBodyEl.appendChild(checklistSection);
 
-        // Update button visibility
-        editBtn.classList.toggle('hidden', !canEditAudit(audit));
-        submitDraftBtn.classList.toggle('hidden', audit.status !== 'draft');
-        
-        // Show modal
+        // Create and append action buttons dynamically
+        const localEditBtn = document.createElement('button');
+        localEditBtn.id = 'modal-dynamic-edit-btn'; // For potential specific styling/selection
+        localEditBtn.className = 'btn btn-secondary'; // existing class for styling
+        localEditBtn.innerHTML = '<i class="fas fa-edit"></i> Edit';
+        localEditBtn.addEventListener('click', editAudit);
+        modalActionsContainer.appendChild(localEditBtn);
+
+        const localExportBtn = document.createElement('button');
+        localExportBtn.id = 'modal-dynamic-export-btn';
+        localExportBtn.className = 'btn btn-success';
+        localExportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export';
+        localExportBtn.addEventListener('click', exportCurrentAudit);
+        modalActionsContainer.appendChild(localExportBtn);
+
+        const localCloseBtn = document.createElement('button');
+        localCloseBtn.id = 'modal-dynamic-close-btn'; // Added ID for consistency
+        localCloseBtn.className = 'btn btn-outline';
+        localCloseBtn.textContent = 'Close';
+        localCloseBtn.addEventListener('click', closeModal);
+        modalActionsContainer.appendChild(localCloseBtn);
+
+        // Control visibility of these specific, newly created buttons
+        const canUserEdit = canEditAudit(currentAudit);
+        localEditBtn.classList.toggle('permission-hidden', !canUserEdit);
+        localEditBtn.disabled = !canUserEdit;
+
+        const canUserExport = hasPermission('export_data');
+        console.log(`User ${currentUser?.email} (role: ${currentUser?.role}) canExport: ${canUserExport}`);
+        localExportBtn.classList.toggle('permission-hidden', !canUserExport);
+        localExportBtn.disabled = !canUserExport;
+
+        // Example: If you had a submit draft button in the modal for draft audits
+        if (audit.status === 'draft' && hasPermission('submit_audit')) { // Assuming 'submit_audit' is the permission
+            const localSubmitDraftBtn = document.createElement('button');
+            localSubmitDraftBtn.className = 'btn btn-primary'; // Or some other appropriate class
+            localSubmitDraftBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Draft from Modal';
+            localSubmitDraftBtn.addEventListener('click', () => {
+                if(confirm("Are you sure you want to submit this draft?")){
+                    submitAuditFromHistory(audit.id); // Re-use existing logic
+                    closeModal();
+                }
+            });
+            modalActionsContainer.insertBefore(localSubmitDraftBtn, localCloseBtn); // Insert before close
+        }
+
+
         modal.classList.remove('hidden');
-
     } catch (error) {
-        console.error('Error opening audit details:', error);
+        console.error('Error in openAuditDetails:', error);
         alert('Failed to load audit details: ' + error.message);
     }
 }
@@ -2967,39 +2954,40 @@ function redirectToTeamsChannel() {
 }
 
 function clearAuditForm() {
-    // Reset form fields
-    if (auditForm) auditForm.reset();
-    
-    
-    // Clear checklist items
-    const checklistItems = checklistContainer?.querySelectorAll('.checklist-item');
-    checklistItems?.forEach(item => {
-        const content = item.querySelector('.checklist-content');
-        if (content) {
-            content.style.display = 'none';
-            content.querySelectorAll('textarea').forEach(t => t.value = '');
-            content.querySelectorAll('.compliance-btn').forEach(b => {
-                b.classList.remove('active', 'compliance-yes', 'compliance-no');
-            });
-            const noRadio = content.querySelector(`input[type="radio"][value="no"]`);
-            if (noRadio) noRadio.checked = true;
+    console.log("Clearing audit form...");
+    if (auditForm) {
+        auditForm.reset(); // Resets standard inputs, selects, textareas to their initial HTML state or empty
+    }
+
+    // Explicitly clear fields that might not be fully reset by auditForm.reset()
+    const introductionTextarea = document.querySelector('#new-audit-section .evidence-container .evidence-input');
+    if (introductionTextarea) introductionTextarea.value = '';
+
+    const auditeeNameEl = document.getElementById('auditee-name');
+    if (auditeeNameEl) auditeeNameEl.value = '';
+
+    const auditeePositionEl = document.getElementById('auditee-position');
+    if (auditeePositionEl) auditeePositionEl.value = '';
+
+    // Re-initialize the checklist to its default empty/non-applicable state
+    if (checklistContainer) {
+        initNewAuditForm(); // This rebuilds the checklist from scratch with defaults
+    }
+
+    // Clear custom multi-select displays and uncheck options
+    document.querySelectorAll('.custom-multiselect').forEach(ms => {
+        const selectedNamesEl = ms.querySelector('.selected-names');
+        if (selectedNamesEl) {
+            selectedNamesEl.textContent = selectedNamesEl.dataset.placeholder || 'Select...';
+            selectedNamesEl.style.color = 'var(--text-muted)';
         }
-        const notApplicableRadio = item.querySelector(`input[type="radio"][value="no"]`);
-        if (notApplicableRadio) notApplicableRadio.checked = true;
+        ms.querySelectorAll('.dropdown-options input[type="checkbox"]').forEach(cb => {
+            cb.checked = false;
+        });
     });
-    
-    // Clear multiselect displays
-    document.querySelectorAll('.selected-names').forEach(el => {
-        el.textContent = el.dataset.placeholder || 'Select';
-        el.style.color = 'var(--text-muted)';
-    });
-    
-    // Uncheck all multiselect options
-    document.querySelectorAll('.dropdown-options input[type="checkbox"]').forEach(cb => {
-        cb.checked = false;
-    });
-    
-    currentAudit = null;
+
+    currentAudit = null; // Crucial for ensuring the next action is treated as new if not an edit
+    console.log("Audit form fully cleared, currentAudit is now null.");
 }
 
 function showPasswordChangeModal(e) {
@@ -3092,46 +3080,47 @@ async function handleForgotPassword(e) {
 }
 
 async function saveAuditAsDraft() {
+    const collectedData = collectAuditFormData();
+    if (!collectedData) return;
+
+    const auditDataToSave = { ...collectedData }; // Make a copy
+
+    saveDraftBtn.disabled = true;
+    saveDraftBtn.textContent = 'Saving...';
+
     try {
-        // Collect form data
-        const formResult = collectAuditFormData();
-        if (!formResult) return; // Validation failed
-        
-        // Prepare audit data with draft status
-        const auditData = {
-            ...formResult.data,
-            location: formResult.location,
-            status: 'draft',
-            lastModified: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        // Show loading state
-        saveDraftBtn.disabled = true;
-        saveDraftBtn.textContent = 'Saving...';
-        
-        // Save to Firestore
-        if (currentAudit?.id) {
-            // Update existing draft
-            await db.collection('audits').doc(currentAudit.id).update(auditData);
-            showMessage('Draft updated successfully!', 'success');
+        // Explicitly set status for draft saving,
+        // but allow saveAuditToFirestore to preserve if currentAudit already has a status
+        if (currentAudit && currentAudit.status) {
+            auditDataToSave.status = currentAudit.status; // Preserve if editing existing
         } else {
-            // Create new draft
-            auditData.createdBy = currentUser.uid;
-            auditData.createdByEmail = currentUser.email;
-            auditData.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-            
-            await db.collection('audits').add(auditData);
-            showMessage('Draft saved successfully!', 'success');
+            auditDataToSave.status = 'draft'; // Default for new
         }
-        
-        // Refresh audits list
-        loadAudits();
-        
+         // If it's an existing draft being saved again, its status is 'draft'
+        if (currentAudit && currentAudit.id && auditDataToSave.status !== 'submitted' && auditDataToSave.status !== 'approved') { // etc.
+            auditDataToSave.status = 'draft';
+        } else if (!currentAudit) { // A brand new audit being saved as draft for the first time
+             auditDataToSave.status = 'draft';
+        }
+        // If currentAudit.status is 'submitted' and an admin is editing and saving as draft,
+        // the status should probably revert to 'draft'. This needs careful thought on workflow.
+        // For now, if it's NOT a submit action, let's ensure it's 'draft' if it's new or was already draft.
+        if (!auditDataToSave.status || (currentAudit && currentAudit.status !== 'submitted')) { // A bit simplistic, might need refinement
+            auditDataToSave.status = 'draft';
+        }
+
+
+        await saveAuditToFirestore(auditDataToSave, false); // false means not submitting
+        // After saving, populateAuditForm with the (potentially updated by server timestamp) currentAudit
+        // This ensures the form reflects the true state of the saved draft if user continues editing.
+        if(currentAudit){
+            populateAuditForm(currentAudit);
+        }
+
     } catch (error) {
-        console.error('Error saving draft:', error);
-        showMessage('Failed to save draft: ' + error.message, 'error');
+        // Error already handled and shown by saveAuditToFirestore
+        console.error("Error during saveAuditAsDraft:", error);
     } finally {
-        // Reset button state
         saveDraftBtn.disabled = false;
         saveDraftBtn.textContent = 'Save Draft';
     }
