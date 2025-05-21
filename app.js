@@ -469,6 +469,9 @@ function canEditAudit(audit) {
     return (
         currentUser.role === ROLES.ADMIN ||
         (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft')
+        // Auditors can only edit their own drafts
+        || (currentUser.role === ROLES.AUDITOR && audit.status === 'draft' && audit.createdBy === currentUser.uid)
+
     );
 }
 
