@@ -821,7 +821,7 @@ function generateNumberOptions(start, end) {
     return options;
 }
 
-ffunction collectAuditFormData() {
+function collectAuditFormData() {
     const auditDate = auditDateInput?.value;
     const directorateUnit = directorateUnitInput?.value.trim();
     const refNo = refNoInput?.value.trim();
