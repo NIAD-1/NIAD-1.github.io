@@ -163,10 +163,32 @@ function setupEventListeners() {
     loginBtn?.addEventListener('click', loginWithEmail);
     googleLoginBtn?.addEventListener('click', loginWithGoogle);
     logoutBtn?.addEventListener('click', logout);
+    
+    document.getElementById('toggle-login-password-visibility')?.addEventListener('click', () => {
+        const pwdInput = document.getElementById('login-password');
+        const icon = document.querySelector('#toggle-login-password-visibility i');
+        if (pwdInput && icon) {
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                icon.className = 'far fa-eye';
+            } else {
+                pwdInput.type = 'password';
+                icon.className = 'far fa-eye-slash';
+            }
+        }
+    });
+
+    // Mobile Sidebar Toggles
+    document.getElementById('sidebar-mobile-toggle')?.addEventListener('click', () => {
+        document.querySelector('.app-sidebar')?.classList.toggle('active');
+    });
 
     // Navigation events
     navItems.forEach(item => {
         item.addEventListener('click', () => {
+            // Close mobile sidebar on click
+            document.querySelector('.app-sidebar')?.classList.remove('active');
+            
             const sectionId = item.dataset.section; // Defined here
             const permission = item.dataset.permission;
 
@@ -263,11 +285,88 @@ function setupEventListeners() {
 
 // --- Authentication & Role Management ---
 
+const LEAD_AUDITORS_LIST = [
+    "Abubakar Fatima", "Adesanya Oluwaseun", "Akinyemi Sidikat", "Bolanle Ikusagba", 
+    "Danga Chinyelu", "Ekwealor Chinenye", "Fatoki Samson", "Ibeh Vivien", 
+    "Ifudu Nkem", "Kalang Biyama Andrew", "Kema Ashibuogwu", "Khadijah Ade-Abolade", 
+    "Muoneke Wendy", "Offor Adaku", "Onwualu Rosemary", "Osho Folasade", 
+    "Sanwoolu Oluwaseyi", "Stephanie Adeoye", "Sunday Adown", "Uche Rose"
+];
+
+const AUDITORS_LIST = [
+    "Adewale Muniru", "Akinyemi Juliannah", "Akinyemi Sidikat", "Alex Tank", 
+    "Anulika Nwosu", "Azogini Ebosie", "Bolanle Ikusagba", "Ekwealor Chinenye", 
+    "Enilama O. Emmanuel", "Gidado Babayo", "Hassan Tanko", "Hulugh Terhemen", 
+    "Ibeh Vivien", "Joan Abaagu", "Maria Aluko", "Marian Bojuwoye", 
+    "Muoneke Wendy", "Odekunle Hannatu", "Offor Adaku", "Ojo Ayodeji Olukunle", 
+    "Omonike Oluyide", "Omoru Emmanuel", "Onwualu Rosemary", "QM ICT", 
+    "QM Public Affairs", "Salihu Bello", "Sanwoolu Oluwaseyi", "Shallwanga Sunday", 
+    "Tabitha Bukar", "Umar Mala Bukar", "Waliu Olamide", "Yunusa Hadizah Ibrahim"
+];
+
+async function autoProvisionUser(user) {
+    if (!user || !db) return null;
+    try {
+        const userDocRef = db.collection('users').doc(user.uid);
+        const docSnap = await userDocRef.get();
+        if (docSnap.exists) {
+            return docSnap.data();
+        }
+
+        const email = user.email || "";
+        const displayName = user.displayName || email.split('@')[0];
+        
+        // Exclude Enilama Emmanuel from standard auditor assignments (he is Admin)
+        const isEnilamaAdmin = email.toLowerCase().includes("enilama") && !email.toLowerCase().includes("enilama.o");
+        
+        let role = null;
+        if (isEnilamaAdmin) {
+            role = ROLES.ADMIN;
+        } else {
+            // Find fuzzy matches against lists
+            const cleanName = displayName.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+            const isLead = LEAD_AUDITORS_LIST.some(name => {
+                const cn = name.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+                return cleanName.includes(cn) || cn.includes(cleanName) || email.toLowerCase().includes(cn.replace(/ /g, "."));
+            });
+            const isAuditor = AUDITORS_LIST.some(name => {
+                const cn = name.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+                return cleanName.includes(cn) || cn.includes(cleanName) || email.toLowerCase().includes(cn.replace(/ /g, "."));
+            });
+
+            if (isLead) {
+                role = ROLES.LEAD_AUDITOR;
+            } else if (isAuditor) {
+                role = ROLES.AUDITOR;
+            } else {
+                role = ROLES.AUDITOR; // Default role
+            }
+        }
+
+        const newProfile = {
+            email: email,
+            displayName: displayName,
+            role: role,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await userDocRef.set(newProfile);
+        console.log(`Auto-provisioned user ${email} with role: ${role}`);
+        return newProfile;
+    } catch (e) {
+        console.error("Error auto-provisioning user:", e);
+        return null;
+    }
+}
+
 function checkAuthState() {
     auth.onAuthStateChanged(async user => {
         if (user) {
             console.log("User logged in:", user.uid, user.email);
-            const userRoleData = await getUserRole(user.uid);
+            let userRoleData = await getUserRole(user.uid);
+            if (!userRoleData) {
+                userRoleData = await autoProvisionUser(user);
+            }
             if (currentUser && currentUser.uid !== user.uid) {
                 clearAuditForm();
             }
@@ -282,6 +381,16 @@ function checkAuthState() {
                 console.log("Current User with Role:", currentUser);
 
                 if(userEmail) userEmail.textContent = currentUser.displayName;
+                
+                const userDisplayNameEl = document.getElementById('user-display-name');
+                const userRoleLabelEl = document.getElementById('user-role-label');
+                if (userDisplayNameEl) userDisplayNameEl.textContent = currentUser.displayName;
+                if (userRoleLabelEl) {
+                    let roleText = currentUser.role.replace('_', ' ');
+                    roleText = roleText.charAt(0).toUpperCase() + roleText.slice(1);
+                    userRoleLabelEl.textContent = roleText;
+                }
+
                 loginScreen?.classList.add('hidden');
                 appContainer?.classList.remove('hidden');
 
@@ -350,7 +459,10 @@ function loginWithGoogle() {
     auth.signInWithPopup(provider)
         .then(async (result) => {
              const user = result.user;
-             const userRoleData = await getUserRole(user.uid);
+             let userRoleData = await getUserRole(user.uid);
+             if (!userRoleData) {
+                  userRoleData = await autoProvisionUser(user);
+             }
              if (!userRoleData) {
                   console.warn(`Google Sign-In successful for ${user.email}, but no profile found. Logging out.`);
                   alert(`Login successful, but your account (${user.email}) needs setup by an administrator.`);
@@ -614,6 +726,14 @@ function populateAuditForm(audit) {
 
 function switchSection(sectionId) {
     console.log(`Switching to section: ${sectionId}`);
+    
+    // Update breadcrumb title
+    const sectionTitleEl = document.getElementById('current-section-title');
+    if (sectionTitleEl) {
+        let title = sectionId.replace('-', ' ');
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+        sectionTitleEl.textContent = title;
+    }
     
     // If leaving new-audit, clean up sessions
     if (isSectionVisible('new-audit') && sectionId !== 'new-audit') {
@@ -1201,8 +1321,8 @@ function renderTrendChart(data) {
             datasets: [{
                 label: 'Compliance Rate',
                 data: data.map(d => d.compliance),
-                borderColor: '#6366f1',
-                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderColor: '#1e7046',
+                backgroundColor: 'rgba(30, 112, 70, 0.1)',
                 fill: true,
                 tension: 0.3
             }]
@@ -1295,7 +1415,7 @@ function renderDepartmentComparison() {
 
 // Helper function for chart colors — returns real hex values, not CSS vars
 function getChartColor(index, alpha) {
-    const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const colors = ['#1e7046', '#4a9d6e', '#2a9d8f', '#f59e0b', '#2d8a56', '#122a1e'];
     const color = colors[index % colors.length];
     if (alpha !== undefined) {
         // Convert hex to rgba

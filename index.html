@@ -23,24 +23,106 @@
     <noscript><p style="text-align:center;padding:2rem;font-family:sans-serif;">This application requires JavaScript to run. Please enable JavaScript in your browser.</p></noscript>
     <!-- Login Screen -->
     <div id="login-screen" class="auth-screen">
-        <div class="auth-container">
-            <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo">
-            <h1>NAFDAC QMS Internal Audit System</h1>
-            <div class="auth-form">
-                <input type="email" id="login-email" placeholder="Email Address" aria-label="Email address" required>
-                <input type="password" id="login-password" placeholder="Password" aria-label="Password" required>
-                <button id="login-btn" class="btn btn-primary">Login</button>
-                <button id="google-login-btn" class="btn btn-google">
-                    <i class="fab fa-google"></i> Sign in with Google
-                </button>
-                <p id="login-error" class="error-message"></p>
-                
-                <!-- Add this forgot password link -->
-                <p class="text-center" style="margin-top: 1rem;">
-                    <a href="#" id="forgot-password-link">Forgot Password?</a> | 
-                    <a href="#" id="change-password-link">Change Password</a>
-                </p>
+        <div class="auth-wrapper">
+            <!-- Left Info Panel -->
+            <div class="auth-info-panel">
+                <div class="info-content">
+                    <h2>Stay on Top of QMS Compliance</h2>
+                    <p class="info-subtitle">National Agency for Food and Drug Administration and Control (NAFDAC) implements Quality Management System (QMS) in accordance with international standards to manage the quality of its processes, regulatory products, and services.</p>
+                    
+                    <div class="info-graphic-card">
+                        <div class="score-badge">
+                            <i class="fas fa-award"></i>
+                            <div>
+                                <span class="score-label">Average Compliance Score</span>
+                                <span class="score-val">80%</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Circular professional at work SVG illustration -->
+                        <div class="circle-illustration">
+                            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <clipPath id="circleView">
+                                        <circle cx="100" cy="100" r="90" />
+                                    </clipPath>
+                                    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#b4edd2;stop-opacity:1" />
+                                        <stop offset="100%" style="stop-color:#d4ecd5;stop-opacity:1" />
+                                    </linearGradient>
+                                </defs>
+                                <circle cx="100" cy="100" r="95" fill="url(#grad)" />
+                                <g clip-path="url(#circleView)">
+                                    <path d="M70,200 L130,200 L130,130 L70,130 Z" fill="#ffffff" />
+                                    <path d="M96,130 L104,130 L102,175 L98,175 Z" fill="#1e7046" />
+                                    <circle cx="100" cy="95" r="28" fill="#e0b388" />
+                                    <path d="M72,90 Q100,60 128,90 Q100,50 72,90" fill="#333" />
+                                    <rect x="85" y="90" width="12" height="8" rx="2" fill="none" stroke="#333" stroke-width="2" />
+                                    <rect x="103" y="90" width="12" height="8" rx="2" fill="none" stroke="#333" stroke-width="2" />
+                                    <line x1="97" y1="94" x2="103" y2="94" stroke="#333" stroke-width="2" />
+                                    <rect x="20" y="170" width="160" height="40" fill="#a0522d" />
+                                    <path d="M40,170 L70,145 L110,145 L80,170 Z" fill="#c0c0c0" />
+                                    <rect x="120" y="150" width="30" height="40" rx="2" fill="#fff" transform="rotate(-10 135 170)" />
+                                    <line x1="125" y1="160" x2="137" y2="158" stroke="#1e7046" stroke-width="2" transform="rotate(-10 135 170)" />
+                                    <line x1="125" y1="170" x2="141" y2="167" stroke="#333" stroke-width="2" transform="rotate(-10 135 170)" />
+                                </g>
+                            </svg>
+                        </div>
+                        
+                        <div class="progress-box">
+                            <div class="progress-box-header">
+                                <span>QMS Appraisal Status</span>
+                                <span class="progress-val">25% Progress</span>
+                            </div>
+                            <div class="progress-box-bar">
+                                <div class="progress-box-fill" style="width: 25%;"></div>
+                            </div>
+                            <div class="progress-box-dots">
+                                <span class="dot active"></span>
+                                <span class="dot"></span>
+                                <span class="dot"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
+            
+            <!-- Right Form Panel -->
+            <div class="auth-form-panel">
+                <div class="form-content">
+                    <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo">
+                    <h2>Login to NAFDAC PMS</h2>
+                    <div class="auth-form">
+                        <div class="form-group-floating">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" placeholder="Enter your email" required>
+                            <span class="input-subtext">You can also use your staff ID.</span>
+                        </div>
+                        
+                        <div class="form-group-floating">
+                            <label for="login-password">Password</label>
+                            <div class="password-input-wrapper">
+                                <input type="password" id="login-password" placeholder="Enter Password" required>
+                                <button type="button" id="toggle-login-password-visibility" class="password-toggle-btn" aria-label="Toggle password visibility">
+                                    <i class="far fa-eye-slash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="forgot-pwd-container">
+                            <a href="#" id="forgot-password-link">Forgot Password?</a>
+                        </div>
+                        
+                        <button id="login-btn" class="btn btn-primary btn-block">Login</button>
+                        <button id="google-login-btn" class="btn btn-google btn-block">
+                            <i class="fab fa-google"></i> Sign in with Google
+                        </button>
+                        <p id="login-error" class="error-message"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
             
             <!-- Add this password change modal -->
             <div id="password-change-modal" class="modal hidden">
@@ -73,40 +155,82 @@
 
     <!-- Main App -->
     <div id="app-container" class="hidden">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="container"> <!-- Wrap header content -->
-                <div class="header-left">
-                     <!-- Optional: <img src="nafdac-logo-small.png" alt="NAFDAC Logo" class="header-logo"> -->
-                    <h1>NAFDAC QMS Internal Audit</h1>
-                </div>
-                <div class="header-right">
-                    <button id="dark-mode-toggle" class="btn btn-outline btn-sm" aria-label="Toggle Dark Mode" style="border: none; padding: 0.35rem 0.5rem; font-size: 1.15rem; color: white;">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <span id="user-email" class="user-info"></span>
-                    <button id="logout-btn" class="btn btn-danger btn-sm">Logout</button>
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar">
+            <div class="sidebar-header">
+                <img src="nafdac-logo.png" alt="NAFDAC Logo" class="sidebar-logo">
+                <div class="sidebar-brand">
+                    <h3>NAFDAC PMS</h3>
+                    <span>QMS Staff Portal</span>
                 </div>
             </div>
-        </header>
-
-        <!-- Navigation -->
-        <nav class="app-nav">
-             <div class="container"> <!-- Wrap nav ul in container -->
+            
+            <div class="sidebar-user">
+                <div class="user-avatar">
+                    <i class="fas fa-user-circle"></i>
+                </div>
+                <div class="user-details">
+                    <span id="user-display-name" class="user-name">Loading...</span>
+                    <span id="user-role-label" class="user-role-badge">Auditor</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-group-label">Overview</div>
                 <ul>
-                    <!-- Permissions applied via JS based on current user's role -->
-                    <li class="active" data-section="dashboard" data-permission="view_dashboard"><i class="fas fa-tachometer-alt"></i> Dashboard</li>
-                    <li data-section="new-audit" data-permission="create_audit"><i class="fas fa-plus-circle"></i> New Audit</li>
-                    <li data-section="audit-history" data-permission="view_all_audits"><i class="fas fa-history"></i> Audit History</li>
-                    <li data-section="reports" data-permission="view_reports"><i class="fas fa-chart-bar"></i> Reports</li>
-                    <!-- User Management Link - Hidden by default, shown via JS if permission exists -->
-                    <li data-section="user-management" data-permission="manage_users" class="permission-hidden"><i class="fas fa-users-cog"></i> User Management</li>
+                    <li class="active" data-section="dashboard" data-permission="view_dashboard">
+                        <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+                    </li>
                 </ul>
-             </div>
-        </nav>
+                
+                <div class="nav-group-label">Audit Operations</div>
+                <ul>
+                    <li data-section="new-audit" data-permission="create_audit">
+                        <i class="fas fa-plus-circle"></i> <span>New Audit</span>
+                    </li>
+                    <li data-section="audit-history" data-permission="view_all_audits">
+                        <i class="fas fa-history"></i> <span>Audit History</span>
+                    </li>
+                </ul>
+                
+                <div class="nav-group-label">Analytics & Admin</div>
+                <ul>
+                    <li data-section="reports" data-permission="view_reports">
+                        <i class="fas fa-chart-bar"></i> <span>Reports</span>
+                    </li>
+                    <li data-section="user-management" data-permission="manage_users" class="permission-hidden">
+                        <i class="fas fa-users-cog"></i> <span>User Management</span>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <button id="dark-mode-toggle" class="sidebar-action-btn" aria-label="Toggle Dark Mode">
+                    <i class="fas fa-moon"></i> <span>Dark Mode</span>
+                </button>
+                <button id="logout-btn" class="sidebar-action-btn logout" aria-label="Logout">
+                    <i class="fas fa-sign-out-alt"></i> <span>Logout</span>
+                </button>
+            </div>
+        </aside>
 
-        <!-- Main Content -->
-        <main class="container app-main">
+        <!-- Main Content Wrapper -->
+        <div class="app-content-wrapper">
+            <!-- Top Header -->
+            <header class="app-top-header">
+                <button id="sidebar-mobile-toggle" class="mobile-toggle-btn" aria-label="Toggle Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="top-header-title">
+                    <span class="portal-breadcrumb">Staff Portal</span> &nbsp;/&nbsp; <span id="current-section-title">Dashboard</span>
+                </div>
+                <div class="top-header-user">
+                    <span id="user-email" class="user-info"></span>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <main class="app-main-content">
             <section id="dashboard-section" class="content-section" data-permission="view_dashboard">
                 <div class="dashboard-header">
                     <h2>Compliance Overview</h2>
@@ -256,22 +380,25 @@
                             </div>
                             <div class="dropdown-options" id="lead-auditors-options">
                                 <input type="text" class="dropdown-search" placeholder="Search auditor..." onkeyup="filterDropdownOptions('lead-auditors')">
-                                <label><input type="checkbox" value="Fatoki Samson"> Fatoki Samson</label>
-                                <label><input type="checkbox" value="Adesanya Oluwaseun"> Adesanya Oluwaseun</label>
                                 <label><input type="checkbox" value="Abubakar Fatima"> Abubakar Fatima</label>
-                                <label><input type="checkbox" value="Chinyelu Danga"> Chinyelu Danga</label>
-                                <label><input type="checkbox" value="Osho Folashade">Osho Folashade</label>
+                                <label><input type="checkbox" value="Adesanya Oluwaseun"> Adesanya Oluwaseun</label>
+                                <label><input type="checkbox" value="Akinyemi Sidikat"> Akinyemi Sidikat</label>
+                                <label><input type="checkbox" value="Bolanle Ikusagba"> Bolanle Ikusagba</label>
+                                <label><input type="checkbox" value="Danga Chinyelu"> Danga Chinyelu</label>
+                                <label><input type="checkbox" value="Ekwealor Chinenye"> Ekwealor Chinenye</label>
+                                <label><input type="checkbox" value="Fatoki Samson"> Fatoki Samson</label>
+                                <label><input type="checkbox" value="Ibeh Vivien"> Ibeh Vivien</label>
                                 <label><input type="checkbox" value="Ifudu Nkem"> Ifudu Nkem</label>
+                                <label><input type="checkbox" value="Kalang Biyama Andrew"> Kalang Biyama Andrew</label>
                                 <label><input type="checkbox" value="Kema Ashibuogwu"> Kema Ashibuogwu</label>
                                 <label><input type="checkbox" value="Khadijah Ade-Abolade"> Khadijah Ade-Abolade</label>
+                                <label><input type="checkbox" value="Muoneke Wendy"> Muoneke Wendy</label>
+                                <label><input type="checkbox" value="Offor Adaku"> Offor Adaku</label>
                                 <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
+                                <label><input type="checkbox" value="Osho Folasade"> Osho Folasade</label>
+                                <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
                                 <label><input type="checkbox" value="Stephanie Adeoye"> Stephanie Adeoye</label>
                                 <label><input type="checkbox" value="Sunday Adown"> Sunday Adown</label>
-                                <label><input type="checkbox" value="Vivien Ibeh"> Vivien Ibeh</label>
-                                <label><input type="checkbox" value="Wendy Ndugbu Muoneke"> Wendy Ndugbu Muoneke</label>
-                                <label><input type="checkbox" value="Ikusagba Bola"> Ikusagba Bola</label>
-                                <label><input type="checkbox" value="Biyama Kalang"> Biyama Kalang</label>
-                                <label><input type="checkbox" value="Bolanle Ikusagba"> Ikusagba Bola</label>
                                 <label><input type="checkbox" value="Uche Rose"> Uche Rose</label>
                             </div>
                         </div>
@@ -287,34 +414,38 @@
                             </div>
                             <div class="dropdown-options" id="auditors-options">
                                 <input type="text" class="dropdown-search" placeholder="Search auditor..." onkeyup="filterDropdownOptions('auditors')">
-                                <label><input type="checkbox" value="Omoru Emmanuel"> Omoru Emmanuel</label>
-                                <label><input type="checkbox" value="Offor Adaku"> Offor Adaku</label>
-                                <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
-                                <label><input type="checkbox" value="Marian Bojuwoye"> Marian Bojuwoye</label>
-                                <label><input type="checkbox" value="Azogini Ebosie"> Azogini Ebosie</label>
-                                <label><input type="checkbox" value="Bolanle Ikusagba">Bolanle Ikusagba</label>
-                                <label><input type="checkbox" value="Ibeh Vivien Ify"> Ibeh Vivien Ify</label>
-                                <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
-                                <label><input type="checkbox" value="Tabitha Bukar"> Tabitha Bukar</label>
-                                <label><input type="checkbox" value="Omonike Oluyide"> Omonike Oluyide</label>
+                                <label><input type="checkbox" value="Adewale Muniru"> Adewale Muniru</label>
+                                <label><input type="checkbox" value="Akinyemi Juliannah"> Akinyemi Juliannah</label>
                                 <label><input type="checkbox" value="Akinyemi Sidikat"> Akinyemi Sidikat</label>
-                                <label><input type="checkbox" value="Anulika Princess Nwosu"> Anulika Princess Nwosu</label>
-                                <label><input type="checkbox" value="Oriade-Shabi Olabisi"> Oriade-Shabi Olabisi</label>
-                                <label><input type="checkbox" value="Akinyemi Julianah"> Akinyemi Julianah</label>
-                                <label><input type="checkbox" value="Adewale Muniru">Adewale Muniru</label>
-                                <label><input type="checkbox" value="Salihu Bello">Salihu Bello</label>
-                                <label><input type="checkbox" value="Alex Tanko Joyce"> Alex Tanko Joyce</label>
-                                <label><input type="checkbox" value="Shallwanga Sunday">Shallwanga Sunday</label>
-                                <label><input type="checkbox" value="Umar Mala Bukar">Umar Mala Bukar</label>
+                                <label><input type="checkbox" value="Alex Tank"> Alex Tank</label>
+                                <label><input type="checkbox" value="Anulika Nwosu"> Anulika Nwosu</label>
+                                <label><input type="checkbox" value="Azogini Ebosie"> Azogini Ebosie</label>
+                                <label><input type="checkbox" value="Bolanle Ikusagba"> Bolanle Ikusagba</label>
                                 <label><input type="checkbox" value="Ekwealor Chinenye"> Ekwealor Chinenye</label>
-                                <label><input type="checkbox" value="Yunusa Hadizah Ibrahim"> Yunusa Hadizah Ibrahim</label>
-                                <label><input type="checkbox" value="Ojo Ayodeji Olukunle"> Ojo Ayodeji Olukunle</label>
+                                <label><input type="checkbox" value="Enilama O. Emmanuel"> Enilama O. Emmanuel</label>
+                                <label><input type="checkbox" value="Gidado Babayo"> Gidado Babayo</label>
+                                <label><input type="checkbox" value="Hassan Tanko"> Hassan Tanko</label>
+                                <label><input type="checkbox" value="Hulugh Terhemen"> Hulugh Terhemen</label>
+                                <label><input type="checkbox" value="Ibeh Vivien"> Ibeh Vivien</label>
+                                <label><input type="checkbox" value="Joan Abaagu"> Joan Abaagu</label>
+                                <label><input type="checkbox" value="Maria Aluko"> Maria Aluko</label>
+                                <label><input type="checkbox" value="Marian Bojuwoye"> Marian Bojuwoye</label>
+                                <label><input type="checkbox" value="Muoneke Wendy"> Muoneke Wendy</label>
                                 <label><input type="checkbox" value="Odekunle Hannatu"> Odekunle Hannatu</label>
+                                <label><input type="checkbox" value="Offor Adaku"> Offor Adaku</label>
+                                <label><input type="checkbox" value="Ojo Ayodeji Olukunle"> Ojo Ayodeji Olukunle</label>
+                                <label><input type="checkbox" value="Omonike Oluyide"> Omonike Oluyide</label>
+                                <label><input type="checkbox" value="Omoru Emmanuel"> Omoru Emmanuel</label>
+                                <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
                                 <label><input type="checkbox" value="QM ICT"> QM ICT</label>
                                 <label><input type="checkbox" value="QM Public Affairs"> QM Public Affairs</label>
-                                <label><input type="checkbox" value="Hulugh Terhemen"> Hulugh Terhemen</label>
-                                <label><input type="checkbox" value="Joan Abaagu"> Joan Abaagu</label>
-                                <label><input type="checkbox" value="Hassan Tanko">Hassan Tanko</label>
+                                <label><input type="checkbox" value="Salihu Bello"> Salihu Bello</label>
+                                <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
+                                <label><input type="checkbox" value="Shallwanga Sunday"> Shallwanga Sunday</label>
+                                <label><input type="checkbox" value="Tabitha Bukar"> Tabitha Bukar</label>
+                                <label><input type="checkbox" value="Umar Mala Bukar"> Umar Mala Bukar</label>
+                                <label><input type="checkbox" value="Waliu Olamide"> Waliu Olamide</label>
+                                <label><input type="checkbox" value="Yunusa Hadizah Ibrahim"> Yunusa Hadizah Ibrahim</label>
                             </div>
                         </div>
                     </div>
@@ -457,7 +588,8 @@
                 </div>
             </section>
 
-        </main>
+            </main>
+        </div> <!-- /#app-content-wrapper -->
     </div> <!-- /#app-container -->
 
     <!-- Audit Detail Modal -->
