@@ -351,7 +351,14 @@ function setupEventListeners() {
                 
             } catch (error) {
                 console.error("Error creating user:", error);
-                messageDiv.textContent = 'Error: ' + error.message;
+                if (error.code === 'auth/email-already-in-use' || (error.message && error.message.includes('already-in-use'))) {
+                    messageDiv.innerHTML = `<strong>Account Already Registered:</strong> The email <em>${email}</em> is already in use by an existing account.<br><br>
+                    • If they are in the <strong>Registered Accounts</strong> list below, you can change their role there.<br>
+                    • If they are not in the list yet, they just need to sign in once (or use Google Sign-in) to automatically configure and show their profile.<br>
+                    • If they forgot their password, they can click "Forgot Password?" on the login page to reset it.`;
+                } else {
+                    messageDiv.textContent = 'Error: ' + error.message;
+                }
                 messageDiv.className = 'error-message';
             } finally {
                 submitBtn.disabled = false;
