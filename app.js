@@ -324,8 +324,10 @@ function setupEventListeners() {
                 // Set display name in auth profile
                 await newUser.updateProfile({ displayName: name });
                 
-                // Create user document in Firestore collection
-                await db.collection('users').doc(newUser.uid).set({
+                // Create user document in Firestore collection using secondary app instance
+                // to satisfy security rules that require owner authentication (request.auth.uid == userId)
+                const secondaryDb = secondaryApp.firestore();
+                await secondaryDb.collection('users').doc(newUser.uid).set({
                     email: email,
                     displayName: name,
                     role: role,
