@@ -281,6 +281,82 @@ function setupEventListeners() {
             submitAuditFromHistory(auditId);
         }
     });
+
+    const createUserForm = document.getElementById('create-user-form');
+    if (createUserForm) {
+        createUserForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const nameInput = document.getElementById('create-user-name');
+            const emailInput = document.getElementById('create-user-email');
+            const passwordInput = document.getElementById('create-user-password');
+            const roleInput = document.getElementById('create-user-role');
+            const messageDiv = document.getElementById('create-user-message');
+            const submitBtn = document.getElementById('create-user-submit-btn');
+            
+            if (!nameInput || !emailInput || !passwordInput || !roleInput || !messageDiv || !submitBtn) return;
+            
+            const name = nameInput.value.trim();
+            const email = emailInput.value.trim();
+            const password = passwordInput.value;
+            const role = roleInput.value;
+            
+            messageDiv.textContent = '';
+            messageDiv.className = '';
+            
+            if (password.length < 6) {
+                messageDiv.textContent = 'Password must be at least 6 characters long.';
+                messageDiv.className = 'error-message';
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating account...';
+            
+            try {
+                // Instantiate secondary App to create user without logging out the current admin session
+                const secondaryApp = firebase.initializeApp(firebaseConfig, "SecondaryApp");
+                const secondaryAuth = secondaryApp.auth();
+                
+                const userCredential = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+                const newUser = userCredential.user;
+                
+                // Set display name in auth profile
+                await newUser.updateProfile({ displayName: name });
+                
+                // Create user document in Firestore collection
+                await db.collection('users').doc(newUser.uid).set({
+                    email: email,
+                    displayName: name,
+                    role: role,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                // Delete secondary app to free resources
+                await secondaryApp.delete();
+                
+                messageDiv.textContent = `Account successfully created for ${name} (${email})!`;
+                messageDiv.style.color = 'var(--primary-color)';
+                messageDiv.style.fontWeight = 'bold';
+                
+                // Reset fields
+                nameInput.value = '';
+                emailInput.value = '';
+                passwordInput.value = '';
+                
+                // Reload user list
+                loadUsersForManagement();
+                
+            } catch (error) {
+                console.error("Error creating user:", error);
+                messageDiv.textContent = 'Error: ' + error.message;
+                messageDiv.className = 'error-message';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Account';
+            }
+        });
+    }
 }
 
 // --- Authentication & Role Management ---
