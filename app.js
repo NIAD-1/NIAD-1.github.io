@@ -147,28 +147,14 @@ let reportChartInstance = null;
 let leadAuditorUsers = [];
 let auditorUsers = [];
 
-
-auth.onAuthStateChanged(async user => {
-    console.log("Auth state changed - User:", user);
-    
-    if (user) {
-      const userRoleData = await getUserRole(user.uid);
-      console.log("User role data:", userRoleData);
-      
-      if (userRoleData?.role) {
-        console.log("Effective permissions:", 
-          Object.entries(PERMISSIONS).filter(([_, roles]) => 
-            roles.includes(userRoleData.role)
-          ).map(([perm]) => perm)
-        );
-      }
-    }
-  });
+// Auth state debug logging handled inside checkAuthState()
 // --- Initialize the App ---
 function init() {
     console.log("Initializing App...");
     setupEventListeners();
     checkAuthState();
+    setupDarkMode();
+    setupAutoSave();
 }
 
 
@@ -310,6 +296,8 @@ function checkAuthState() {
                  logout();
             }
         } else {
+            leaveSession();
+            unsubscribeFromAudit();
             currentUser = null;
             audits = [];
             currentAudit = null;
@@ -448,7 +436,20 @@ function populateAuditorSelections(leadAuditors, auditors) {
     }
     
     // Update the display of selected names if using custom multi-select
-    updateSelectedAuditorsDisplay();
+    updateSelectedAuditorsDisplay('lead-auditors');
+    updateSelectedAuditorsDisplay('auditors');
+}
+
+function updateSelectedAuditorsDisplay(type) {
+    const container = document.getElementById(`${type}-options`);
+    const multiselect = container?.closest('.custom-multiselect');
+    const displayEl = multiselect?.querySelector('.selected-names');
+    if (!displayEl) return;
+    const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+    const names = Array.from(checked).map(cb => cb.parentElement.textContent.trim());
+    const placeholder = displayEl.dataset.placeholder || 'Select...';
+    displayEl.textContent = names.length > 0 ? names.join(', ') : placeholder;
+    displayEl.style.color = names.length > 0 ? 'var(--dark-color)' : 'var(--text-muted)';
 }
 
 function updateModalEditButtonVisibility() {
@@ -613,6 +614,13 @@ function populateAuditForm(audit) {
 
 function switchSection(sectionId) {
     console.log(`Switching to section: ${sectionId}`);
+    
+    // If leaving new-audit, clean up sessions
+    if (isSectionVisible('new-audit') && sectionId !== 'new-audit') {
+        leaveSession();
+        unsubscribeFromAudit();
+    }
+
     navItems.forEach(item => item.classList.toggle('active', item.dataset.section === sectionId));
 
     let sectionFoundAndPermitted = false;
@@ -646,7 +654,14 @@ function switchSection(sectionId) {
 function initializeSection(sectionId) {
     switch (sectionId) {
         case 'new-audit':
-            initNewAuditForm(); // Now handles fetching users
+            initNewAuditForm();
+            if (currentAudit && currentAudit.id) {
+                joinSession(currentAudit.id);
+                subscribeToAudit(currentAudit.id);
+            } else {
+                // Check if there's an auto-saved draft locally
+                setTimeout(loadAutoSavedDraft, 300);
+            }
             break;
         case 'dashboard':
             renderDashboard();
@@ -698,102 +713,194 @@ function initNewAuditForm() {
     
     checklistContainer.innerHTML = '';
     
-    auditChecklist.forEach(item => {
-        const itemDiv = document.createElement('div');
-        itemDiv.className = 'checklist-item';
-        itemDiv.dataset.itemId = item.id;
+    const clauseGroups = [
+        { title: "Clause 4: Context of the Organization", items: [1, 2, 3, 4, 5] },
+        { title: "Clause 5 & 6: Leadership & Planning", items: [6, 7, 8, 9, 10] },
+        { title: "Clause 7: Support", items: [11, 12, 13, 14, 15, 16, 17, 18] },
+        { title: "Clause 8: Operation", items: [19, 20, 21] },
+        { title: "Clause 9: Performance Evaluation", items: [22, 23, 24, 25] },
+        { title: "Clause 10 & General: Improvement & Observations", items: [26, 27, 28] }
+    ];
 
-
-        itemDiv.innerHTML = `
-            <div class="applicability-toggle">
-                <div class="question-header">
-                    <span class="question-number">${item.id}.</span>
-                    <span class="question-text">${item.requirement}</span>
-                    ${item.clause ? `<span class="question-clause">(Clause ${item.clause})</span>` : ''}
+    clauseGroups.forEach(group => {
+        const accordionDiv = document.createElement('div');
+        accordionDiv.className = 'clause-accordion';
+        
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'clause-header';
+        headerDiv.innerHTML = `
+            <h3>${group.title}</h3>
+            <span class="chevron"><i class="fas fa-chevron-down"></i></span>
+        `;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'clause-content';
+        
+        headerDiv.addEventListener('click', () => {
+            accordionDiv.classList.toggle('active');
+        });
+        
+        group.items.forEach(itemId => {
+            const item = auditChecklist.find(ci => ci.id === itemId);
+            if (!item) return;
+            
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'checklist-item';
+            itemDiv.dataset.itemId = item.id;
+            
+            itemDiv.innerHTML = `
+                <div class="applicability-toggle">
+                    <div class="question-header">
+                        <span class="question-number">${item.id}.</span>
+                        <span class="question-text">${item.requirement}</span>
+                        ${item.clause ? `<span class="question-clause">(Clause ${item.clause})</span>` : ''}
+                    </div>
+                    <div class="toggle-options">
+                        <input type="radio" id="applicable-${item.id}" name="applicable-${item.id}" value="yes">
+                        <label for="applicable-${item.id}">Applicable/Reviewed</label>
+                        <input type="radio" id="not-applicable-${item.id}" name="applicable-${item.id}" value="no">
+                        <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
+                    </div>
                 </div>
-                <div class="toggle-options">
-                    <input type="radio" id="applicable-${item.id}" name="applicable-${item.id}" value="yes">
-                    <label for="applicable-${item.id}">Applicable/Reviewed</label>
-                    <input type="radio" id="not-applicable-${item.id}" name="applicable-${item.id}" value="no" checked>
-                    <label for="not-applicable-${item.id}">Not Applicable/Not Reviewed</label>
-                </div>
-            </div>
-            <div class="checklist-content" style="display:none">
-                ${item.id === 28 ? `
-                    <div class="form-group">
-                        <label for="observations-${item.id}">Other Observations:</label>
-                        <textarea id="observations-${item.id}" 
-                                rows="5" 
-                                class="observation-field" 
-                                placeholder="Enter any additional observations not covered above..."></textarea>
-                    </div>
-                ` : `
-                    <div class="form-group">
-                        <label for="evidence-${item.id}">Objective Evidence:</label>
-                        <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="comments-${item.id}">Comments:</label>
-                        <textarea id="comments-${item.id}" rows="2"></textarea>
-                    </div>
-                    <div class="compliance-toggle">
-                        <label>Compliance:</label>
-                        <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
-                        <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
-                    </div>
-                    <div class="corrective-action-group">
-                        <label>Corrective Action Needed?</label>
-                        <input type="radio" id="ca-yes-${item.id}" name="corrective-action-${item.id}" value="yes">
-                        <label for="ca-yes-${item.id}">Yes</label>
-                        <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
-                        <label for="ca-no-${item.id}">No</label>
-                    </div>
-                    <div class="classification-group">
-                        <label for="classification-${item.id}">Classification:</label>
-                        <select id="classification-${item.id}">
-                            <option value="">Select Classification</option>
-                            <option value="Major">Major</option>
-                            <option value="Minor">Minor</option>
-                            <option value="OFI">OFI (Opportunity for Improvement)</option>
-                        </select>
-                    </div>
-                `}
-            </div>`;
-
-        // Event listener for applicability toggle
-        itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const content = itemDiv.querySelector('.checklist-content');
-                if (content) {
-                    content.style.display = e.target.value === 'yes' ? 'block' : 'none';
-                    
-                    // Reset fields when marked not applicable
-                    if (e.target.value === 'no') {
-                        content.querySelectorAll('textarea').forEach(t => t.value = '');
-                        content.querySelectorAll('.compliance-btn').forEach(b => {
-                            b.classList.remove('active', 'compliance-yes', 'compliance-no');
-                        });
-                        content.querySelector(`input[name="corrective-action-${item.id}"][value="no"]`).checked = true;
+                <div class="checklist-content" style="display:none">
+                    ${item.id === 28 ? `
+                        <div class="form-group">
+                            <label for="observations-${item.id}">Other Observations:</label>
+                            <textarea id="observations-${item.id}" 
+                                    rows="5" 
+                                    class="observation-field" 
+                                    placeholder="Enter any additional observations not covered above..."></textarea>
+                        </div>
+                    ` : `
+                        <div class="form-group">
+                            <label for="evidence-${item.id}">Objective Evidence:</label>
+                            <textarea id="evidence-${item.id}" rows="3" class="evidence-input"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="comments-${item.id}">Comments:</label>
+                            <textarea id="comments-${item.id}" rows="2"></textarea>
+                        </div>
+                        <div class="compliance-toggle">
+                            <label>Compliance:</label>
+                            <button type="button" class="compliance-btn" data-compliance="yes">Compliant</button>
+                            <button type="button" class="compliance-btn" data-compliance="no">Non-Compliant</button>
+                        </div>
+                        <div class="corrective-action-group">
+                            <label>Corrective Action Needed?</label>
+                            <input type="radio" id="ca-yes-${item.id}" name="corrective-action-${item.id}" value="yes">
+                            <label for="ca-yes-${item.id}">Yes</label>
+                            <input type="radio" id="ca-no-${item.id}" name="corrective-action-${item.id}" value="no" checked>
+                            <label for="ca-no-${item.id}">No</label>
+                        </div>
+                        <div class="classification-group">
+                            <label for="classification-${item.id}">Classification:</label>
+                            <select id="classification-${item.id}">
+                                <option value="">Select Classification</option>
+                                <option value="Major">Major</option>
+                                <option value="Minor">Minor</option>
+                                <option value="OFI">OFI (Opportunity for Improvement)</option>
+                            </select>
+                        </div>
+                    `}
+                </div>`;
+            
+            // Event listener for applicability toggle
+            itemDiv.querySelectorAll(`input[name="applicable-${item.id}"]`).forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const content = itemDiv.querySelector('.checklist-content');
+                    if (content) {
+                        content.style.display = e.target.value === 'yes' ? 'block' : 'none';
+                        
+                        // Reset fields when marked not applicable
+                        if (e.target.value === 'no') {
+                            content.querySelectorAll('textarea').forEach(t => t.value = '');
+                            content.querySelectorAll('.compliance-btn').forEach(b => {
+                                b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                            });
+                            const noCARadio = content.querySelector(`input[name="corrective-action-${item.id}"][value="no"]`);
+                            if (noCARadio) noCARadio.checked = true;
+                        }
                     }
-                }
-            });
-        });
-
-        // Initialize compliance buttons
-        const complianceButtons = itemDiv.querySelectorAll('.compliance-btn');
-        complianceButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                // Fixed: Removed incorrect 'itemDiv.inner' reference
-                complianceButtons.forEach(b => {
-                    b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                    updateChecklistProgress();
+                    triggerAutoSave();
+                    syncFieldToFirestore(item.id, 'applicable', e.target.value);
                 });
-                this.classList.add('active');
-                this.classList.add(`compliance-${this.dataset.compliance}`);
             });
-        });
+            
+            // Initialize compliance buttons
+            const complianceButtons = itemDiv.querySelectorAll('.compliance-btn');
+            complianceButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    complianceButtons.forEach(b => {
+                        b.classList.remove('active', 'compliance-yes', 'compliance-no');
+                    });
+                    this.classList.add('active');
+                    this.classList.add(`compliance-${this.dataset.compliance}`);
+                    updateChecklistProgress();
+                    triggerAutoSave();
+                    syncFieldToFirestore(item.id, 'compliance', this.dataset.compliance);
+                });
+            });
 
-        checklistContainer.appendChild(itemDiv);
+            // Listeners for textareas and selects
+            itemDiv.querySelectorAll('textarea, select').forEach(input => {
+                input.addEventListener('input', () => {
+                    triggerAutoSave();
+                    const fieldType = input.id.startsWith('evidence') ? 'objectiveEvidence' : 
+                                      input.id.startsWith('comments') ? 'comments' :
+                                      input.id.startsWith('observations') ? 'observations' : 'classification';
+                    syncFieldToFirestore(item.id, fieldType, input.value);
+                });
+            });
+
+            // Corrective Action radio change listener
+            itemDiv.querySelectorAll(`input[name^="corrective-action-"]`).forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    triggerAutoSave();
+                    syncFieldToFirestore(item.id, 'correctiveActionNeeded', e.target.value === 'yes');
+                });
+            });
+
+            contentDiv.appendChild(itemDiv);
+        });
+        
+        accordionDiv.appendChild(headerDiv);
+        accordionDiv.appendChild(contentDiv);
+        checklistContainer.appendChild(accordionDiv);
     });
+
+    updateChecklistProgress();
+}
+
+function updateChecklistProgress() {
+    const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
+    if (!checklistItemElements) return;
+    let total = 27; // items 1-27
+    let completed = 0;
+    
+    checklistItemElements.forEach(itemElement => {
+        const itemId = parseInt(itemElement.dataset.itemId);
+        if (itemId === 28) return; // Skip observations
+        
+        const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemId}"]:checked`);
+        if (applicableRadio) {
+            const isApplicable = applicableRadio.value === 'yes';
+            if (!isApplicable) {
+                completed++;
+            } else {
+                const complianceBtn = itemElement.querySelector('.compliance-btn.active');
+                if (complianceBtn) {
+                    completed++;
+                }
+            }
+        }
+    });
+    
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    const progressBar = document.getElementById('audit-progress-bar');
+    const progressText = document.getElementById('audit-progress-text');
+    if (progressBar) progressBar.style.width = `${percentage}%`;
+    if (progressText) progressText.textContent = `${percentage}% (${completed} of ${total} reviewed)`;
 }
 
 // Helper function to generate number options
@@ -934,6 +1041,7 @@ function collectAuditFormData() {
 
 async function saveAuditAsDraft() {
     const auditData = collectAuditFormData();
+    if (!auditData) return;
     auditData.status = 'draft';
     await saveAuditToFirestore(auditData);
     loadAudits();
@@ -1070,7 +1178,8 @@ function renderDashboard() {
         directorates.map(d => `<option value="${d}">${d}</option>`).join('')
     }`;
 
-    // Set up filter handler
+    // Set up filter handler (remove first to prevent duplicates)
+    filterSelect.removeEventListener('change', updateDashboardMetrics);
     filterSelect.addEventListener('change', updateDashboardMetrics);
     updateDashboardMetrics();
 }
@@ -1078,182 +1187,124 @@ function renderDashboard() {
 // Add new chart instances
 let trendChartInstance, departmentChartInstance;
 
-function updateDashboardMetrics() {
-    const selectedDirectorate = document.getElementById('directorate-filter').value;
-    const filteredAudits = selectedDirectorate ? 
-        audits.filter(a => a.directorateUnit === selectedDirectorate) : 
-        audits;
-
-    // Calculate metrics
-    const { complianceRate, nonComplianceRate, totalAudits, avgCorrective, trendData, ncData } = 
-        calculateMetrics(filteredAudits);
-    
-    // Update metrics display
-    document.getElementById('compliance-rate').textContent = `${complianceRate}%`;
-    document.getElementById('non-compliance-rate').textContent = `${nonComplianceRate}%`;
-    document.getElementById('total-audits').textContent = totalAudits;
-    document.getElementById('avg-corrective').textContent = avgCorrective;
-
-    // Update charts
-    renderComplianceChart(complianceRate, nonComplianceRate);
-    renderTrendChart(trendData);
-    renderNCChart(ncData);
-    renderDepartmentComparison();
-}
-
-function calculateMetrics(audits) {
-    // Existing calculations...
-    
-    // Trend data (last 6 months)
-    const months = Array.from({ length: 6 }, (_, i) => {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    }).reverse();
-
-    const trendData = months.map(month => {
-        const monthAudits = audits.filter(a => a.date.startsWith(month));
-        // ... calculate monthly compliance
-        return { month, compliance: 0 }; // Placeholder for your actual calculation
-    });
-
-    // Top non-conformance
-    const ncCounts = {};
-    audits.forEach(a => {
-        a.checklist.forEach(item => {
-            if (item.compliance === 'no') {
-                ncCounts[item.requirement] = (ncCounts[item.requirement] || 0) + 1;
-            }
-        });
-    });
-    const ncData = Object.entries(ncCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
-
-    return { trendData, ncData }; 
-}
-
-
-function renderComplianceChart(data) {
-    const ctx = document.getElementById('compliance-chart').getContext('2d');
-    complianceChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['Compliant', 'Non-Compliant'],
-            datasets: [{
-                data: [data.compliant, data.total - data.compliant],
-                backgroundColor: ['#2a9d8f', '#e76f51']
-            }]
-        }
-    });
-}
+// First duplicate definitions of updateDashboardMetrics and renderComplianceChart removed.
+// The correct versions are below (L1369+ and L1413+).
 
 function renderTrendChart(data) {
-    const ctx = document.getElementById('trend-chart').getContext('2d');
-    trendChartInstance = new Chart(ctx, {
+    const ctx = document.getElementById('trend-chart');
+    if (!ctx) return;
+    if (trendChartInstance) trendChartInstance.destroy();
+    trendChartInstance = new Chart(ctx.getContext('2d'), {
         type: 'line',
         data: {
             labels: data.map(d => d.month),
             datasets: [{
                 label: 'Compliance Rate',
-                data: data.map(d => d.rate),
-                borderColor: '#0a9396',
+                data: data.map(d => d.compliance),
+                borderColor: '#6366f1',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                fill: true,
                 tension: 0.3
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                y: { max: 100 }
+                y: { beginAtZero: true, max: 100 }
             }
         }
     });
 }
 
 function renderNCChart(data) {
-    const ctx = document.getElementById('nc-chart').getContext('2d');
-    ncChartInstance = new Chart(ctx, {
+    const ctx = document.getElementById('nc-chart');
+    if (!ctx) return;
+    if (ncChartInstance) ncChartInstance.destroy();
+    ncChartInstance = new Chart(ctx.getContext('2d'), {
         type: 'bar',
         data: {
             labels: data.map(d => d[0]),
             datasets: [{
                 label: 'Non-Conformances',
                 data: data.map(d => d[1]),
-                backgroundColor: '#e76f51'
+                backgroundColor: '#ef4444'
             }]
         },
         options: {
-            indexAxis: 'y'
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false
         }
     });
 }
 
 function renderDepartmentComparison() {
-    const departments = [...new Set(audits.map(a => a.directorateUnit))];
+    const departments = [...new Set(audits.map(a => a.directorateUnit).filter(Boolean))];
+    if (departments.length === 0) return;
+    const ctx = document.getElementById('department-chart');
+    if (!ctx) return;
+    if (departmentChartInstance) departmentChartInstance.destroy();
+
     const metrics = departments.map(dept => {
         const deptAudits = audits.filter(a => a.directorateUnit === dept);
-        // Calculate department metrics
-        return { 
-            compliance: 0, // Replace with actual calculation
-            nonCompliance: 0, // Replace with actual calculation
+        let compliant = 0, total = 0, corrective = 0;
+        deptAudits.forEach(a => {
+            if (!a.checklist) return;
+            a.checklist.forEach(item => {
+                if (item.applicable === 'yes') {
+                    total++;
+                    if (item.compliance === 'yes') compliant++;
+                    if (item.correctiveActionNeeded) corrective++;
+                }
+            });
+        });
+        return {
+            compliance: total > 0 ? Math.round((compliant / total) * 100) : 0,
             audits: deptAudits.length,
-            correctiveActions: 0 // Replace with actual calculation
+            correctiveActions: corrective
         };
     });
 
-    const ctx = document.getElementById('department-chart').getContext('2d');
-    departmentChartInstance = new Chart(ctx, {
+    departmentChartInstance = new Chart(ctx.getContext('2d'), {
         type: 'radar',
         data: {
-            labels: ['Compliance', 'Non-Compliance', 'Audits', 'Corrective Actions'],
+            labels: ['Compliance %', 'Total Audits', 'Corrective Actions'],
             datasets: departments.map((dept, i) => ({
                 label: dept,
                 data: [
                     metrics[i].compliance,
-                    metrics[i].nonCompliance,
                     metrics[i].audits,
                     metrics[i].correctiveActions
                 ],
                 borderColor: getChartColor(i),
                 pointBackgroundColor: getChartColor(i),
+                backgroundColor: getChartColor(i, 0.15),
                 tension: 0.3
             }))
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             scales: {
-                r: {
-                    beginAtZero: true,
-                    max: Math.max(...metrics.flatMap(m => [m.compliance, m.nonCompliance]))
-                }
+                r: { beginAtZero: true }
             }
         }
     });
-}
-// Helper function for chart colors
-function getChartColor(index) {
-    const colors = ['var(--primary-color)', 'var(--secondary-color)', 'var(--accent-color)', 'var(--success-color)'];
-    return colors[index % colors.length];
 }
 
-function renderDeptChart(data) {
-    const ctx = document.getElementById('department-chart').getContext('2d');
-    deptChartInstance = new Chart(ctx, {
-        type: 'radar',
-        data: {
-            labels: ['Compliance Rate', 'Total Audits', 'Avg. Corrective Actions'],
-            datasets: data.map((dept, i) => ({
-                label: dept.dept,
-                data: [dept.compliance, dept.audits, dept.avgCorrective],
-                backgroundColor: `hsla(${i * 90}, 70%, 50%, 0.2)`,
-                borderColor: `hsl(${i * 90}, 70%, 50%)`
-            }))
-        },
-        options: {
-            scales: {
-                r: {
-                    beginAtZero: true,
-                    pointLabels: { font: { size: 12 } }
-                }
-            }
-        }
-    });
+// Helper function for chart colors — returns real hex values, not CSS vars
+function getChartColor(index, alpha) {
+    const colors = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const color = colors[index % colors.length];
+    if (alpha !== undefined) {
+        // Convert hex to rgba
+        const r = parseInt(color.slice(1,3), 16);
+        const g = parseInt(color.slice(3,5), 16);
+        const b = parseInt(color.slice(5,7), 16);
+        return `rgba(${r},${g},${b},${alpha})`;
+    }
+    return color;
 }
 
 function updateDashboardMetrics() {
@@ -1269,6 +1320,7 @@ function updateDashboardMetrics() {
     let correctiveActions = 0;
 
     filteredAudits.forEach(audit => {
+        if (!audit.checklist) return;
         audit.checklist.forEach(item => {
             if (item.applicable === 'yes') {
                 totalItems++;
@@ -1315,8 +1367,8 @@ function renderComplianceChart(compliant, nonCompliant) {
             datasets: [{
                 data: [compliant, nonCompliant],
                 backgroundColor: [
-                    '#2a9d8f', 
-                    '#e76f51'  
+                    '#10b981', 
+                    '#ef4444'  
                 ],
                 borderColor: [
                     '#ffffff', 
@@ -1374,7 +1426,7 @@ function renderNonConformanceChart() {
     if (!ncChartCanvas) return;
     const ctx = ncChartCanvas.getContext('2d');
      if (ncChartInstance) ncChartInstance.destroy();
-     ncChartInsttance = new Chart(); 
+     // ncChartInstance already destroyed above
     const ncByArea = {}; let hasNcData = false;
     audits.forEach(audit => {
         if (audit.checklist && (audit.directorateUnit || audit.auditedArea)) {
@@ -1489,23 +1541,7 @@ async function deleteAudit(auditId) {
         showMessage('Failed to delete audit: ' + error.message, 'error');
     }
 }
-// Add to setupEventListeners()
-document.addEventListener('click', async (e) => {
-    if (e.target.closest('.btn-edit')) {
-      const auditId = e.target.closest('.btn-edit').dataset.auditId;
-      const audit = audits.find(a => a.id === auditId);
-      if (audit && canEditAudit(audit)) {
-        currentAudit = audit;
-        switchSection('new-audit');
-        populateAuditForm(audit);
-      }
-    }
-    
-    if (e.target.closest('.btn-submit')) {
-      const auditId = e.target.closest('.btn-submit').dataset.auditId;
-      submitAuditFromHistory(auditId);
-    }
-  });
+// Duplicate click handler removed — handled in setupEventListeners()
 
 
 async function submitAuditFromHistory(auditId) {
@@ -1622,6 +1658,42 @@ function openAuditDetails(audit) {
             ${audit.submittedAt ? `<p><strong>Submitted At:</strong> ${formatDateTime(audit.submittedAt)}</p>` : ''}
         `;
         modalBodyEl.appendChild(auditMeta);
+
+        // Build visual timeline (audit trail)
+        const timelineDiv = document.createElement('div');
+        timelineDiv.className = 'timeline-section';
+        timelineDiv.innerHTML = '<h4>Audit Progress Trail</h4>';
+        const timelineTrail = document.createElement('div');
+        timelineTrail.className = 'timeline-trail';
+        
+        let timelineHTML = `
+            <div class="timeline-item">
+                <div class="timeline-time">${formatDateTime(audit.createdAt)}</div>
+                <div class="timeline-desc">Draft Created by ${escapeHtml(audit.createdByEmail || 'N/A')}</div>
+            </div>
+        `;
+        
+        if (audit.submittedAt) {
+            timelineHTML += `
+                <div class="timeline-item submitted">
+                    <div class="timeline-time">${formatDateTime(audit.submittedAt)}</div>
+                    <div class="timeline-desc">Submitted for Approval</div>
+                </div>
+            `;
+        }
+        
+        if (audit.approvedAt) {
+            timelineHTML += `
+                <div class="timeline-item approved">
+                    <div class="timeline-time">${formatDateTime(audit.approvedAt)}</div>
+                    <div class="timeline-desc">Approved by ${escapeHtml(audit.approvedBy || 'N/A')}</div>
+                </div>
+            `;
+        }
+        
+        timelineTrail.innerHTML = timelineHTML;
+        timelineDiv.appendChild(timelineTrail);
+        modalBodyEl.appendChild(timelineDiv);
 
         if (audit.introduction) {
             const introSection = document.createElement('div');
@@ -2912,15 +2984,7 @@ async function generateAuditDocument(auditData) {
         return auditors.map(a => a.displayName || a.email).join(', ');
     }
 
-    function escapeHtml(unsafe) {
-        if (!unsafe) return '';
-        return unsafe.toString()
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
+    // Using global escapeHtml() function
 
     function formatDate(dateString) {
         if (!dateString) return 'Not specified';
@@ -2958,6 +3022,16 @@ function redirectToTeamsChannel() {
 
 function clearAuditForm() {
     console.log("Clearing audit form...");
+    
+    // Clean up real-time sessions
+    leaveSession();
+    unsubscribeFromAudit();
+    
+    // Clear local storage auto-save
+    localStorage.removeItem('nafdac_audit_autosave');
+    const autoSaveStatusEl = document.getElementById('auto-save-status');
+    if (autoSaveStatusEl) autoSaveStatusEl.textContent = '';
+
     if (auditForm) {
         auditForm.reset(); // Resets standard inputs, selects, textareas to their initial HTML state or empty
     }
@@ -3128,5 +3202,528 @@ async function saveAuditAsDraft() {
         saveDraftBtn.textContent = 'Save Draft';
     }
 }
+
+// --- Live Collaboration & Presence Tracking ---
+
+let auditSubscription = null;
+let sessionsSubscription = null;
+let currentSessionId = null;
+
+async function joinSession(auditId) {
+    if (!currentUser || !db) return;
+    
+    // Clean up any old sessions just in case
+    await leaveSession();
+    
+    const sessionData = {
+        auditId: auditId,
+        userEmail: currentUser.email,
+        userName: currentUser.displayName,
+        userId: currentUser.uid,
+        lastActive: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    try {
+        const docRef = await db.collection('active_sessions').add(sessionData);
+        currentSessionId = docRef.id;
+        console.log(`Joined real-time session: ${currentSessionId} for audit ${auditId}`);
+        subscribeToSessions(auditId);
+    } catch (e) {
+        console.error("Error joining collaborative session:", e);
+    }
+}
+
+async function leaveSession() {
+    if (currentSessionId && db) {
+        try {
+            await db.collection('active_sessions').doc(currentSessionId).delete();
+            console.log(`Left session: ${currentSessionId}`);
+            currentSessionId = null;
+        } catch (e) {
+            console.error("Error leaving collaborative session:", e);
+        }
+    }
+    if (sessionsSubscription) {
+        sessionsSubscription();
+        sessionsSubscription = null;
+    }
+    const container = document.getElementById('collab-badge-container');
+    if (container) container.innerHTML = '';
+}
+
+function subscribeToSessions(auditId) {
+    if (!db) return;
+    if (sessionsSubscription) sessionsSubscription();
+    
+    sessionsSubscription = db.collection('active_sessions')
+        .where('auditId', '==', auditId)
+        .onSnapshot(snapshot => {
+            const activeUsers = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (!activeUsers.some(u => u.userId === data.userId)) {
+                    activeUsers.push(data);
+                }
+            });
+            renderCollaborators(activeUsers);
+        }, error => {
+            console.error("Error listing collaborators:", error);
+        });
+}
+
+function renderCollaborators(users) {
+    const container = document.getElementById('collab-badge-container');
+    if (!container) return;
+    
+    if (users.length <= 1) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = users.map(user => {
+        const isMe = user.userId === currentUser?.uid;
+        return `
+            <div class="collab-badge ${isMe ? 'active-user' : ''}">
+                <span class="pulse-dot"></span>
+                <span>${escapeHtml(user.userName)} ${isMe ? '(You)' : ''}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function subscribeToAudit(auditId) {
+    if (!db) return;
+    if (auditSubscription) auditSubscription();
+    
+    console.log(`Subscribing to real-time updates for audit: ${auditId}`);
+    auditSubscription = db.collection('audits').doc(auditId).onSnapshot(doc => {
+        if (doc.exists) {
+            const data = doc.data();
+            data.id = doc.id;
+            
+            // Check if updates are from another user
+            if (data.lastModified && currentAudit && currentAudit.lastModified) {
+                const docTime = data.lastModified.toDate ? data.lastModified.toDate().getTime() : new Date(data.lastModified).getTime();
+                const localTime = currentAudit.lastModified.toDate ? currentAudit.lastModified.toDate().getTime() : new Date(currentAudit.lastModified).getTime();
+                
+                if (docTime > localTime) {
+                    updateFormRealTime(data);
+                }
+            } else if (!currentAudit || currentAudit.id !== data.id) {
+                updateFormRealTime(data);
+            }
+        }
+    }, error => {
+        console.error("Error subscribing to audit updates:", error);
+    });
+}
+
+function unsubscribeFromAudit() {
+    if (auditSubscription) {
+        auditSubscription();
+        auditSubscription = null;
+        console.log("Unsubscribed from audit updates.");
+    }
+}
+
+function updateFormRealTime(data) {
+    if (!data) return;
+    
+    // Update basic fields if they don't have focus
+    const fields = {
+        'audit-date': data.date,
+        'directorate-unit': data.directorateUnit,
+        'ref-no': data.refNo,
+        'location': data.location,
+        'auditee-name': data.auditeeName,
+        'auditee-position': data.auditeePosition
+    };
+    
+    Object.keys(fields).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && document.activeElement !== el) {
+            el.value = fields[id] || '';
+        }
+    });
+    
+    const introTextarea = document.querySelector('#new-audit-section .evidence-container .evidence-input');
+    if (introTextarea && document.activeElement !== introTextarea) {
+        introTextarea.value = data.introduction || '';
+    }
+    
+    // Sync checkboxes for lead auditors and auditors
+    const updateCheckboxes = (optionsId, selectedList) => {
+        const container = document.getElementById(optionsId);
+        const searchInput = container?.querySelector('.dropdown-search');
+        if (container && document.activeElement !== searchInput) {
+            const selectedUids = (selectedList || []).map(a => a.uid);
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            const selectedDisplayNames = [];
+            
+            checkboxes.forEach(cb => {
+                const isChecked = selectedUids.includes(cb.value);
+                cb.checked = isChecked;
+                if (isChecked) {
+                    selectedDisplayNames.push(cb.parentElement.textContent.trim());
+                }
+            });
+            
+            const displayEl = container.closest('.custom-multiselect')?.querySelector('.selected-names');
+            if (displayEl) {
+                const placeholder = displayEl.dataset.placeholder || 'Select...';
+                displayEl.textContent = selectedDisplayNames.length > 0 ? selectedDisplayNames.join(', ') : placeholder;
+                displayEl.style.color = selectedDisplayNames.length > 0 ? 'var(--dark-color)' : 'var(--text-muted)';
+            }
+        }
+    };
+    
+    updateCheckboxes('lead-auditors-options', data.leadAuditors);
+    updateCheckboxes('auditors-options', data.auditors);
+    
+    // Sync checklist inputs
+    if (data.checklist && checklistContainer) {
+        data.checklist.forEach(itemFromDb => {
+            const itemElement = checklistContainer.querySelector(`.checklist-item[data-item-id="${itemFromDb.id}"]`);
+            if (!itemElement) return;
+            
+            const applicabilityValue = itemFromDb.applicable || 'no';
+            const yesRadio = itemElement.querySelector(`input[name="applicable-${itemFromDb.id}"][value="yes"]`);
+            const noRadio = itemElement.querySelector(`input[name="applicable-${itemFromDb.id}"][value="no"]`);
+            
+            if (yesRadio && noRadio && document.activeElement !== yesRadio && document.activeElement !== noRadio) {
+                if (applicabilityValue === 'yes') yesRadio.checked = true;
+                else if (applicabilityValue === 'no') noRadio.checked = true;
+            }
+            
+            const contentDiv = itemElement.querySelector('.checklist-content');
+            if (contentDiv) {
+                contentDiv.style.display = (applicabilityValue === 'yes') ? 'block' : 'none';
+                
+                if (applicabilityValue === 'yes') {
+                    if (String(itemFromDb.id) === '28') {
+                        const obsTextarea = contentDiv.querySelector(`#observations-${itemFromDb.id}`);
+                        if (obsTextarea && document.activeElement !== obsTextarea) {
+                            obsTextarea.value = itemFromDb.observations || '';
+                        }
+                    } else {
+                        const evidenceTextarea = contentDiv.querySelector(`#evidence-${itemFromDb.id}`);
+                        if (evidenceTextarea && document.activeElement !== evidenceTextarea) {
+                            evidenceTextarea.value = itemFromDb.objectiveEvidence || '';
+                        }
+                        
+                        const commentsTextarea = contentDiv.querySelector(`#comments-${itemFromDb.id}`);
+                        if (commentsTextarea && document.activeElement !== commentsTextarea) {
+                            commentsTextarea.value = itemFromDb.comments || '';
+                        }
+                        
+                        // Update compliance buttons
+                        const buttons = contentDiv.querySelectorAll('.compliance-btn');
+                        buttons.forEach(btn => btn.classList.remove('active', 'compliance-yes', 'compliance-no'));
+                        if (itemFromDb.compliance) {
+                            const activeBtn = contentDiv.querySelector(`.compliance-btn[data-compliance="${itemFromDb.compliance}"]`);
+                            if (activeBtn) {
+                                activeBtn.classList.add('active', `compliance-${itemFromDb.compliance}`);
+                            }
+                        }
+                        
+                        // Corrective action radio
+                        const caNeeded = itemFromDb.correctiveActionNeeded === true;
+                        const caYes = contentDiv.querySelector(`input[name="corrective-action-${itemFromDb.id}"][value="yes"]`);
+                        const caNo = contentDiv.querySelector(`input[name="corrective-action-${itemFromDb.id}"][value="no"]`);
+                        if (caYes && caNo && document.activeElement !== caYes && document.activeElement !== caNo) {
+                            if (caNeeded) caYes.checked = true;
+                            else caNo.checked = true;
+                        }
+                        
+                        // Classification select
+                        const classSelect = contentDiv.querySelector(`#classification-${itemFromDb.id}`);
+                        if (classSelect && document.activeElement !== classSelect) {
+                            classSelect.value = itemFromDb.classification || '';
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    currentAudit = data;
+    updateChecklistProgress();
+}
+
+async function syncFieldToFirestore(itemId, field, value) {
+    if (!currentAudit || !currentAudit.id || currentAudit.status !== 'draft') return;
+    
+    const checklistItem = currentAudit.checklist?.find(i => i.id === itemId);
+    if (checklistItem) {
+        checklistItem[field] = value;
+    }
+    
+    try {
+        await db.collection('audits').doc(currentAudit.id).update({
+            checklist: currentAudit.checklist,
+            lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Error syncing field:", e);
+    }
+}
+
+async function syncBasicFieldToFirestore(field, value) {
+    if (!currentAudit || !currentAudit.id || currentAudit.status !== 'draft') return;
+    currentAudit[field] = value;
+    try {
+        await db.collection('audits').doc(currentAudit.id).update({
+            [field]: value,
+            lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error(`Error syncing field ${field}:`, e);
+    }
+}
+
+async function syncAuditorsToFirestore() {
+    if (!currentAudit || !currentAudit.id || currentAudit.status !== 'draft') return;
+    
+    const getSelectedAuditors = (optionsId) => {
+        const optionsContainer = document.getElementById(optionsId);
+        if (!optionsContainer) return [];
+        return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(checkbox => ({
+                uid: checkbox.value,
+                displayName: checkbox.parentElement.textContent.trim()
+            }));
+    };
+    
+    const leadAuditors = getSelectedAuditors('lead-auditors-options');
+    const auditors = getSelectedAuditors('auditors-options');
+    
+    currentAudit.leadAuditors = leadAuditors;
+    currentAudit.auditors = auditors;
+    
+    try {
+        await db.collection('audits').doc(currentAudit.id).update({
+            leadAuditors,
+            auditors,
+            lastModified: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (e) {
+        console.error("Error syncing auditors:", e);
+    }
+}
+
+// --- Local Storage Auto-Save ---
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function collectAuditFormDataForAutoSave() {
+    const auditDate = auditDateInput?.value || '';
+    const directorateUnit = directorateUnitInput?.value.trim() || '';
+    const refNo = refNoInput?.value.trim() || '';
+    const locationValue = locationInput?.value || '';
+    const introductionText = document.querySelector('#new-audit-section .evidence-container .evidence-input')?.value.trim() || '';
+    const auditeeName = document.getElementById('auditee-name')?.value.trim() || '';
+    const auditeePosition = document.getElementById('auditee-position')?.value.trim() || '';
+
+    const getSelectedAuditorData = (optionsId) => {
+        const optionsContainer = document.getElementById(optionsId);
+        if (!optionsContainer) return [];
+        return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
+            .map(checkbox => ({
+                uid: checkbox.value,
+                displayName: checkbox.parentElement.textContent.trim()
+            }));
+    };
+
+    const selectedLeadAuditors = getSelectedAuditorData('lead-auditors-options');
+    const selectedAuditors = getSelectedAuditorData('auditors-options');
+
+    const checklistData = [];
+    const checklistItemElements = checklistContainer?.querySelectorAll('.checklist-item');
+    if (checklistItemElements) {
+        checklistItemElements.forEach((itemElement) => {
+            const itemId = parseInt(itemElement.dataset.itemId);
+            const originalItem = auditChecklist.find(ci => ci.id === itemId);
+            if (!originalItem) return;
+
+            const applicableRadio = itemElement.querySelector(`input[name="applicable-${itemId}"]:checked`);
+            const isApplicable = applicableRadio?.value === 'yes';
+            let itemEntry = {
+                id: itemId,
+                requirement: originalItem.requirement,
+                clause: originalItem.clause,
+                applicable: isApplicable ? 'yes' : 'no'
+            };
+
+            if (isApplicable) {
+                if (itemId === 28) {
+                    itemEntry.observations = itemElement.querySelector(`#observations-${itemId}`)?.value.trim() || '';
+                } else {
+                    const complianceBtn = itemElement.querySelector('.compliance-btn.active');
+                    itemEntry.compliance = complianceBtn ? complianceBtn.dataset.compliance : '';
+                    itemEntry.objectiveEvidence = itemElement.querySelector(`#evidence-${itemId}`)?.value.trim() || '';
+                    itemEntry.comments = itemElement.querySelector(`#comments-${itemId}`)?.value.trim() || '';
+                    itemEntry.correctiveActionNeeded = itemElement.querySelector(`input[name="corrective-action-${itemId}"][value="yes"]`)?.checked || false;
+                    itemEntry.classification = itemElement.querySelector(`#classification-${itemId}`)?.value || '';
+                }
+            }
+            checklistData.push(itemEntry);
+        });
+    }
+
+    return {
+        date: auditDate,
+        directorateUnit,
+        refNo,
+        location: locationValue,
+        introduction: introductionText,
+        auditeeName,
+        auditeePosition,
+        leadAuditors: selectedLeadAuditors,
+        auditors: selectedAuditors,
+        checklist: checklistData,
+        timestamp: new Date().getTime()
+    };
+}
+
+const triggerAutoSave = debounce(() => {
+    // Only auto-save local drafts if starting a new audit
+    if (currentAudit && currentAudit.status !== 'draft') return;
+    
+    const draftData = collectAuditFormDataForAutoSave();
+    localStorage.setItem('nafdac_audit_autosave', JSON.stringify(draftData));
+    
+    // Render/update auto-save indicator
+    let statusIndicator = document.getElementById('auto-save-status');
+    if (!statusIndicator) {
+        statusIndicator = document.createElement('span');
+        statusIndicator.id = 'auto-save-status';
+        statusIndicator.className = 'auto-save-status';
+        const actionsContainer = document.querySelector('.form-actions');
+        if (actionsContainer) {
+            actionsContainer.prepend(statusIndicator);
+        }
+    }
+    
+    const timeString = new Date().toLocaleTimeString();
+    statusIndicator.textContent = `Draft auto-saved locally at ${timeString}`;
+}, 1500);
+
+function loadAutoSavedDraft() {
+    const raw = localStorage.getItem('nafdac_audit_autosave');
+    if (!raw) return;
+    
+    try {
+        const draft = JSON.parse(raw);
+        if (!draft || !draft.timestamp) return;
+        
+        const elapsedMinutes = Math.round((new Date().getTime() - draft.timestamp) / 60000);
+        if (elapsedMinutes > 120) {
+            // Expire drafts older than 2 hours to avoid stale prompts
+            localStorage.removeItem('nafdac_audit_autosave');
+            return;
+        }
+        
+        if (confirm(`We found an auto-saved draft of a new audit from ${elapsedMinutes} minutes ago. Would you like to restore it?`)) {
+            populateAuditForm(draft);
+        } else {
+            localStorage.removeItem('nafdac_audit_autosave');
+        }
+    } catch (e) {
+        console.error("Error reading auto-saved draft:", e);
+    }
+}
+
+function setupAutoSave() {
+    // Basic fields listeners
+    const basicFields = {
+        'audit-date': 'date',
+        'directorate-unit': 'directorateUnit',
+        'ref-no': 'refNo',
+        'location': 'location',
+        'auditee-name': 'auditeeName',
+        'auditee-position': 'auditeePosition'
+    };
+    
+    Object.keys(basicFields).forEach(id => {
+        document.getElementById(id)?.addEventListener('input', (e) => {
+            triggerAutoSave();
+            syncBasicFieldToFirestore(basicFields[id], e.target.value);
+        });
+    });
+    
+    document.querySelector('#new-audit-section .evidence-container .evidence-input')?.addEventListener('input', (e) => {
+        triggerAutoSave();
+        syncBasicFieldToFirestore('introduction', e.target.value);
+    });
+}
+
+// --- Real-time Search for Custom Dropdowns ---
+
+function filterDropdownOptions(type) {
+    const searchInput = document.querySelector(`#${type}-options .dropdown-search`);
+    if (!searchInput) return;
+    
+    const filter = searchInput.value.toLowerCase();
+    const optionsContainer = document.getElementById(`${type}-options`);
+    const labels = optionsContainer.querySelectorAll('label');
+    
+    labels.forEach(label => {
+        const text = label.textContent.toLowerCase();
+        label.style.display = text.includes(filter) ? 'block' : 'none';
+    });
+}
+
+// --- Dark Mode Controller ---
+
+function setupDarkMode() {
+    const toggleBtn = document.getElementById('dark-mode-toggle');
+    if (!toggleBtn) return;
+    
+    const applyTheme = (theme) => {
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('nafdac_theme', theme);
+        
+        const icon = toggleBtn.querySelector('i');
+        if (icon) {
+            if (theme === 'dark') {
+                icon.className = 'fas fa-sun';
+                toggleBtn.style.color = '#fbbf24'; // Warm yellow for sun
+            } else {
+                icon.className = 'fas fa-moon';
+                toggleBtn.style.color = '#ffffff'; // White for moon
+            }
+        }
+    };
+    
+    // Load from local storage
+    const savedTheme = localStorage.getItem('nafdac_theme') || 'light';
+    applyTheme(savedTheme);
+    
+    toggleBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+    });
+}
+
+// Clean up active session on page close/refresh
+window.addEventListener('beforeunload', () => {
+    if (currentSessionId && db) {
+        // Use synchronous approach for reliability on page close
+        const sessionRef = db.collection('active_sessions').doc(currentSessionId);
+        sessionRef.delete().catch(() => {});
+    }
+});
+
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);

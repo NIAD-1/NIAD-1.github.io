@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NAFDAC Internal Audit System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <meta name="description" content="NAFDAC QMS Internal Audit Management System - ISO 9001 Compliance Tracking">
+    <meta name="robots" content="noindex, nofollow">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <!-- Chart.js for visualizations -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- html2pdf.js for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-auth-compat.js"></script>
@@ -16,14 +20,15 @@
     <script src="https://www.gstatic.com/firebasejs/9.0.2/firebase-storage-compat.js"></script>
 </head>
 <body>
+    <noscript><p style="text-align:center;padding:2rem;font-family:sans-serif;">This application requires JavaScript to run. Please enable JavaScript in your browser.</p></noscript>
     <!-- Login Screen -->
     <div id="login-screen" class="auth-screen">
         <div class="auth-container">
             <img src="nafdac-logo.png" alt="NAFDAC Logo" class="auth-logo">
             <h1>NAFDAC QMS Internal Audit System</h1>
             <div class="auth-form">
-                <input type="email" id="login-email" placeholder="Email Address" required>
-                <input type="password" id="login-password" placeholder="Password" required>
+                <input type="email" id="login-email" placeholder="Email Address" aria-label="Email address" required>
+                <input type="password" id="login-password" placeholder="Password" aria-label="Password" required>
                 <button id="login-btn" class="btn btn-primary">Login</button>
                 <button id="google-login-btn" class="btn btn-google">
                     <i class="fab fa-google"></i> Sign in with Google
@@ -76,6 +81,9 @@
                     <h1>NAFDAC QMS Internal Audit</h1>
                 </div>
                 <div class="header-right">
+                    <button id="dark-mode-toggle" class="btn btn-outline btn-sm" aria-label="Toggle Dark Mode" style="border: none; padding: 0.35rem 0.5rem; font-size: 1.15rem; color: white;">
+                        <i class="fas fa-moon"></i>
+                    </button>
                     <span id="user-email" class="user-info"></span>
                     <button id="logout-btn" class="btn btn-danger btn-sm">Logout</button>
                 </div>
@@ -175,6 +183,16 @@
 
             <section id="new-audit-section" class="content-section hidden" data-permission="create_audit">
                 <h2>New Internal Audit</h2>
+                <div id="collab-badge-container" class="collab-badge-container"></div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-label-wrapper">
+                        <span>Checklist Completion Progress</span>
+                        <span id="audit-progress-text">0% (0 of 27 reviewed)</span>
+                    </div>
+                    <div class="progress-bar-wrapper">
+                        <div id="audit-progress-bar" class="progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
                 <form id="audit-form">
                     <!-- Audit Date and Ref No -->
                     <div class="form-row">
@@ -237,6 +255,7 @@
                                 <span class="arrow">▼</span>
                             </div>
                             <div class="dropdown-options" id="lead-auditors-options">
+                                <input type="text" class="dropdown-search" placeholder="Search auditor..." onkeyup="filterDropdownOptions('lead-auditors')">
                                 <label><input type="checkbox" value="Fatoki Samson"> Fatoki Samson</label>
                                 <label><input type="checkbox" value="Adesanya Oluwaseun"> Adesanya Oluwaseun</label>
                                 <label><input type="checkbox" value="Abubakar Fatima"> Abubakar Fatima</label>
@@ -267,6 +286,7 @@
                                 <span class="arrow">▼</span>
                             </div>
                             <div class="dropdown-options" id="auditors-options">
+                                <input type="text" class="dropdown-search" placeholder="Search auditor..." onkeyup="filterDropdownOptions('auditors')">
                                 <label><input type="checkbox" value="Omoru Emmanuel"> Omoru Emmanuel</label>
                                 <label><input type="checkbox" value="Offor Adaku"> Offor Adaku</label>
                                 <label><input type="checkbox" value="Onwualu Rosemary"> Onwualu Rosemary</label>
@@ -276,10 +296,10 @@
                                 <label><input type="checkbox" value="Ibeh Vivien Ify"> Ibeh Vivien Ify</label>
                                 <label><input type="checkbox" value="Sanwoolu Oluwaseyi"> Sanwoolu Oluwaseyi</label>
                                 <label><input type="checkbox" value="Tabitha Bukar"> Tabitha Bukar</label>
-                                <label><input type="checkbox" value="Omonike Oluyide "> Omonike Oluyide</label>
+                                <label><input type="checkbox" value="Omonike Oluyide"> Omonike Oluyide</label>
                                 <label><input type="checkbox" value="Akinyemi Sidikat"> Akinyemi Sidikat</label>
                                 <label><input type="checkbox" value="Anulika Princess Nwosu"> Anulika Princess Nwosu</label>
-                                <label><input type="checkbox" value="Oriade-Shabi Olabisi "> Oriade-Shabi Olabisi </label>
+                                <label><input type="checkbox" value="Oriade-Shabi Olabisi"> Oriade-Shabi Olabisi</label>
                                 <label><input type="checkbox" value="Akinyemi Julianah"> Akinyemi Julianah</label>
                                 <label><input type="checkbox" value="Adewale Muniru">Adewale Muniru</label>
                                 <label><input type="checkbox" value="Salihu Bello">Salihu Bello</label>
@@ -465,15 +485,15 @@
         <h2>Change Password</h2>
         <form id="change-password-form">
             <div class="form-group">
-                <label>Current Password:</label>
+                <label for="current-password">Current Password:</label>
                 <input type="password" id="current-password" required>
             </div>
             <div class="form-group">
-                <label>New Password:</label>
+                <label for="new-password">New Password:</label>
                 <input type="password" id="new-password" required>
             </div>
             <div class="form-group">
-                <label>Confirm New Password:</label>
+                <label for="confirm-password">Confirm New Password:</label>
                 <input type="password" id="confirm-password" required>
             </div>
             <button type="submit" class="btn">Change Password</button>
