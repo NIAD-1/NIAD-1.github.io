@@ -344,7 +344,7 @@ function setupEventListeners() {
                 // Reset fields
                 nameInput.value = '';
                 emailInput.value = '';
-                passwordInput.value = '';
+                passwordInput.value = 'Internal2026';
                 
                 // Reload user list
                 loadUsersForManagement();
