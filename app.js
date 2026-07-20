@@ -226,6 +226,7 @@ function setupEventListeners() {
 
     // Audit history events
     document.getElementById('filter-btn')?.addEventListener('click', filterAudits);
+    document.getElementById('history-year-filter')?.addEventListener('change', filterAudits);
 
     // Reports events
     document.getElementById('generate-report-btn')?.addEventListener('click', generateReport);
@@ -1229,7 +1230,17 @@ function collectAuditFormData() {
         baseData.status = currentAudit.status; // Preserve status, submit/saveDraft will override if necessary
         if(currentAudit.submittedAt) baseData.submittedAt = currentAudit.submittedAt; // Preserve if exists
     } else {
-        // New audit
+        // New audit - Check for duplicate audit in the same directorate and year
+        const targetYear = auditDate ? new Date(auditDate).getFullYear().toString() : new Date().getFullYear().toString();
+        const existingAudit = audits.find(a => 
+            a.directorateUnit === directorateUnit && 
+            getAuditYear(a) === targetYear
+        );
+        if (existingAudit) {
+            alert(`An audit (${existingAudit.status.toUpperCase()}) already exists for "${directorateUnit}" in ${targetYear}. Multiple audits for the same directorate in the same year are not allowed.`);
+            return null;
+        }
+
         if (!currentUser) {
             console.error("No currentUser for new audit.");
             alert("Error: User session lost. Please log in again.");
@@ -1377,15 +1388,22 @@ function renderDashboard() {
     );
 
     // Populate directorate filter
-    const directorates = [...new Set(audits.map(a => a.directorateUnit))];
+    const directorates = [...new Set(audits.map(a => a.directorateUnit).filter(Boolean))].sort();
     const filterSelect = document.getElementById('directorate-filter');
-    filterSelect.innerHTML = `<option value="">All Directorates</option>${
-        directorates.map(d => `<option value="${d}">${d}</option>`).join('')
-    }`;
+    if (filterSelect) {
+        filterSelect.innerHTML = `<option value="">All Directorates</option>${
+            directorates.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('')
+        }`;
+        filterSelect.removeEventListener('change', updateDashboardMetrics);
+        filterSelect.addEventListener('change', updateDashboardMetrics);
+    }
 
-    // Set up filter handler (remove first to prevent duplicates)
-    filterSelect.removeEventListener('change', updateDashboardMetrics);
-    filterSelect.addEventListener('change', updateDashboardMetrics);
+    const yearSelect = document.getElementById('dashboard-year-filter');
+    if (yearSelect) {
+        yearSelect.removeEventListener('change', updateDashboardMetrics);
+        yearSelect.addEventListener('change', updateDashboardMetrics);
+    }
+
     updateDashboardMetrics();
 }
 
@@ -1512,11 +1530,37 @@ function getChartColor(index, alpha) {
     return color;
 }
 
+function getAuditYear(audit) {
+    if (!audit) return null;
+    let d = null;
+    if (audit.date) {
+        d = new Date(audit.date);
+    } else if (audit.createdAt) {
+        d = audit.createdAt.toDate ? audit.createdAt.toDate() : new Date(audit.createdAt);
+    }
+    if (d && !isNaN(d.getFullYear())) {
+        return d.getFullYear().toString();
+    }
+    return null;
+}
+
 function updateDashboardMetrics() {
-    const selectedDirectorate = document.getElementById('directorate-filter').value;
-    const filteredAudits = selectedDirectorate ? 
-        audits.filter(a => a.directorateUnit === selectedDirectorate) : 
-        audits;
+    const selectedYear = document.getElementById('dashboard-year-filter')?.value ?? '2026';
+    const selectedDirectorate = document.getElementById('directorate-filter')?.value || '';
+
+    // Dashboard metrics & charts calculate ONLY from SUBMITTED audits
+    let filteredAudits = audits.filter(a => a.status === 'submitted');
+
+    if (selectedYear) {
+        filteredAudits = filteredAudits.filter(a => {
+            const y = getAuditYear(a);
+            return y ? y === selectedYear : true;
+        });
+    }
+
+    if (selectedDirectorate) {
+        filteredAudits = filteredAudits.filter(a => a.directorateUnit === selectedDirectorate);
+    }
 
     // Calculate metrics
     let totalItems = 0;
@@ -1546,12 +1590,17 @@ function updateDashboardMetrics() {
     const avgCorrective = filteredAudits.length > 0 ? 
         Math.round(correctiveActions / filteredAudits.length) : 0;
 
-    document.getElementById('compliance-rate').textContent = `${complianceRate}%`;
-    document.getElementById('non-compliance-rate').textContent = `${nonComplianceRate}%`;
-    document.getElementById('total-audits').textContent = filteredAudits.length;
-    document.getElementById('avg-corrective').textContent = avgCorrective;
+    const compRateEl = document.getElementById('compliance-rate');
+    const nonCompRateEl = document.getElementById('non-compliance-rate');
+    const totalAuditsEl = document.getElementById('total-audits');
+    const avgCorrEl = document.getElementById('avg-corrective');
 
-    // Update chart
+    if (compRateEl) compRateEl.textContent = `${complianceRate}%`;
+    if (nonCompRateEl) nonCompRateEl.textContent = `${nonComplianceRate}%`;
+    if (totalAuditsEl) totalAuditsEl.textContent = filteredAudits.length;
+    if (avgCorrEl) avgCorrEl.textContent = avgCorrective;
+
+    // Update charts
     renderComplianceChart(compliantItems, nonCompliantItems);
     renderRecentAudits(filteredAudits);
 }
@@ -1653,13 +1702,59 @@ function renderNonConformanceChart() {
     });
 }
 
+function canDeleteAudit(audit) {
+    if (!currentUser || !userRole) return false;
+    // Admins can delete any audit
+    if (userRole === ROLES.ADMIN) return true;
+
+    // Auditors and Lead Auditors can delete their own drafts
+    if (audit && audit.status === 'draft') {
+        const userEmail = currentUser.email?.toLowerCase();
+        const createdBy = audit.createdByEmail?.toLowerCase() || audit.createdBy?.toLowerCase();
+        if (createdBy && userEmail && createdBy === userEmail) {
+            return true;
+        }
+        if (audit.leadAuditors?.some(a => a.email?.toLowerCase() === userEmail)) return true;
+        if (audit.auditors?.some(a => a.email?.toLowerCase() === userEmail)) return true;
+    }
+    return false;
+}
+
 // --- Audit History & Filtering ---
-function renderAuditHistory(auditsToDisplay = audits) {
+function getFilteredHistoryAudits() {
+    const yearFilter = document.getElementById('history-year-filter')?.value ?? '2026';
+    const fromDate = document.getElementById('date-from')?.value;
+    const toDate = document.getElementById('date-to')?.value;
+    const areaFilter = document.getElementById('audit-area-filter')?.value;
+    const statusFilter = document.getElementById('status-filter')?.value;
+
+    return audits.filter(audit => {
+        const area = audit.directorateUnit || audit.auditedArea;
+        let match = true;
+
+        if (yearFilter) {
+            const y = getAuditYear(audit);
+            if (y && y !== yearFilter) match = false;
+        }
+        if (fromDate && audit.date < fromDate) match = false;
+        if (toDate && audit.date > toDate) match = false;
+        if (areaFilter && area !== areaFilter) match = false;
+        if (statusFilter && audit.status !== statusFilter) match = false;
+
+        return match;
+    });
+}
+
+function renderAuditHistory(auditsToDisplay = null) {
     if (!auditHistoryList) return;
     auditHistoryList.innerHTML = '';
 
+    if (!auditsToDisplay) {
+        auditsToDisplay = getFilteredHistoryAudits();
+    }
+
     if (auditsToDisplay.length === 0) {
-        auditHistoryList.innerHTML = '<p>No audits found matching criteria.</p>';
+        auditHistoryList.innerHTML = '<p class="text-muted" style="padding: 1rem;">No audits found matching criteria.</p>';
         return;
     }
 
@@ -1679,7 +1774,7 @@ function renderAuditHistory(auditsToDisplay = audits) {
 
         itemDiv.innerHTML = `
             <div class="details">
-                <strong>${escapeHtml(audit.directorateUnit)} (Ref: ${escapeHtml(audit.refNo || 'N/A')})</strong>
+                <strong>${escapeHtml(audit.directorateUnit || 'Audit')} (Ref: ${escapeHtml(audit.refNo || 'N/A')})</strong>
                 <div class="meta">
                     <div><strong>Date:</strong> ${formatDate(audit.date)}</div>
                     <div><strong>Lead Auditors:</strong> ${escapeHtml(leadAuditorsText)}</div>
@@ -1691,21 +1786,20 @@ function renderAuditHistory(auditsToDisplay = audits) {
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
                 ${audit.status === 'draft' ? `
-                    <div class="draft-actions">
-                        <button class="btn btn-sm btn-edit permission-hidden" 
-                                data-permission="lead_auditor" 
+                    <div class="draft-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                        <button class="btn btn-sm btn-secondary btn-edit" 
                                 data-audit-id="${audit.id}">
-                            <i class="fas fa-edit"></i> Edit
+                            <i class="fas fa-edit"></i> Edit Draft
                         </button>
-                        <button class="btn btn-sm btn-submit permission-hidden" 
-                                data-permission="lead_auditor" 
+                        <button class="btn btn-sm btn-primary btn-submit" 
                                 data-audit-id="${audit.id}">
-                            <i class="fas fa-check"></i> Submit
+                            <i class="fas fa-check"></i> Submit Audit
                         </button>
                     </div>
                 ` : ''}
-                ${hasPermission('delete_audit') ? `
+                ${canDeleteAudit(audit) ? `
                     <button class="btn btn-danger btn-sm delete-audit" 
+                            style="margin-top: 0.5rem;"
                             data-audit-id="${audit.id}">
                         <i class="fas fa-trash"></i> Delete
                     </button>
@@ -1714,44 +1808,38 @@ function renderAuditHistory(auditsToDisplay = audits) {
             <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>
 `;
         itemDiv.addEventListener('click', (e) => {
-            // Don't open details if clicking the submit button
-            if (!e.target.classList.contains('submit-draft-btn')) {
-                openAuditDetails(audit);
+            // Don't open details modal if clicking action buttons
+            if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit')) {
+                return;
             }
+            openAuditDetails(audit);
         });
-        
-        // Add event listener for submit draft button
-        const submitBtn = itemDiv.querySelector('.submit-draft-btn');
-        if (submitBtn) {
-            submitBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                submitAuditFromHistory(audit.id);
-            });
-        }
 
         auditHistoryList.appendChild(itemDiv);
     });
 }
 
-// Enhance the delete handler (app.js)
 async function deleteAudit(auditId) {
+    const auditToDelete = audits.find(a => a.id === auditId);
+    if (auditToDelete && !canDeleteAudit(auditToDelete)) {
+        alert('You do not have permission to delete this audit.');
+        return;
+    }
+    
     if (!confirm('Are you sure you want to permanently delete this audit?')) return;
     
     try {
         await db.collection('audits').doc(auditId).delete();
         showMessage('Audit deleted successfully', 'success');
-        loadAudits(); // Refresh the list
+        loadAudits(); // Refresh list & metrics
     } catch (error) {
         console.error('Delete error:', error);
-        showMessage('Failed to delete audit: ' + error.message, 'error');
+        alert('Failed to delete audit: ' + error.message);
     }
 }
-// Duplicate click handler removed — handled in setupEventListeners()
-
 
 async function submitAuditFromHistory(auditId) {
     try {
-        // Get the audit document
         const auditDoc = await db.collection('audits').doc(auditId).get();
         if (!auditDoc.exists) {
             throw new Error('Audit not found');
@@ -1759,22 +1847,17 @@ async function submitAuditFromHistory(auditId) {
         
         const auditData = auditDoc.data();
         
-        // Confirm submission
-        if (!confirm(`Are you ready to submit this audit (${auditData.refNo})? Once submitted, you won't be able to edit it unless you're an admin.`)) {
+        if (!confirm(`Are you ready to submit this audit (${auditData.refNo || 'Ref N/A'})? Once submitted, it will be finalized.`)) {
             return;
         }
         
-        // Update audit status
         await db.collection('audits').doc(auditId).update({
             status: 'submitted',
             submittedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Generate document and redirect
         await generateAuditDocument({ ...auditData, id: auditId });
         redirectToTeamsChannel();
-        
-        // Refresh the audit history
         loadAudits();
         
     } catch (error) {
@@ -1784,17 +1867,8 @@ async function submitAuditFromHistory(auditId) {
 }
 
 function filterAudits() {
-    const fromDate = document.getElementById('date-from').value;
-    const toDate = document.getElementById('date-to').value;
-    const areaFilter = document.getElementById('audit-area-filter').value;
-    const statusFilter = document.getElementById('status-filter').value;
-    
-    const filtered = audits.filter(audit => {
-        const area = audit.directorateUnit || audit.auditedArea;
-        let match = true;
-        
-        if (fromDate && audit.date < fromDate) match = false;
-        if (toDate && audit.date > toDate) match = false;
+    renderAuditHistory();
+}
         if (areaFilter && area !== areaFilter) match = false;
         if (statusFilter && audit.status !== statusFilter) match = false;
         
