@@ -1360,14 +1360,29 @@ function loadAudits() {
     if (!currentUser) {
          audits = []; renderAuditHistory(); renderDashboard(); return;
     }
-    db.collection('audits').orderBy('createdAt', 'desc').get()
+    // Fetch all audit documents without strict orderBy (which excludes pending serverTimestamps or unindexed docs)
+    db.collection('audits').get()
         .then(querySnapshot => {
             audits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // Sort in memory (newest first)
+            audits.sort((a, b) => {
+                const getTime = (x) => {
+                    if (!x) return 0;
+                    if (x.createdAt?.toDate) return x.createdAt.toDate().getTime();
+                    if (x.createdAt?.seconds) return x.createdAt.seconds * 1000;
+                    if (x.createdAt instanceof Date) return x.createdAt.getTime();
+                    if (x.date) return new Date(x.date).getTime();
+                    return 0;
+                };
+                return getTime(b) - getTime(a);
+            });
+
             console.log(`Loaded ${audits.length} audits.`);
             if (isSectionVisible('dashboard')) renderDashboard();
-            if (isSectionVisible('audit-history')) renderAuditHistory();
-            if (isSectionVisible('reports')) updateAreaFilter(); // Ensure area filter in reports is updated
-            updateAreaFilter(); // Update history filter too
+            renderAuditHistory(); // Always refresh audit history list
+            if (isSectionVisible('reports')) updateAreaFilter();
+            updateAreaFilter();
         })
         .catch(error => {
             console.error('Error loading audits: ', error);
@@ -1531,17 +1546,29 @@ function getChartColor(index, alpha) {
 }
 
 function getAuditYear(audit) {
-    if (!audit) return null;
+    if (!audit) return new Date().getFullYear().toString();
+    
+    // Check audit.date string first (e.g., "2026-07-20")
+    if (audit.date && typeof audit.date === 'string' && audit.date.length >= 4) {
+        const yearStr = audit.date.substring(0, 4);
+        if (!isNaN(parseInt(yearStr)) && parseInt(yearStr) > 2000) {
+            return yearStr;
+        }
+    }
+    
     let d = null;
     if (audit.date) {
         d = new Date(audit.date);
     } else if (audit.createdAt) {
         d = audit.createdAt.toDate ? audit.createdAt.toDate() : new Date(audit.createdAt);
     }
+    
     if (d && !isNaN(d.getFullYear())) {
         return d.getFullYear().toString();
     }
-    return null;
+    
+    // Default fallback to 2026 / current year so newly created drafts are never hidden by year filter
+    return new Date().getFullYear().toString();
 }
 
 function updateDashboardMetrics() {
