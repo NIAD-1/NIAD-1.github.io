@@ -18,6 +18,11 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+// Set auth persistence to LOCAL for cross-browser compatibility
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(err => {
+    console.warn('Auth persistence could not be set:', err.message);
+});
+
 
 // --- Roles Definition ---
 const ROLES = {
@@ -152,6 +157,26 @@ let auditorUsers = [];
 function init() {
     console.log("Initializing App...");
     setupEventListeners();
+    
+    // Handle Google redirect result (for browsers where popup was blocked)
+    auth.getRedirectResult().then(async (result) => {
+        if (result && result.user) {
+            console.log('Redirect sign-in successful for:', result.user.email);
+            let userRoleData = await getUserRole(result.user.uid);
+            if (!userRoleData) {
+                userRoleData = await autoProvisionUser(result.user);
+            }
+            if (!userRoleData) {
+                alert(`Login successful, but your account (${result.user.email}) needs setup by an administrator.`);
+                logout();
+            }
+        }
+    }).catch(error => {
+        console.error('Redirect result error:', error);
+        const loginErr = document.getElementById('login-error');
+        if (loginErr) loginErr.textContent = getFriendlyAuthError(error);
+    });
+
     checkAuthState();
     setupDarkMode();
     setupAutoSave();
@@ -163,6 +188,10 @@ function setupEventListeners() {
     loginBtn?.addEventListener('click', loginWithEmail);
     googleLoginBtn?.addEventListener('click', loginWithGoogle);
     logoutBtn?.addEventListener('click', logout);
+
+    // Allow Enter key to trigger login from email or password fields
+    loginEmail?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loginWithEmail(); } });
+    loginPassword?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); loginWithEmail(); } });
     
     document.getElementById('toggle-login-password-visibility')?.addEventListener('click', () => {
         const pwdInput = document.getElementById('login-password');
@@ -525,23 +554,64 @@ async function getUserRole(userId) {
     }
 }
 
+function getFriendlyAuthError(error) {
+    const code = error.code || '';
+    switch (code) {
+        case 'auth/invalid-login-credentials':
+        case 'auth/wrong-password':
+            return 'Incorrect password. Please try again or use "Forgot Password?" to reset it.';
+        case 'auth/user-not-found':
+            return 'No account found with this email. Please check the email or contact your administrator.';
+        case 'auth/invalid-email':
+            return 'Please enter a valid email address.';
+        case 'auth/user-disabled':
+            return 'This account has been disabled. Please contact your administrator.';
+        case 'auth/too-many-requests':
+            return 'Too many failed attempts. Please wait a few minutes and try again.';
+        case 'auth/network-request-failed':
+            return 'Network error. Please check your internet connection and try again.';
+        case 'auth/popup-blocked':
+            return 'Popup was blocked by your browser. Trying redirect method instead...';
+        case 'auth/popup-closed-by-user':
+            return 'Sign-in popup was closed. Please try again.';
+        case 'auth/cancelled-popup-request':
+            return ''; // Silent — user just closed the popup
+        default:
+            return `Login failed: ${error.message}`;
+    }
+}
+
 function loginWithEmail() {
     if (!loginEmail || !loginPassword || !loginError) return;
-    const email = loginEmail.value;
+    const email = loginEmail.value?.trim();
     const password = loginPassword.value;
     loginError.textContent = '';
+    loginError.style.color = '#ef4444';
     if (!email || !password) { loginError.textContent = 'Please enter email and password.'; return; }
+    
+    // Disable button to prevent double-clicks
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Logging in...'; }
+    
     auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+            // Success is handled by onAuthStateChanged
+        })
         .catch(error => {
-            loginError.textContent = `Login failed: ${error.message}`;
+            loginError.textContent = getFriendlyAuthError(error);
             console.error("Login Error:", error);
+        })
+        .finally(() => {
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login'; }
         });
 }
 
 function loginWithGoogle() {
-     if (!loginError) return;
+    if (!loginError) return;
     const provider = new firebase.auth.GoogleAuthProvider();
     loginError.textContent = '';
+    loginError.style.color = '#ef4444';
+    
+    // Try popup first, fall back to redirect if blocked
     auth.signInWithPopup(provider)
         .then(async (result) => {
              const user = result.user;
@@ -556,8 +626,20 @@ function loginWithGoogle() {
              }
         })
         .catch(error => {
-            loginError.textContent = `Google Sign-In failed: ${error.message}`;
-             console.error("Google Sign-In Error:", error);
+            console.error("Google Sign-In Error:", error);
+            // If popup was blocked, automatically fall back to redirect
+            if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+                console.log('Popup blocked or closed, falling back to redirect...');
+                loginError.textContent = 'Redirecting to Google sign-in...';
+                loginError.style.color = '#f59e0b';
+                auth.signInWithRedirect(provider).catch(redirectError => {
+                    loginError.textContent = getFriendlyAuthError(redirectError);
+                    loginError.style.color = '#ef4444';
+                    console.error('Redirect sign-in also failed:', redirectError);
+                });
+            } else if (error.code !== 'auth/cancelled-popup-request') {
+                loginError.textContent = getFriendlyAuthError(error);
+            }
         });
 }
 
