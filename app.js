@@ -2055,8 +2055,8 @@ function openAuditDetails(audit) {
         const localExportBtn = document.createElement('button');
         localExportBtn.id = 'modal-dynamic-export-btn';
         localExportBtn.className = 'btn btn-success';
-        localExportBtn.innerHTML = '<i class="fas fa-file-export"></i> Export';
-        localExportBtn.addEventListener('click', exportCurrentAudit);
+        localExportBtn.innerHTML = '<i class="fas fa-file-word"></i> Export Document';
+        localExportBtn.addEventListener('click', exportCurrentAuditAsDocument);
         modalActionsContainer.appendChild(localExportBtn);
 
         const localCloseBtn = document.createElement('button');
