@@ -1869,14 +1869,6 @@ async function submitAuditFromHistory(auditId) {
 function filterAudits() {
     renderAuditHistory();
 }
-        if (areaFilter && area !== areaFilter) match = false;
-        if (statusFilter && audit.status !== statusFilter) match = false;
-        
-        return match;
-    });
-    
-    renderAuditHistory(filtered);
-}
 
 function updateAreaFilter() {
     if (!areaFilterHistory) return;
