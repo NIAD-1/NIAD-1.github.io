@@ -1730,9 +1730,10 @@ function renderNonConformanceChart() {
 }
 
 function canDeleteAudit(audit) {
-    if (!currentUser || !userRole) return false;
+    if (!currentUser || !currentUser.role) return false;
+    const role = currentUser.role;
     // Admins can delete any audit
-    if (userRole === ROLES.ADMIN) return true;
+    if (role === ROLES.ADMIN) return true;
 
     // Auditors and Lead Auditors can delete their own drafts
     if (audit && audit.status === 'draft') {
