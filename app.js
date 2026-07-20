@@ -745,15 +745,38 @@ function updateModalEditButtonVisibility() {
      }
 }
 
+function isUserAssigned(audit, user) {
+    if (!audit || !user) return false;
+    const userEmail = user.email?.toLowerCase();
+    const createdBy = audit.createdByEmail?.toLowerCase() || audit.createdBy?.toLowerCase();
+    if (createdBy && userEmail && createdBy === userEmail) return true;
+    
+    // Check by exact email match if available, otherwise by fuzzy name match
+    const cleanCurrentName = user.displayName?.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+    
+    const checkArray = (arr) => {
+        if (!arr) return false;
+        return arr.some(a => {
+            if (a.email && userEmail && a.email.toLowerCase() === userEmail) return true;
+            const name = (a.displayName || a.uid || '').toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+            return name && cleanCurrentName && (name === cleanCurrentName || name.includes(cleanCurrentName) || cleanCurrentName.includes(name));
+        });
+    };
+    
+    return checkArray(audit.leadAuditors) || checkArray(audit.auditors);
+}
+
 function canEditAudit(audit) {
     if (!audit || !currentUser) return false;
-    return (
-        currentUser.role === ROLES.ADMIN ||
-        (currentUser.role === ROLES.LEAD_AUDITOR && audit.status === 'draft')
-        // Auditors can only edit their own drafts
-        || (currentUser.role === ROLES.AUDITOR && audit.status === 'draft' && audit.createdBy === currentUser.uid)
-
-    );
+    
+    if (currentUser.role === ROLES.ADMIN) return true;
+    
+    if (audit.status === 'draft') {
+        // Any assigned auditor or lead auditor can edit the draft
+        if (isUserAssigned(audit, currentUser)) return true;
+    }
+    
+    return false;
 }
 
 
@@ -1817,15 +1840,9 @@ function canDeleteAudit(audit) {
     // Admins can delete any audit
     if (role === ROLES.ADMIN) return true;
 
-    // Auditors and Lead Auditors can delete their own drafts
+    // Assigned Auditors and Lead Auditors can delete their own drafts
     if (audit && audit.status === 'draft') {
-        const userEmail = currentUser.email?.toLowerCase();
-        const createdBy = audit.createdByEmail?.toLowerCase() || audit.createdBy?.toLowerCase();
-        if (createdBy && userEmail && createdBy === userEmail) {
-            return true;
-        }
-        if (audit.leadAuditors?.some(a => a.email?.toLowerCase() === userEmail)) return true;
-        if (audit.auditors?.some(a => a.email?.toLowerCase() === userEmail)) return true;
+        if (isUserAssigned(audit, currentUser)) return true;
     }
     return false;
 }
@@ -1839,6 +1856,13 @@ function getFilteredHistoryAudits() {
     const statusFilter = document.getElementById('status-filter')?.value;
 
     return audits.filter(audit => {
+        // Hide drafts from users who are not assigned to them (and are not admins)
+        if (audit.status === 'draft' && currentUser?.role !== ROLES.ADMIN) {
+            if (!isUserAssigned(audit, currentUser)) {
+                return false;
+            }
+        }
+
         const area = audit.directorateUnit || audit.auditedArea;
         let match = true;
 
