@@ -954,10 +954,10 @@ select {
     flex-shrink: 0; /* Prevent status from shrinking */
 }
 
-.status-draft { background-color: #fdc500; color: var(--dark-color); border: 1px solid #e8b400; } /* More distinct yellow */
-.status-submitted { background-color: var(--info-color); color: white; }
-/* Add other statuses if needed */
-/* .status-completed { background-color: var(--success-color); color: white; } */
+.status-draft { background-color: #f59e0b; color: white; border: 1px solid #d97706; }
+.status-submitted { background-color: #3b82f6; color: white; border: 1px solid #2563eb; }
+.status-pending_capa { background-color: #8b5cf6; color: white; border: 1px solid #7c3aed; }
+.status-capa_submitted, .status-approved, .status-completed { background-color: #10b981; color: white; border: 1px solid #059669; }
 
 .audit-item .submit-draft-btn {
     margin-top: 10px;
