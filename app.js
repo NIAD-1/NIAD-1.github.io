@@ -1449,6 +1449,10 @@ async function saveAuditToFirestore(auditDataToSave, isSubmitting = false) {
         loadAudits(); // Refresh lists
 
         if (isSubmitting) {
+            const leadEmail = await resolveLeadAuditorEmail(currentAudit);
+            console.log("Triggering Lead Auditor notification to:", leadEmail);
+            await sendPowerAutomateNotification('lead_approval_required', currentAudit, leadEmail);
+
             await generateAuditDocument(currentAudit); // Use the potentially updated currentAudit
             redirectToTeamsChannel();
             clearAuditForm(); // Also clears currentAudit to null
@@ -4173,6 +4177,41 @@ function setupDarkMode() {
 // --- Power Automate & Lead Auditor Approval & Tokenized CAPA Helpers ---
 
 const POWER_AUTOMATE_WEBHOOK_URL = ""; // Optional Power Automate HTTP trigger URL
+
+async function resolveLeadAuditorEmail(audit) {
+    if (!audit || !audit.leadAuditors || audit.leadAuditors.length === 0) return '';
+    
+    const lead = audit.leadAuditors[0];
+    if (lead.email) return lead.email;
+
+    const leadName = (lead.displayName || lead.uid || '').trim();
+    if (!leadName) return '';
+
+    // Search users collection by displayName
+    try {
+        const query = await db.collection('users').get();
+        const cleanLeadName = leadName.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+        
+        let foundEmail = '';
+        query.forEach(doc => {
+            const data = doc.data();
+            const uName = (data.displayName || '').toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+            if (uName && (uName === cleanLeadName || uName.includes(cleanLeadName) || cleanLeadName.includes(uName))) {
+                foundEmail = data.email || '';
+            }
+        });
+        if (foundEmail) return foundEmail;
+    } catch (e) {
+        console.warn("Could not query users collection for lead auditor email:", e);
+    }
+
+    // Fallback: construct NAFDAC email format (e.g., firstname.lastname@nafdac.gov.ng)
+    const nameParts = leadName.toLowerCase().split(' ').filter(Boolean);
+    if (nameParts.length >= 2) {
+        return `${nameParts[0]}.${nameParts[1]}@nafdac.gov.ng`;
+    }
+    return `${leadName.toLowerCase().replace(/\s+/g, '.')}@nafdac.gov.ng`;
+}
 
 async function sendPowerAutomateNotification(type, audit, recipientEmail, extraData = {}) {
     const baseUrl = window.location.origin + window.location.pathname;
