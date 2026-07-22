@@ -4242,6 +4242,7 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
     };
 
     if (POWER_AUTOMATE_WEBHOOK_URL && POWER_AUTOMATE_WEBHOOK_URL.startsWith('http')) {
+        console.log("Sending payload to Power Automate webhook:", payload);
         try {
             await fetch(POWER_AUTOMATE_WEBHOOK_URL, {
                 method: 'POST',
@@ -4250,8 +4251,7 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
             });
             console.log("Power Automate webhook triggered successfully for:", type);
         } catch (err) {
-            console.warn("Power Automate webhook failed, using mailto fallback:", err);
-            triggerMailtoFallback(recipientEmail, subject, bodyText);
+            console.warn("Power Automate webhook call failed:", err);
         }
     } else {
         console.log("Power Automate URL not set, using mailto fallback");
