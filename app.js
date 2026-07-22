@@ -526,8 +526,14 @@ function checkAuthState() {
             currentUser = null;
             audits = [];
             currentAudit = null;
-            loginScreen?.classList.remove('hidden');
-            appContainer?.classList.add('hidden');
+            const hasCapaToken = new URLSearchParams(window.location.search).has('capaToken');
+            if (!hasCapaToken) {
+                loginScreen?.classList.remove('hidden');
+                appContainer?.classList.add('hidden');
+            } else {
+                loginScreen?.classList.add('hidden');
+                appContainer?.classList.add('hidden');
+            }
             console.log("User logged out");
             if(userEmail) userEmail.textContent = '';
             if(auditHistoryList) auditHistoryList.innerHTML = '';
@@ -4307,11 +4313,23 @@ async function checkCapaTokenOnLoad() {
     const capaToken = urlParams.get('capaToken');
     if (!capaToken) return;
 
+    // Suppress login screen when CAPA token is present
+    if (loginScreen) loginScreen.classList.add('hidden');
+    if (appContainer) appContainer.classList.add('hidden');
+
     try {
         console.log("Checking CAPA token from URL:", capaToken);
+        
+        // Ensure user is authenticated (anonymous sign-in) so Firestore rules allow reading the tokenized document
+        if (!auth.currentUser) {
+            console.log("Signing in anonymously for direct CAPA access...");
+            await auth.signInAnonymously();
+        }
+
         const query = await db.collection('audits').where('capaToken', '==', capaToken).get();
         if (query.empty) {
             alert("Invalid or expired CAPA submission link.");
+            if (loginScreen) loginScreen.classList.remove('hidden');
             return;
         }
 
@@ -4321,6 +4339,7 @@ async function checkCapaTokenOnLoad() {
     } catch (err) {
         console.error("Error checking CAPA token:", err);
         alert("Failed to load CAPA submission portal: " + err.message);
+        if (loginScreen) loginScreen.classList.remove('hidden');
     }
 }
 
