@@ -4176,7 +4176,7 @@ function setupDarkMode() {
 
 // --- Power Automate & Lead Auditor Approval & Tokenized CAPA Helpers ---
 
-const POWER_AUTOMATE_WEBHOOK_URL = ""; // Optional Power Automate HTTP trigger URL
+const POWER_AUTOMATE_WEBHOOK_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/21/workflows/fbcd1ceed0ba4b80acf2fd29ef893d1c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BNF9XOiWbi7IcmvHYZlY3DISrwhr1nrQFPkOs5MZzBs";
 
 async function resolveLeadAuditorEmail(audit) {
     if (!audit || !audit.leadAuditors || audit.leadAuditors.length === 0) return '';
