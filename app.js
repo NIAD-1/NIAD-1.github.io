@@ -295,6 +295,10 @@ function setupEventListeners() {
             const auditId = e.target.closest('.delete-audit').dataset.auditId;
             deleteAudit(auditId);
         }
+        if (e.target.closest('.restore-audit')) {
+            const auditId = e.target.closest('.restore-audit').dataset.auditId;
+            restoreAudit(auditId);
+        }
         // Handling for edit/submit from audit history list items
         if (e.target.closest('.btn-edit[data-audit-id]')) { // from history list
             const auditId = e.target.closest('.btn-edit').dataset.auditId;
@@ -1872,6 +1876,13 @@ function getFilteredHistoryAudits() {
     const statusFilter = document.getElementById('status-filter')?.value;
 
     return audits.filter(audit => {
+        // Trash handling: if user selected 'trash', show only trashed items; otherwise hide trashed items
+        if (statusFilter === 'trash') {
+            if (audit.status !== 'trash') return false;
+        } else {
+            if (audit.status === 'trash') return false;
+        }
+
         // Hide drafts from users who are not assigned to them (and are not admins)
         if (audit.status === 'draft' && currentUser?.role !== ROLES.ADMIN) {
             if (!isUserAssigned(audit, currentUser)) {
@@ -1889,7 +1900,7 @@ function getFilteredHistoryAudits() {
         if (fromDate && audit.date < fromDate) match = false;
         if (toDate && audit.date > toDate) match = false;
         if (areaFilter && area !== areaFilter) match = false;
-        if (statusFilter && audit.status !== statusFilter) match = false;
+        if (statusFilter && statusFilter !== 'trash' && audit.status !== statusFilter) match = false;
 
         return match;
     });
@@ -1947,15 +1958,28 @@ function renderAuditHistory(auditsToDisplay = null) {
                         </button>
                     </div>
                 ` : ''}
-                ${canDeleteAudit(audit) ? `
-                    <button class="btn btn-danger btn-sm delete-audit" 
-                            style="margin-top: 0.5rem;"
-                            data-audit-id="${audit.id}">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
-                ` : ''}
+                ${audit.status === 'trash' ? `
+                    <div class="trash-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                        <button class="btn btn-sm btn-success restore-audit" data-audit-id="${audit.id}">
+                            <i class="fas fa-undo"></i> Restore Audit
+                        </button>
+                        ${canDeleteAudit(audit) ? `
+                            <button class="btn btn-sm btn-danger delete-audit" data-audit-id="${audit.id}">
+                                <i class="fas fa-trash-alt"></i> Delete Permanently
+                            </button>
+                        ` : ''}
+                    </div>
+                ` : `
+                    ${canDeleteAudit(audit) ? `
+                        <button class="btn btn-danger btn-sm delete-audit" 
+                                style="margin-top: 0.5rem;"
+                                data-audit-id="${audit.id}">
+                            <i class="fas fa-trash"></i> Move to Trash
+                        </button>
+                    ` : ''}
+                `}
             </div>
-            <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>
+            <span class="status status-${audit.status}">${escapeHtml(audit.status === 'trash' ? 'Trash / Deleted' : audit.status)}</span>
 `;
         itemDiv.addEventListener('click', (e) => {
             // Don't open details modal if clicking action buttons
@@ -1975,16 +1999,57 @@ async function deleteAudit(auditId) {
         alert('You do not have permission to delete this audit.');
         return;
     }
-    
-    if (!confirm('Are you sure you want to permanently delete this audit?')) return;
-    
+
+    if (auditToDelete.status === 'trash') {
+        // Permanent deletion from Trash
+        if (!confirm('Are you sure you want to PERMANENTLY delete this audit? This action cannot be undone!')) return;
+        
+        try {
+            await db.collection('audits').doc(auditId).delete();
+            showMessage('Audit permanently deleted', 'success');
+            loadAudits();
+        } catch (error) {
+            console.error('Permanent delete error:', error);
+            alert('Failed to delete audit permanently: ' + error.message);
+        }
+    } else {
+        // Soft delete: move to Trash
+        if (!confirm(`Are you sure you want to move audit ${auditToDelete.refNo || ''} to Trash? You can restore it anytime from the Status -> Trash filter.`)) return;
+
+        try {
+            await db.collection('audits').doc(auditId).update({
+                previousStatus: auditToDelete.status || 'draft',
+                status: 'trash',
+                deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                deletedBy: currentUser?.email || 'User'
+            });
+            showMessage('Audit moved to Trash. You can restore it from Status -> Trash filter.', 'success');
+            loadAudits();
+        } catch (error) {
+            console.error('Trash error:', error);
+            alert('Failed to move audit to Trash: ' + error.message);
+        }
+    }
+}
+
+async function restoreAudit(auditId) {
+    const auditToRestore = audits.find(a => a.id === auditId);
+    if (!auditToRestore) return;
+
+    if (!confirm(`Restore audit ${auditToRestore.refNo || ''} back to active records?`)) return;
+
     try {
-        await db.collection('audits').doc(auditId).delete();
-        showMessage('Audit deleted successfully', 'success');
-        loadAudits(); // Refresh list & metrics
+        const restoredStatus = auditToRestore.previousStatus || 'draft';
+        await db.collection('audits').doc(auditId).update({
+            status: restoredStatus,
+            restoredAt: firebase.firestore.FieldValue.serverTimestamp(),
+            restoredBy: currentUser?.email || 'User'
+        });
+        showMessage(`Audit restored successfully to '${restoredStatus}' status!`, 'success');
+        loadAudits();
     } catch (error) {
-        console.error('Delete error:', error);
-        alert('Failed to delete audit: ' + error.message);
+        console.error('Restore error:', error);
+        alert('Failed to restore audit: ' + error.message);
     }
 }
 

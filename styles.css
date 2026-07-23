@@ -958,6 +958,7 @@ select {
 .status-submitted { background-color: #3b82f6; color: white; border: 1px solid #2563eb; }
 .status-pending_capa { background-color: #8b5cf6; color: white; border: 1px solid #7c3aed; }
 .status-capa_submitted, .status-approved, .status-completed { background-color: #10b981; color: white; border: 1px solid #059669; }
+.status-trash { background-color: #ef4444; color: white; border: 1px solid #dc2626; }
 
 .audit-item .submit-draft-btn {
     margin-top: 10px;

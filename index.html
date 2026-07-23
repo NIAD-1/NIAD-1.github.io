@@ -543,9 +543,12 @@
                         <div class="form-group">
                             <label for="status-filter">Status:</label>
                             <select id="status-filter">
-                                <option value="">All Statuses</option>
+                                <option value="">All Active Statuses</option>
                                 <option value="draft">Draft</option>
-                                <option value="submitted">Submitted</option>
+                                <option value="submitted">Submitted (Pending Approval)</option>
+                                <option value="pending_capa">Pending CAPA</option>
+                                <option value="capa_submitted">CAPA Submitted</option>
+                                <option value="trash">🗑️ Trash / Deleted Audits</option>
                             </select>
                         </div>
                         <button id="filter-btn" class="btn btn-primary">Filter</button>
@@ -728,7 +731,7 @@
         </form>
     </section>
 
-    <script src="app.js?v=4.0"></script>
+    <script src="app.js?v=5.0"></script>
     <!-- Add this with your other script imports -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/7.1.0/docx.min.js"></script>
     <!-- Your final JS -->
