@@ -1504,10 +1504,22 @@ function loadAudits() {
             });
 
             console.log(`Loaded ${audits.length} audits.`);
-            if (isSectionVisible('dashboard')) renderDashboard();
-            renderAuditHistory(); // Always refresh audit history list
-            if (isSectionVisible('reports')) updateAreaFilter();
-            updateAreaFilter();
+            try {
+                if (isSectionVisible('dashboard')) renderDashboard();
+            } catch (e) {
+                console.warn("Dashboard render issue (non-critical):", e);
+            }
+            try {
+                renderAuditHistory(); // Always refresh audit history list
+            } catch (e) {
+                console.error("Error rendering audit history:", e);
+            }
+            try {
+                if (isSectionVisible('reports')) updateAreaFilter();
+                updateAreaFilter();
+            } catch (e) {
+                console.warn("Area filter update issue:", e);
+            }
         })
         .catch(error => {
             console.error('Error loading audits: ', error);
@@ -1759,7 +1771,13 @@ function updateDashboardMetrics() {
 
 
 function renderComplianceChart(compliant, nonCompliant) {
-    const ctx = document.getElementById('compliance-chart').getContext('2d');
+    if (typeof Chart === 'undefined') {
+        console.warn("Chart.js is not loaded or blocked by network, skipping compliance chart.");
+        return;
+    }
+    const chartEl = document.getElementById('compliance-chart');
+    if (!chartEl) return;
+    const ctx = chartEl.getContext('2d');
     
     // Destroy previous chart instance if it exists
     if (complianceChartInstance) {
@@ -1829,6 +1847,7 @@ function renderRecentAudits(audits) {
 }
 
 function renderNonConformanceChart() {
+    if (typeof Chart === 'undefined') return;
     if (!ncChartCanvas) return;
     const ctx = ncChartCanvas.getContext('2d');
      if (ncChartInstance) ncChartInstance.destroy();
