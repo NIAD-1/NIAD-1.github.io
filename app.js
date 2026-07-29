@@ -5043,5 +5043,54 @@ function exportCurrentAuditAsDocumentCustom(auditId) {
     }
 }
 
+function previewNcarForm() {
+    const sampleAudit = {
+        id: 'sample-preview-123',
+        refNo: '2026/NAFDAC/PV/AUD-001',
+        directorateUnit: 'Pharmacovigilance',
+        date: '2026-07-29',
+        auditeeName: 'Wendy (PV Directorate)',
+        auditeeEmail: 'wendy.pv@nafdac.gov.ng',
+        leadAuditors: [{ displayName: 'Adesanya Oluwaseun' }],
+        auditors: [{ displayName: 'Wendy' }],
+        checklist: [
+            {
+                id: 1,
+                clause: 'ISO 9001:2015 Clause 8.2',
+                requirement: 'Are adverse drug reaction (ADR) reports logged and processed within specified QMS timelines?',
+                applicable: 'yes',
+                compliance: 'no',
+                classification: 'Major',
+                objectiveEvidence: 'Delays observed in logging high-priority ADR cases exceeding 15 days.',
+                rootCause: '',
+                capaPlan: '',
+                targetCompletionDate: '',
+                respondingOfficer: 'Wendy (PV Directorate)',
+                capaEvidenceDescription: '',
+                capaEvidenceLink: '',
+                sopUpdates: ''
+            },
+            {
+                id: 2,
+                clause: 'ISO 9001:2015 Clause 7.2',
+                requirement: 'Is staff training on revised Pharmacovigilance SOPs documented and updated in training records?',
+                applicable: 'yes',
+                compliance: 'no',
+                classification: 'Minor',
+                objectiveEvidence: 'Training logs for 3 junior PV officers were missing signatures for SOP Rev 03.',
+                rootCause: '',
+                capaPlan: '',
+                targetCompletionDate: '',
+                respondingOfficer: 'Wendy (PV Directorate)',
+                capaEvidenceDescription: '',
+                capaEvidenceLink: '',
+                sopUpdates: ''
+            }
+        ]
+    };
+
+    renderNcarModal(sampleAudit);
+}
+
 // --- Run Initialization on Load ---
 document.addEventListener('DOMContentLoaded', init);
