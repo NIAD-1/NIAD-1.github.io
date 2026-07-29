@@ -1513,6 +1513,7 @@ function loadAudits() {
             }
             try {
                 renderAuditHistory(); // Always refresh audit history list
+                updateActionBarBanner(); // Update Action Bar Banner notice
             } catch (e) {
                 console.error("Error rendering audit history:", e);
             }
@@ -1911,10 +1912,12 @@ function getFilteredHistoryAudits() {
             }
         }
 
-        // Auditee View Restrictions: ONLY see their own audits in pending_capa or capa_submitted
+        // Auditee View Restrictions: ONLY see audits for their email/directorate
         if (currentUser?.role === ROLES.AUDITEE) {
-            if (audit.auditeeEmail !== currentUser.email) return false;
-            if (audit.status !== 'pending_capa' && audit.status !== 'capa_submitted') return false;
+            const userEmail = currentUser.email?.toLowerCase();
+            const matchesEmail = (audit.auditeeEmail?.toLowerCase() === userEmail) || (audit.auditeeEmail2?.toLowerCase() === userEmail);
+            const matchesDirectorate = currentUser.directorateUnit && (audit.directorateUnit || audit.auditedArea) === currentUser.directorateUnit;
+            if (!matchesEmail && !matchesDirectorate) return false;
         }
 
         const area = audit.directorateUnit || audit.auditedArea;
@@ -2294,45 +2297,41 @@ function openAuditDetails(audit) {
         localExportBtn.classList.toggle('permission-hidden', !canUserExport);
         localExportBtn.disabled = !canUserExport;
 
-        // Show Lead Auditor Approval button if status is 'submitted' and user is Lead Auditor or Admin
-        if (audit.status === 'submitted' && (currentUser?.role === ROLES.ADMIN || (currentUser?.role === ROLES.LEAD_AUDITOR && isUserAssigned(audit, currentUser)))) {
-            const localApproveBtn = document.createElement('button');
-            localApproveBtn.className = 'btn btn-primary';
-            localApproveBtn.style.background = '#8b5cf6';
-            localApproveBtn.style.borderColor = '#7c3aed';
-            localApproveBtn.innerHTML = '<i class="fas fa-check-circle"></i> Approve Audit Report & Notify Auditee';
-            localApproveBtn.addEventListener('click', () => {
-                approveAuditReport(audit.id);
-            });
-            modalActionsContainer.insertBefore(localApproveBtn, localCloseBtn);
+        // Show "Send CAPA / NCAR Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
+        if (audit.status === 'submitted' || audit.status === 'draft') {
+            const triggerCapaBtn = document.createElement('button');
+            triggerCapaBtn.className = 'btn btn-primary';
+            triggerCapaBtn.style.background = '#8b5cf6';
+            triggerCapaBtn.style.borderColor = '#7c3aed';
+            triggerCapaBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send CAPA / NCAR Request';
+            triggerCapaBtn.addEventListener('click', () => triggerCapaRequest(audit.id));
+            modalActionsContainer.insertBefore(triggerCapaBtn, localCloseBtn);
         }
 
-        // Show "Send CAPA Reminder" button for Lead Auditor / Admin when pending_capa
-        if (audit.status === 'pending_capa' && (currentUser?.role === ROLES.ADMIN || (currentUser?.role === ROLES.LEAD_AUDITOR && isUserAssigned(audit, currentUser)))) {
-            const reminderBtn = document.createElement('button');
-            reminderBtn.className = 'btn btn-secondary';
-            reminderBtn.style.background = '#f59e0b';
-            reminderBtn.style.borderColor = '#d97706';
-            reminderBtn.style.color = '#ffffff';
-            reminderBtn.innerHTML = '<i class="fas fa-bell"></i> Send CAPA Reminder';
-            reminderBtn.addEventListener('click', () => {
-                sendCapaReminder(audit.id);
-            });
-            modalActionsContainer.insertBefore(reminderBtn, localCloseBtn);
-        }
-
-        // Show "Respond to CAPA" button for Auditee when pending_capa
-        if (audit.status === 'pending_capa' && currentUser?.role === ROLES.AUDITEE) {
-            const respondCapaBtn = document.createElement('button');
-            respondCapaBtn.className = 'btn btn-primary';
-            respondCapaBtn.style.background = '#f59e0b';
-            respondCapaBtn.style.borderColor = '#d97706';
-            respondCapaBtn.innerHTML = '<i class="fas fa-tasks"></i> Respond to CAPA';
-            respondCapaBtn.addEventListener('click', () => {
-                renderPerItemCapaModal(audit);
+        // Show "Respond to NCAR" button when pending_capa if user is Auditee or matches auditee email
+        const isUserAuditee = currentUser?.role === ROLES.AUDITEE || audit.auditeeEmail === currentUser?.email || audit.auditeeEmail2 === currentUser?.email;
+        if (audit.status === 'pending_capa' && isUserAuditee) {
+            const respondNcarBtn = document.createElement('button');
+            respondNcarBtn.className = 'btn btn-primary';
+            respondNcarBtn.style.background = '#d97706';
+            respondNcarBtn.style.borderColor = '#b45309';
+            respondNcarBtn.innerHTML = '<i class="fas fa-edit"></i> Respond to Non-Conformances (NCAR)';
+            respondNcarBtn.addEventListener('click', () => {
                 closeModal();
+                renderNcarModal(audit);
             });
-            modalActionsContainer.insertBefore(respondCapaBtn, localCloseBtn);
+            modalActionsContainer.insertBefore(respondNcarBtn, localCloseBtn);
+        }
+
+        // Download NCAR DOCX button if NCAR data or checklist items exist
+        if (audit.checklist?.some(i => i.capaPlan || i.rootCause || i.capaEvidenceLink) || audit.status === 'capa_submitted') {
+            const ncarDocBtn = document.createElement('button');
+            ncarDocBtn.className = 'btn btn-primary';
+            ncarDocBtn.style.background = '#2563eb';
+            ncarDocBtn.style.borderColor = '#1d4ed8';
+            ncarDocBtn.innerHTML = '<i class="fas fa-file-word"></i> Download NCAR (CARF) Report (.docx)';
+            ncarDocBtn.addEventListener('click', () => generateNcarDocument(audit));
+            modalActionsContainer.insertBefore(ncarDocBtn, localCloseBtn);
         }
 
         // Render CAPA Evidence Links if available
@@ -4355,10 +4354,14 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         subject = `ACTION REQUIRED: Audit Pending Approval - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?auditId=${audit.id}`;
         bodyText = `Audit for ${audit.directorateUnit} (Ref: ${audit.refNo}) has been submitted and is pending your review and approval as Lead Auditor. Please click the link to view and approve: ${actionUrl}`;
-    } else if (type === 'auditee_capa_required') {
-        subject = `ACTION REQUIRED: Submit CAPA & Evidence Link - Ref: ${audit.refNo || 'N/A'}`;
-        actionUrl = `${baseUrl}?capaToken=${extraData.capaToken}`;
-        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) has been approved. Please submit your CAPA response and evidence document cloud link using this secure direct portal link (valid for 15 days): ${actionUrl}`;
+    } else if (type === 'auditee_capa_required' || type === 'auditee_ncar_required') {
+        subject = `ACTION REQUIRED: Submit Non-Conformance Action Response (NCAR) - Ref: ${audit.refNo || 'N/A'}`;
+        actionUrl = baseUrl;
+        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) is ready for Non-Conformance Action Response (NCAR / CARF Annexure-02).\n\n${extraData.accountNote || 'Please log in to your NAFDAC QMS account to view and respond.'}\n\nPortal URL: ${actionUrl}`;
+    } else if (type === 'ncar_submitted') {
+        subject = `NOTIFIED: NCAR Submitted by Auditee - Ref: ${audit.refNo || 'N/A'}`;
+        actionUrl = `${baseUrl}?auditId=${audit.id}`;
+        bodyText = `The Auditee has submitted the Non-Conformance Action Response (NCAR / CARF Annexure-02) for audit ${audit.directorateUnit} (Ref: ${audit.refNo}). Please click here to view and download the NCAR document: ${actionUrl}`;
     } else if (type === 'auditee_capa_reminder') {
         subject = `REMINDER (Expiring Soon): Submit CAPA Response - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?capaToken=${extraData.capaToken}`;
@@ -4662,6 +4665,382 @@ function renderPerItemCapaModal(audit, daysRemaining = null) {
             submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit CAPA Responses';
         }
     };
+}
+
+// --- Smart Auditee Auto-Provisioning ---
+async function autoProvisionAuditeeAccount(email, name = '') {
+    if (!email) return null;
+    const cleanEmail = email.trim().toLowerCase();
+
+    try {
+        const query = await db.collection('users').where('email', '==', cleanEmail).get();
+        if (!query.empty) {
+            console.log(`User ${cleanEmail} already exists in database.`);
+            return { isNew: false, email: cleanEmail };
+        }
+
+        const tempPassword = 'Audit@2026';
+        const appName = "TempApp_" + Date.now();
+        const secondaryApp = firebase.initializeApp(firebaseConfig, appName);
+        const secondaryAuth = secondaryApp.auth();
+
+        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(cleanEmail, tempPassword);
+        const newUser = userCredential.user;
+        const displayName = name || cleanEmail.split('@')[0];
+
+        await newUser.updateProfile({ displayName: displayName });
+
+        const secondaryDb = secondaryApp.firestore();
+        await secondaryDb.collection('users').doc(newUser.uid).set({
+            email: cleanEmail,
+            displayName: displayName,
+            role: ROLES.AUDITEE,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            isTempPassword: true
+        });
+
+        await secondaryApp.delete();
+        console.log(`Auto-provisioned Auditee account for ${cleanEmail} with temp password.`);
+        return { isNew: true, email: cleanEmail, tempPassword: tempPassword };
+    } catch (err) {
+        console.warn("User provision check or auth creation warning:", err.message);
+        return { isNew: false, email: cleanEmail };
+    }
+}
+
+// --- Trigger CAPA / NCAR Request ---
+async function triggerCapaRequest(auditId) {
+    if (!auditId) return;
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) { alert("Audit record not found."); return; }
+
+    if (!confirm(`Send CAPA / NCAR Request for Audit Ref: ${audit.refNo || auditId}? This will notify the Auditee(s).`)) {
+        return;
+    }
+
+    const email1 = audit.auditeeEmail || '';
+    const email2 = audit.auditeeEmail2 || '';
+    const auditeeName = audit.auditeeName || '';
+
+    try {
+        const result1 = email1 ? await autoProvisionAuditeeAccount(email1, auditeeName) : null;
+        const result2 = email2 ? await autoProvisionAuditeeAccount(email2, auditeeName) : null;
+
+        await db.collection('audits').doc(auditId).update({
+            status: 'pending_capa',
+            approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            approvedBy: currentUser?.email || 'Auditor',
+            capaRequestedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        const recipients = [email1, email2].filter(Boolean).join(', ');
+        let accountNote = '';
+        if (result1?.isNew || result2?.isNew) {
+            accountNote = `Temporary login credentials created:\nUsername: ${recipients}\nTemporary Password: Audit@2026`;
+        } else {
+            accountNote = `Please log into your NAFDAC QMS account using your existing credentials.`;
+        }
+
+        await sendPowerAutomateNotification('auditee_ncar_required', audit, recipients, {
+            accountNote: accountNote,
+            tempPassword: 'Audit@2026'
+        });
+
+        showMessage('NCAR Request sent successfully to Auditee(s)!', 'success');
+        closeModal();
+        loadAudits();
+    } catch (err) {
+        console.error("Error sending NCAR request:", err);
+        showMessage("Failed to send NCAR request: " + err.message, 'error');
+    }
+}
+
+// --- Action Bar Banner for Pending NCAR ---
+function updateActionBarBanner() {
+    const banner = document.getElementById('ncar-action-banner');
+    if (!banner || !currentUser) return;
+
+    const pendingAudit = audits.find(a => {
+        if (a.status !== 'pending_capa') return false;
+        const userEmail = currentUser.email?.toLowerCase();
+        if (a.auditeeEmail?.toLowerCase() === userEmail || a.auditeeEmail2?.toLowerCase() === userEmail) return true;
+        if (currentUser.role === ROLES.AUDITEE && (a.directorateUnit || a.auditedArea) === currentUser.directorateUnit) return true;
+        return false;
+    });
+
+    if (pendingAudit) {
+        banner.classList.remove('hidden');
+        const titleEl = document.getElementById('ncar-banner-title');
+        const descEl = document.getElementById('ncar-banner-desc');
+        const actionBtn = document.getElementById('ncar-banner-action-btn');
+
+        if (titleEl) titleEl.textContent = `Action Required: NCAR Pending for ${pendingAudit.directorateUnit || 'Unit'}`;
+        if (descEl) descEl.textContent = `Audit Ref: ${pendingAudit.refNo || 'N/A'} has non-conformances awaiting your response (CARF Annexure-02).`;
+
+        if (actionBtn) {
+            actionBtn.onclick = () => renderNcarModal(pendingAudit);
+        }
+    } else {
+        banner.classList.add('hidden');
+    }
+}
+
+// --- Official NCAR / CARF (Annexure-02 / NAFDAC-QMS-008-03) Modal ---
+function renderNcarModal(audit) {
+    const modal = document.getElementById('ncar-modal');
+    const bodyEl = document.getElementById('ncar-modal-body');
+    const submitBtn = document.getElementById('submit-ncar-btn');
+    const closeBtn = document.getElementById('close-ncar-modal');
+    const closeAltBtn = document.getElementById('close-ncar-btn-alt');
+
+    if (!modal || !bodyEl) return;
+
+    const closeHandler = () => modal.classList.add('hidden');
+    if (closeBtn) closeBtn.onclick = closeHandler;
+    if (closeAltBtn) closeAltBtn.onclick = closeHandler;
+
+    const itemsNeedingNcar = (audit.checklist || []).filter(item => 
+        item.applicable === 'yes' && 
+        item.compliance === 'no' && 
+        (item.classification === 'Major' || item.classification === 'Minor')
+    );
+
+    let html = `
+        <div style="margin-bottom: 1.5rem; background: var(--light-color); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h4 style="margin: 0; color: var(--primary-color);">Audit Ref: ${escapeHtml(audit.refNo || 'N/A')}</h4>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;"><strong>Directorate/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')} | <strong>Date:</strong> ${formatDate(audit.date)}</p>
+            </div>
+            <div>
+                <button class="btn btn-outline btn-sm" onclick="exportCurrentAuditAsDocumentCustom('${audit.id}')">
+                    <i class="fas fa-file-word" style="color: #2563eb;"></i> Download IASR Report (.docx)
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (itemsNeedingNcar.length === 0) {
+        html += `<p class="text-muted">No non-compliance items (Major/Minor) flagged for this report. No NCAR response is required.</p>`;
+    } else {
+        itemsNeedingNcar.forEach((item, index) => {
+            const ncNumber = `NC ${index + 1}`;
+            const carNo = `${new Date().getFullYear()}/CAR/${(audit.directorateUnit || 'UNIT').substring(0,6).toUpperCase()}/${index + 1}`;
+            const officerName = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Lead Auditor';
+
+            html += `
+                <div class="ncar-item-card" data-item-id="${item.id}" style="border: 2px solid var(--border-color); border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; background: var(--card-bg); box-shadow: var(--box-shadow-sm);">
+                    
+                    <!-- Annexure-02 Form Header Box -->
+                    <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 1rem; margin-bottom: 1.25rem; font-size: 0.92rem;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem;">
+                            <div><strong>CAR No. (Year/Serial No/Unit):</strong> <span style="color: #2563eb; font-weight:700;">${escapeHtml(carNo)}</span></div>
+                            <div><strong>Directorate/Division/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')}</div>
+                            <div><strong>Non-Conformity (NC & Number):</strong> <span class="status status-no">${ncNumber}</span></div>
+                            <div><strong>Standard Clause Number:</strong> ${escapeHtml(item.clause || 'ISO 9001 Clause 8.2')}</div>
+                            <div><strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}</div>
+                            <div><strong>Name of Officer Raising NC:</strong> ${escapeHtml(officerName)}</div>
+                        </div>
+                        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1;">
+                            <strong>Requirement / Audit Finding:</strong>
+                            <p style="margin: 0.25rem 0 0 0; color: #334155; font-style: italic;">"${escapeHtml(item.requirement)}" - ${escapeHtml(item.objectiveEvidence || 'Non-compliance observed')}</p>
+                        </div>
+                    </div>
+
+                    <!-- Auditee Input Section Styled Like New Audit Form -->
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="ncar-root-cause-${item.id}" style="font-weight: 600; color: var(--primary-color);">
+                            <i class="fas fa-search-minus"></i> Most Probable Root Cause(s):
+                        </label>
+                        <textarea id="ncar-root-cause-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Detail the root cause analysis for this non-conformity...">${escapeHtml(item.rootCause || '')}</textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="ncar-corrective-action-${item.id}" style="font-weight: 600; color: var(--primary-color);">
+                            <i class="fas fa-tools"></i> Corrective Action(s):
+                        </label>
+                        <textarea id="ncar-corrective-action-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Specify exact corrective actions taken or to be taken...">${escapeHtml(item.capaPlan || '')}</textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1; min-width: 220px;">
+                            <label for="ncar-target-date-${item.id}" style="font-weight: 600;">Date of Completion (Target):</label>
+                            <input type="date" id="ncar-target-date-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(item.targetCompletionDate || '')}">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 220px;">
+                            <label for="ncar-officer-name-${item.id}" style="font-weight: 600;">Officer Responding (Name/Signature):</label>
+                            <input type="text" id="ncar-officer-name-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(item.respondingOfficer || audit.auditeeName || '')}">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="ncar-evidence-${item.id}" style="font-weight: 600;">
+                            <i class="fas fa-link"></i> Objective Evidence of Action Taken (Text & SharePoint / OneDrive Link):
+                        </label>
+                        <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.5rem;" placeholder="Describe evidence of action taken...">${escapeHtml(item.capaEvidenceDescription || '')}</textarea>
+                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/folder... or OneDrive URL link" value="${escapeHtml(item.capaEvidenceLink || '')}">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ncar-sop-update-${item.id}" style="font-weight: 600;">Possible SOP or Documents to be Updated (if any):</label>
+                        <input type="text" id="ncar-sop-update-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="e.g. NAFDAC-SOP-PV-002 Rev 03" value="${escapeHtml(item.sopUpdates || '')}">
+                    </div>
+
+                </div>
+            `;
+        });
+    }
+
+    bodyEl.innerHTML = html;
+    modal.classList.remove('hidden');
+
+    submitBtn.onclick = async () => {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting NCAR...';
+
+        const updatedChecklist = (audit.checklist || []).map(item => {
+            const rootCauseEl = document.getElementById(`ncar-root-cause-${item.id}`);
+            const actionEl = document.getElementById(`ncar-corrective-action-${item.id}`);
+            const dateEl = document.getElementById(`ncar-target-date-${item.id}`);
+            const officerEl = document.getElementById(`ncar-officer-name-${item.id}`);
+            const evDescEl = document.getElementById(`ncar-evidence-${item.id}`);
+            const evLinkEl = document.getElementById(`ncar-link-${item.id}`);
+            const sopEl = document.getElementById(`ncar-sop-update-${item.id}`);
+
+            if (rootCauseEl || actionEl) {
+                return {
+                    ...item,
+                    rootCause: rootCauseEl?.value.trim() || '',
+                    capaPlan: actionEl?.value.trim() || '',
+                    targetCompletionDate: dateEl?.value || '',
+                    respondingOfficer: officerEl?.value.trim() || '',
+                    capaEvidenceDescription: evDescEl?.value.trim() || '',
+                    capaEvidenceLink: evLinkEl?.value.trim() || '',
+                    sopUpdates: sopEl?.value.trim() || ''
+                };
+            }
+            return item;
+        });
+
+        try {
+            await db.collection('audits').doc(audit.id).update({
+                checklist: updatedChecklist,
+                status: 'capa_submitted',
+                capaSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                capaSubmittedBy: currentUser?.email || audit.auditeeEmail || 'Auditee'
+            });
+
+            const leadEmail = await resolveLeadAuditorEmail(audit);
+            await sendPowerAutomateNotification('ncar_submitted', audit, leadEmail);
+
+            alert("Non-Conformance Action Report (NCAR) submitted successfully! Auditors have been notified.");
+            modal.classList.add('hidden');
+            loadAudits();
+        } catch (err) {
+            console.error("Error submitting NCAR:", err);
+            alert("Failed to submit NCAR: " + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Non-Conformance Action Report (NCAR)';
+        }
+    };
+}
+
+// --- Official NCAR (CARF Annexure-02) DOCX Generator ---
+async function generateNcarDocument(audit) {
+    if (!window.docx) {
+        alert("Docx generator library not loaded. Please check your network connection.");
+        return;
+    }
+
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType } = window.docx;
+
+    const items = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no' && (i.classification === 'Major' || i.classification === 'Minor'));
+    if (items.length === 0) {
+        alert("No non-conformance items found to generate NCAR document.");
+        return;
+    }
+
+    const sections = [];
+
+    items.forEach((item, idx) => {
+        const carNo = `${new Date().getFullYear()}/CAR/${(audit.directorateUnit || 'UNIT').substring(0,6).toUpperCase()}/${idx + 1}`;
+        const officerName = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Lead Auditor';
+
+        const table = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Annexure-02", bold: true, size: 20 })], alignment: AlignmentType.CENTER })], width: { size: 25, type: WidthType.PERCENTAGE } }),
+                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "SOP Ref. No.: NAFDAC-QMS-008-03", bold: true, size: 20 })], alignment: AlignmentType.CENTER })], width: { size: 35, type: WidthType.PERCENTAGE } }),
+                        new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Title of Annexure:\nCorrective Action Report Form (CARF)", bold: true, size: 20 })], alignment: AlignmentType.CENTER })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                    ]
+                }),
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            columnSpan: 3,
+                            children: [
+                                new Paragraph({ children: [new TextRun({ text: "NATIONAL AGENCY FOR FOOD AND DRUG ADMINISTRATION AND CONTROL", bold: true, size: 22 })], alignment: AlignmentType.CENTER }),
+                                new Paragraph({ children: [new TextRun({ text: "CORRECTIVE ACTION REPORT FORM (CARF)", bold: true, size: 20 })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `CAR No.: `, bold: true }), new TextRun({ text: carNo })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Name of Directorate/Division/Unit: `, bold: true }), new TextRun({ text: audit.directorateUnit || 'N/A' })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Non-Conformity (NC) & (NC number): `, bold: true }), new TextRun({ text: `NC ${idx + 1}: ${item.requirement}` })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Standard Clause Number: `, bold: true }), new TextRun({ text: item.clause || 'ISO 9001 Clause 8.2' })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Reference document Number: `, bold: true }), new TextRun({ text: audit.refNo || 'NAFDAC-SOP-QMS-001' })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Name of Officer raising NC: `, bold: true }), new TextRun({ text: officerName })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Most Probable Root Cause(s):`, bold: true })] }),
+                                new Paragraph({ children: [new TextRun({ text: item.rootCause || 'N/A' })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Corrective Action(s):`, bold: true })] }),
+                                new Paragraph({ children: [new TextRun({ text: item.capaPlan || 'N/A' })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Date of completion (target): `, bold: true }), new TextRun({ text: item.targetCompletionDate || 'N/A' }), new TextRun({ text: `    Name/Signature: `, bold: true }), new TextRun({ text: item.respondingOfficer || audit.auditeeName || 'Auditee' })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Objective Evidence of action taken(on):`, bold: true })] }),
+                                new Paragraph({ children: [new TextRun({ text: item.capaEvidenceDescription || '' }), new TextRun({ text: item.capaEvidenceLink ? `\nLink: ${item.capaEvidenceLink}` : '' })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Possible SOP or documents to be updated (if any):`, bold: true })] }),
+                                new Paragraph({ children: [new TextRun({ text: item.sopUpdates || 'None' })], spacing: { after: 200 } }),
+
+                                new Paragraph({ children: [new TextRun({ text: `Corrective Action Follow-up & Effectiveness of action(s) taken (QA):`, bold: true })] }),
+                                new Paragraph({ children: [new TextRun({ text: `Pending QA Verification`, italic: true })], spacing: { after: 200 } })
+                            ]
+                        })
+                    ]
+                })
+            ]
+        });
+
+        sections.push({
+            children: [table, new Paragraph({ text: "", spacing: { after: 400 } })]
+        });
+    });
+
+    const doc = new Document({
+        sections: sections
+    });
+
+    const blob = await Packer.toBlob(doc);
+    const fileName = `NAFDAC_CARF_Annexure02_${(audit.directorateUnit || 'Audit').replace(/\s+/g, '_')}_${audit.refNo || 'Report'}.docx`;
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function exportCurrentAuditAsDocumentCustom(auditId) {
+    const audit = audits.find(a => a.id === auditId);
+    if (audit) {
+        generateAuditDocument(audit);
+    }
 }
 
 // --- Run Initialization on Load ---
