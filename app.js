@@ -28,7 +28,8 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(err => {
 const ROLES = {
     ADMIN: 'admin',
     LEAD_AUDITOR: 'lead_auditor',
-    AUDITOR: 'auditor'
+    AUDITOR: 'auditor',
+    AUDITEE: 'auditee'
 };
 
 // --- Permission Mapping ---
@@ -38,7 +39,7 @@ const PERMISSIONS = {
     create_audit: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     edit_audit: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR], // Fine-grained check in canEditAudit
     submit_audit: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
-    view_all_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
+    view_all_audits: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR, ROLES.AUDITEE],
     view_dashboard: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     view_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
     generate_reports: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
@@ -48,9 +49,10 @@ const PERMISSIONS = {
     view_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
     submit_review: [ROLES.LEAD_AUDITOR],
     final_approval: [ROLES.ADMIN],
-    change_password: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR],
+    change_password: [ROLES.ADMIN, ROLES.LEAD_AUDITOR, ROLES.AUDITOR, ROLES.AUDITEE],
     view_lead_comments: [ROLES.ADMIN, ROLES.LEAD_AUDITOR],
     delete_audit: [ROLES.ADMIN],
+    submit_capa: [ROLES.AUDITEE, ROLES.ADMIN, ROLES.LEAD_AUDITOR]
 
 };
 
@@ -180,6 +182,7 @@ function init() {
     checkAuthState();
     setupDarkMode();
     setupAutoSave();
+    setupModalEvents();
     checkCapaTokenOnLoad();
 }
 
@@ -530,14 +533,8 @@ function checkAuthState() {
             currentUser = null;
             audits = [];
             currentAudit = null;
-            const hasCapaToken = new URLSearchParams(window.location.search).has('capaToken');
-            if (!hasCapaToken) {
-                loginScreen?.classList.remove('hidden');
-                appContainer?.classList.add('hidden');
-            } else {
-                loginScreen?.classList.add('hidden');
-                appContainer?.classList.add('hidden');
-            }
+            loginScreen?.classList.remove('hidden');
+            appContainer?.classList.add('hidden');
             console.log("User logged out");
             if(userEmail) userEmail.textContent = '';
             if(auditHistoryList) auditHistoryList.innerHTML = '';
@@ -817,6 +814,9 @@ function populateAuditForm(audit) {
 
     const auditeeEmailEl = document.getElementById('auditee-email');
     if (auditeeEmailEl) auditeeEmailEl.value = audit.auditeeEmail || '';
+
+    const auditeeEmail2El = document.getElementById('auditee-email-2');
+    if (auditeeEmail2El) auditeeEmail2El.value = audit.auditeeEmail2 || '';
 
     // 2. Populate Introduction Text
     const introductionTextarea = document.querySelector('#new-audit-section .evidence-container .evidence-input');
@@ -1262,6 +1262,7 @@ function collectAuditFormData() {
     const auditeeName = document.getElementById('auditee-name')?.value.trim() || '';
     const auditeePosition = document.getElementById('auditee-position')?.value.trim() || '';
     const auditeeEmail = document.getElementById('auditee-email')?.value.trim() || '';
+    const auditeeEmail2 = document.getElementById('auditee-email-2')?.value.trim() || '';
 
     // Basic required field validation (keep your existing checks)
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
@@ -1337,6 +1338,7 @@ function collectAuditFormData() {
         auditeeName,
         auditeePosition,
         auditeeEmail,
+        auditeeEmail2,
         leadAuditors: selectedLeadAuditors,
         auditors: selectedAuditors,
         checklist: checklistData,
@@ -1909,6 +1911,12 @@ function getFilteredHistoryAudits() {
             }
         }
 
+        // Auditee View Restrictions: ONLY see their own audits in pending_capa or capa_submitted
+        if (currentUser?.role === ROLES.AUDITEE) {
+            if (audit.auditeeEmail !== currentUser.email) return false;
+            if (audit.status !== 'pending_capa' && audit.status !== 'capa_submitted') return false;
+        }
+
         const area = audit.directorateUnit || audit.auditedArea;
         let match = true;
 
@@ -1998,7 +2006,7 @@ function renderAuditHistory(auditsToDisplay = null) {
                     ` : ''}
                 `}
             </div>
-            <span class="status status-${audit.status}">${escapeHtml(audit.status === 'trash' ? 'Trash / Deleted' : audit.status)}</span>
+            ${formatStatusBadge(audit)}
 `;
         itemDiv.addEventListener('click', (e) => {
             // Don't open details modal if clicking action buttons
@@ -2151,10 +2159,14 @@ function openAuditDetails(audit) {
         auditMeta.className = 'audit-meta';
         auditMeta.innerHTML = `
             <p><strong>Ref No.:</strong> ${escapeHtml(audit.refNo || 'N/A')}</p>
-            <p><strong>Status:</strong> <span class="status status-${audit.status}">${escapeHtml(audit.status)}</span></p>
+            <p><strong>Status:</strong> ${formatStatusBadge(audit)}</p>
+            ${audit.capaSubmittedBy ? `<p><strong>CAPA Submitted By:</strong> ${escapeHtml(audit.capaSubmittedBy)}</p>` : ''}
+            ${audit.capaSubmittedAt ? `<p><strong>CAPA Submitted At:</strong> ${formatDateTime(audit.capaSubmittedAt)}</p>` : ''}
             <p><strong>Location:</strong> ${escapeHtml(audit.location || 'N/A')}</p>
             <p><strong>Auditee Name:</strong> ${escapeHtml(audit.auditeeName || 'N/A')}</p>
             <p><strong>Auditee Position:</strong> ${escapeHtml(audit.auditeePosition || 'N/A')}</p>
+            <p><strong>Auditee Email 1:</strong> ${escapeHtml(audit.auditeeEmail || 'N/A')}</p>
+            ${audit.auditeeEmail2 ? `<p><strong>Auditee Email 2:</strong> ${escapeHtml(audit.auditeeEmail2)}</p>` : ''}
             <p><strong>Lead Auditor(s):</strong> ${audit.leadAuditors?.map(a => escapeHtml(a.displayName)).join(', ') || 'N/A'}</p>
             <p><strong>Auditor(s):</strong> ${audit.auditors?.map(a => escapeHtml(a.displayName)).join(', ') || 'N/A'}</p>
             <p><strong>Created By:</strong> ${escapeHtml(audit.createdByEmail || audit.createdBy || 'N/A')}</p>
@@ -2295,6 +2307,34 @@ function openAuditDetails(audit) {
             modalActionsContainer.insertBefore(localApproveBtn, localCloseBtn);
         }
 
+        // Show "Send CAPA Reminder" button for Lead Auditor / Admin when pending_capa
+        if (audit.status === 'pending_capa' && (currentUser?.role === ROLES.ADMIN || (currentUser?.role === ROLES.LEAD_AUDITOR && isUserAssigned(audit, currentUser)))) {
+            const reminderBtn = document.createElement('button');
+            reminderBtn.className = 'btn btn-secondary';
+            reminderBtn.style.background = '#f59e0b';
+            reminderBtn.style.borderColor = '#d97706';
+            reminderBtn.style.color = '#ffffff';
+            reminderBtn.innerHTML = '<i class="fas fa-bell"></i> Send CAPA Reminder';
+            reminderBtn.addEventListener('click', () => {
+                sendCapaReminder(audit.id);
+            });
+            modalActionsContainer.insertBefore(reminderBtn, localCloseBtn);
+        }
+
+        // Show "Respond to CAPA" button for Auditee when pending_capa
+        if (audit.status === 'pending_capa' && currentUser?.role === ROLES.AUDITEE) {
+            const respondCapaBtn = document.createElement('button');
+            respondCapaBtn.className = 'btn btn-primary';
+            respondCapaBtn.style.background = '#f59e0b';
+            respondCapaBtn.style.borderColor = '#d97706';
+            respondCapaBtn.innerHTML = '<i class="fas fa-tasks"></i> Respond to CAPA';
+            respondCapaBtn.addEventListener('click', () => {
+                renderPerItemCapaModal(audit);
+                closeModal();
+            });
+            modalActionsContainer.insertBefore(respondCapaBtn, localCloseBtn);
+        }
+
         // Render CAPA Evidence Links if available
         if (audit.checklist?.some(i => i.capaEvidenceLink || i.capaPlan) || audit.generalCapaEvidenceLink || audit.generalCapaPlan) {
             const capaSection = document.createElement('div');
@@ -2305,10 +2345,6 @@ function openAuditDetails(audit) {
             capaSection.style.borderRadius = '8px';
             
             let capaHTML = '<h4><i class="fas fa-link" style="color: #10b981;"></i> Auditee CAPA & Evidence Document Links</h4>';
-            if (audit.generalCapaPlan) capaHTML += `<p><strong>General CAPA Plan:</strong> ${escapeHtml(audit.generalCapaPlan)}</p>`;
-            if (audit.generalCapaEvidenceLink) {
-                capaHTML += `<p><strong>General Evidence Share Link:</strong> <a href="${escapeHtml(audit.generalCapaEvidenceLink)}" target="_blank" rel="noopener" style="color: #2563eb; text-decoration: underline;"><i class="fas fa-external-link-alt"></i> View Cloud Evidence Folder</a></p>`;
-            }
 
             audit.checklist?.forEach(item => {
                 if (item.capaPlan || item.capaEvidenceLink) {
@@ -3594,6 +3630,12 @@ function clearAuditForm() {
     const auditeePositionEl = document.getElementById('auditee-position');
     if (auditeePositionEl) auditeePositionEl.value = '';
 
+    const auditeeEmailEl = document.getElementById('auditee-email');
+    if (auditeeEmailEl) auditeeEmailEl.value = '';
+
+    const auditeeEmail2El = document.getElementById('auditee-email-2');
+    if (auditeeEmail2El) auditeeEmail2El.value = '';
+
     // Re-initialize the checklist to its default empty/non-applicable state
     if (checklistContainer) {
         initNewAuditForm(); // This rebuilds the checklist from scratch with defaults
@@ -4316,7 +4358,11 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
     } else if (type === 'auditee_capa_required') {
         subject = `ACTION REQUIRED: Submit CAPA & Evidence Link - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?capaToken=${extraData.capaToken}`;
-        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) has been approved. Please submit your CAPA response and evidence document cloud link using this secure direct portal link: ${actionUrl}`;
+        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) has been approved. Please submit your CAPA response and evidence document cloud link using this secure direct portal link (valid for 15 days): ${actionUrl}`;
+    } else if (type === 'auditee_capa_reminder') {
+        subject = `REMINDER (Expiring Soon): Submit CAPA Response - Ref: ${audit.refNo || 'N/A'}`;
+        actionUrl = `${baseUrl}?capaToken=${extraData.capaToken}`;
+        bodyText = `REMINDER: Your CAPA submission link for ${audit.directorateUnit} (Ref: ${audit.refNo}) will expire in ${extraData.daysRemaining} day(s). Please click here to complete your CAPA response before it expires: ${actionUrl}`;
     }
 
     const payload = {
@@ -4325,9 +4371,12 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         refNo: audit.refNo || '',
         directorateUnit: audit.directorateUnit || '',
         recipientEmail: recipientEmail || '',
+        auditeeEmail1: audit.auditeeEmail || '',
+        auditeeEmail2: audit.auditeeEmail2 || '',
         subject: subject,
         bodyText: bodyText,
         actionUrl: actionUrl,
+        daysRemaining: extraData.daysRemaining !== undefined ? extraData.daysRemaining : null,
         timestamp: new Date().toISOString()
     };
 
@@ -4341,17 +4390,13 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
             });
             console.log("Power Automate webhook triggered successfully for:", type);
         } catch (err) {
-            console.warn("Power Automate webhook call failed:", err);
+            console.error("Power Automate webhook call failed:", err);
+            alert("Failed to send Power Automate notification: " + err.message);
         }
     } else {
-        console.log("Power Automate URL not set, using mailto fallback");
-        triggerMailtoFallback(recipientEmail, subject, bodyText);
+        console.error("Power Automate Webhook URL is missing or not configured.");
+        alert("Error: Power Automate Webhook URL is not configured. Notification could not be sent.");
     }
-}
-
-function triggerMailtoFallback(email, subject, body) {
-    const mailtoUrl = `mailto:${encodeURIComponent(email || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    window.open(mailtoUrl, '_blank');
 }
 
 async function approveAuditReport(auditId) {
@@ -4381,8 +4426,8 @@ async function approveAuditReport(auditId) {
 
         showMessage('Audit Approved successfully! Triggering CAPA notification for Auditee...', 'success');
 
-        const auditeeEmail = auditToApprove.auditeeEmail || '';
-        await sendPowerAutomateNotification('auditee_capa_required', auditToApprove, auditeeEmail, { capaToken: token });
+        const recipients = [auditToApprove.auditeeEmail, auditToApprove.auditeeEmail2].filter(Boolean).join(', ');
+        await sendPowerAutomateNotification('auditee_capa_required', auditToApprove, recipients, { capaToken: token });
 
         closeModal();
         loadAudits();
@@ -4392,19 +4437,76 @@ async function approveAuditReport(auditId) {
     }
 }
 
+function formatStatusBadge(audit) {
+    if (!audit || !audit.status) return '<span class="status">N/A</span>';
+    if (audit.status === 'trash') return '<span class="status status-trash" style="background:#fee2e2; color:#991b1b;">Trash / Deleted</span>';
+    if (audit.status === 'draft') return '<span class="status status-draft" style="background:#e2e8f0; color:#475569;">Draft</span>';
+    if (audit.status === 'submitted') return '<span class="status status-submitted" style="background:#e0e7ff; color:#3730a3;">Submitted</span>';
+    if (audit.status === 'capa_submitted') {
+        const byText = audit.capaSubmittedBy ? ` (by ${escapeHtml(audit.capaSubmittedBy.split('@')[0])})` : '';
+        return `<span class="status status-capa_submitted" style="background:#d1fae5; color:#047857;"><i class="fas fa-check-circle"></i> CAPA Submitted${byText}</span>`;
+    }
+    if (audit.status === 'pending_capa') {
+        const now = new Date();
+        const createdAt = audit.capaTokenCreatedAt ? (audit.capaTokenCreatedAt.toDate ? audit.capaTokenCreatedAt.toDate() : new Date(audit.capaTokenCreatedAt)) : (audit.approvedAt ? (audit.approvedAt.toDate ? audit.approvedAt.toDate() : new Date(audit.approvedAt)) : now);
+        const diffMs = now - createdAt;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const daysRemaining = Math.max(0, 15 - diffDays);
+        if (diffDays > 15) {
+            return `<span class="status status-expired" style="background:#fee2e2; color:#991b1b;"><i class="fas fa-exclamation-triangle"></i> CAPA Expired</span>`;
+        }
+        return `<span class="status status-pending_capa" style="background:#fef3c7; color:#b45309;"><i class="fas fa-clock"></i> Pending CAPA (${daysRemaining}d left)</span>`;
+    }
+    return `<span class="status status-${audit.status}">${escapeHtml(audit.status)}</span>`;
+}
+
+async function sendCapaReminder(auditId) {
+    if (!auditId) return;
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) {
+        alert("Audit record not found.");
+        return;
+    }
+
+    const recipients = [audit.auditeeEmail, audit.auditeeEmail2].filter(Boolean).join(', ');
+    if (!recipients) {
+        alert("No auditee email address configured for this audit.");
+        return;
+    }
+
+    const now = new Date();
+    const createdAt = audit.capaTokenCreatedAt ? (audit.capaTokenCreatedAt.toDate ? audit.capaTokenCreatedAt.toDate() : new Date(audit.capaTokenCreatedAt)) : (audit.approvedAt ? (audit.approvedAt.toDate ? audit.approvedAt.toDate() : new Date(audit.approvedAt)) : now);
+    const diffMs = now - createdAt;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.max(0, 15 - diffDays);
+
+    if (!confirm(`Send CAPA Reminder email to ${recipients}? (${daysRemaining} days remaining before expiration)`)) {
+        return;
+    }
+
+    try {
+        await sendPowerAutomateNotification('auditee_capa_reminder', audit, recipients, {
+            capaToken: audit.capaToken,
+            daysRemaining: daysRemaining
+        });
+        showMessage(`CAPA Reminder sent successfully to ${recipients}!`, 'success');
+    } catch (err) {
+        console.error("Error sending CAPA reminder:", err);
+        showMessage("Failed to send CAPA reminder: " + err.message, 'error');
+    }
+}
+
 async function checkCapaTokenOnLoad() {
     const urlParams = new URLSearchParams(window.location.search);
     const capaToken = urlParams.get('capaToken');
     if (!capaToken) return;
 
-    // Suppress login screen when CAPA token is present
     if (loginScreen) loginScreen.classList.add('hidden');
     if (appContainer) appContainer.classList.add('hidden');
 
     try {
         console.log("Checking CAPA token from URL:", capaToken);
         
-        // Ensure user is authenticated (anonymous sign-in) so Firestore rules allow reading the tokenized document
         if (!auth.currentUser) {
             console.log("Signing in anonymously for direct CAPA access...");
             await auth.signInAnonymously();
@@ -4412,14 +4514,27 @@ async function checkCapaTokenOnLoad() {
 
         const query = await db.collection('audits').where('capaToken', '==', capaToken).get();
         if (query.empty) {
-            alert("Invalid or expired CAPA submission link.");
+            alert("Invalid, already submitted, or expired CAPA access link.");
             if (loginScreen) loginScreen.classList.remove('hidden');
             return;
         }
 
         const auditDoc = query.docs[0];
         const auditData = { id: auditDoc.id, ...auditDoc.data() };
-        renderPublicCapaModal(auditData, capaToken);
+
+        const now = new Date();
+        const createdAt = auditData.capaTokenCreatedAt ? (auditData.capaTokenCreatedAt.toDate ? auditData.capaTokenCreatedAt.toDate() : new Date(auditData.capaTokenCreatedAt)) : (auditData.approvedAt ? (auditData.approvedAt.toDate ? auditData.approvedAt.toDate() : new Date(auditData.approvedAt)) : now);
+        const diffMs = now - createdAt;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const daysRemaining = Math.max(0, 15 - diffDays);
+
+        if (diffDays > 15) {
+            alert("⚠️ This CAPA submission link has expired (15-day limit reached).\n\nPlease contact your Lead Auditor to re-issue or extend your CAPA access link.");
+            if (loginScreen) loginScreen.classList.remove('hidden');
+            return;
+        }
+
+        renderPerItemCapaModal(auditData, daysRemaining);
     } catch (err) {
         console.error("Error checking CAPA token:", err);
         alert("Failed to load CAPA submission portal: " + err.message);
@@ -4427,47 +4542,68 @@ async function checkCapaTokenOnLoad() {
     }
 }
 
-function renderPublicCapaModal(audit, token) {
-    const modalEl = document.getElementById('capa-token-modal');
-    const bodyEl = document.getElementById('capa-modal-body');
-    const submitBtn = document.getElementById('submit-capa-response-btn');
-    const closeBtn = document.getElementById('close-capa-modal');
+function renderPerItemCapaModal(audit, daysRemaining = null) {
+    const modalEl = document.getElementById('per-item-capa-modal');
+    const bodyEl = document.getElementById('per-item-capa-modal-body');
+    const submitBtn = document.getElementById('submit-per-item-capa-btn');
+    const closeBtn = document.getElementById('close-per-item-capa-modal');
     if (!modalEl || !bodyEl) return;
 
     if (closeBtn) {
         closeBtn.onclick = () => modalEl.classList.add('hidden');
     }
 
+    if (daysRemaining === null) {
+        const now = new Date();
+        const createdAt = audit.capaTokenCreatedAt ? (audit.capaTokenCreatedAt.toDate ? audit.capaTokenCreatedAt.toDate() : new Date(audit.capaTokenCreatedAt)) : (audit.approvedAt ? (audit.approvedAt.toDate ? audit.approvedAt.toDate() : new Date(audit.approvedAt)) : now);
+        const diffMs = now - createdAt;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        daysRemaining = Math.max(0, 15 - diffDays);
+    }
+
     const itemsNeedingCapa = (audit.checklist || []).filter(item => 
-        item.applicable === 'yes' && (item.compliance === 'no' || item.correctiveActionNeeded || item.id === 28)
+        item.applicable === 'yes' && 
+        item.compliance === 'no' && 
+        (item.classification === 'Major' || item.classification === 'Minor')
     );
 
     let html = `
+        <div class="capa-notice-banner" style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+            <p style="margin: 0; font-weight: 600; color: #b45309;">
+                <i class="fas fa-clock"></i> <strong>Expiration Reminder:</strong> This CAPA submission link will expire in <strong>${daysRemaining} day(s)</strong>.
+            </p>
+            <p style="margin: 0.25rem 0 0 0; font-size: 0.88rem; color: #475569;">
+                Please complete your corrective action plans and paste cloud evidence share links for each non-compliant finding below.
+            </p>
+        </div>
+
         <div style="margin-bottom: 1rem; background: rgba(79,70,229,0.05); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
             <p style="margin:0;"><strong>Audit Ref:</strong> ${escapeHtml(audit.refNo || 'N/A')} | <strong>Directorate/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')}</p>
-            <p style="margin-top:0.25rem; margin-bottom:0;"><strong>Auditee:</strong> ${escapeHtml(audit.auditeeName || 'N/A')} (${escapeHtml(audit.auditeeEmail || 'N/A')})</p>
+            <p style="margin-top:0.25rem; margin-bottom:0;"><strong>Auditee 1:</strong> ${escapeHtml(audit.auditeeEmail || 'N/A')} ${audit.auditeeEmail2 ? `| <strong>Auditee 2:</strong> ${escapeHtml(audit.auditeeEmail2)}` : ''}</p>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.25rem; background: var(--light-color); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-color);">
+            <label for="capa-responder-email" style="font-weight:600;"><i class="fas fa-user-check"></i> Submitting As (Responder Email):</label>
+            <select id="capa-responder-email" class="evidence-input" style="width:100%; padding:0.75rem; font-size:0.95rem;">
+                ${audit.auditeeEmail ? `<option value="${escapeHtml(audit.auditeeEmail)}">Auditee 1: ${escapeHtml(audit.auditeeEmail)}</option>` : ''}
+                ${audit.auditeeEmail2 ? `<option value="${escapeHtml(audit.auditeeEmail2)}">Auditee 2: ${escapeHtml(audit.auditeeEmail2)}</option>` : ''}
+                ${currentUser?.email && currentUser.email !== audit.auditeeEmail && currentUser.email !== audit.auditeeEmail2 ? `<option value="${escapeHtml(currentUser.email)}" selected>Logged in User: ${escapeHtml(currentUser.email)}</option>` : ''}
+            </select>
         </div>
     `;
 
     if (itemsNeedingCapa.length === 0) {
-        html += `
-            <p class="text-muted">No non-compliance items flagged for this audit report. You may submit general remarks below:</p>
-            <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="capa-general-text">General CAPA Response / Remarks:</label>
-                <textarea id="capa-general-text" rows="4" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Enter CAPA response..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="capa-general-link"><i class="fas fa-link"></i> Evidence Document Share Link (URL):</label>
-                <input type="url" id="capa-general-link" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/... or https://onedrive.live.com/...">
-                <small style="color: #64748b; display:block; margin-top:0.25rem;">Note: Direct document uploads are disabled. Only paste URL links here.</small>
-            </div>
-        `;
+        html += `<p class="text-muted">No non-compliance items (Major/Minor) were flagged for this audit report. No CAPA response is required.</p>`;
     } else {
         itemsNeedingCapa.forEach(item => {
             html += `
                 <div class="capa-item-card" data-item-id="${item.id}" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; background: var(--card-bg);">
                     <h4 style="margin: 0 0 0.5rem 0; color: var(--primary-color);">Item ${item.id}: ${escapeHtml(item.requirement)} ${item.clause ? `(Clause ${item.clause})` : ''}</h4>
-                    ${item.objectiveEvidence ? `<p style="font-size:0.9rem; margin-bottom:0.5rem;"><strong>Finding / Evidence:</strong> ${escapeHtml(item.objectiveEvidence)}</p>` : ''}
+                    <div style="margin-bottom: 0.5rem; display: flex; gap: 1rem;">
+                        <span class="status status-no">Non-Compliant</span>
+                        <span class="status" style="background:#fef3c7; color:#d97706;">Classification: ${escapeHtml(item.classification)}</span>
+                    </div>
+                    ${item.objectiveEvidence ? `<p style="font-size:0.9rem; margin-bottom:0.75rem;"><strong>Finding / Evidence:</strong> ${escapeHtml(item.objectiveEvidence)}</p>` : ''}
                     <div class="form-group" style="margin-bottom: 0.75rem;">
                         <label for="capa-plan-${item.id}">Corrective & Preventive Action (CAPA) Plan:</label>
                         <textarea id="capa-plan-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Detail root cause analysis and action plan...">${escapeHtml(item.capaPlan || '')}</textarea>
@@ -4475,7 +4611,6 @@ function renderPublicCapaModal(audit, token) {
                     <div class="form-group">
                         <label for="capa-link-${item.id}"><i class="fas fa-link"></i> Evidence Document Share Link (URL):</label>
                         <input type="url" id="capa-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/folder... or OneDrive link" value="${escapeHtml(item.capaEvidenceLink || '')}">
-                        <small style="color: #64748b; display:block; margin-top:0.25rem;">Direct document file uploads are disabled. Please paste a cloud URL link.</small>
                     </div>
                 </div>
             `;
@@ -4486,8 +4621,10 @@ function renderPublicCapaModal(audit, token) {
     modalEl.classList.remove('hidden');
 
     submitBtn.onclick = async () => {
+        const responderEmail = document.getElementById('capa-responder-email')?.value || currentUser?.email || audit.auditeeEmail || 'Auditee';
+
         submitBtn.disabled = true;
-        submitBtn.textContent = 'Submitting CAPA...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
 
         const updatedChecklist = (audit.checklist || []).map(item => {
             const planEl = document.getElementById(`capa-plan-${item.id}`);
@@ -4502,20 +4639,18 @@ function renderPublicCapaModal(audit, token) {
             return item;
         });
 
-        const generalPlan = document.getElementById('capa-general-text')?.value.trim() || '';
-        const generalLink = document.getElementById('capa-general-link')?.value.trim() || '';
-
         try {
             await db.collection('audits').doc(audit.id).update({
                 checklist: updatedChecklist,
-                generalCapaPlan: generalPlan,
-                generalCapaEvidenceLink: generalLink,
                 status: 'capa_submitted',
                 capaSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                capaToken: null // Invalidate token after successful submission
+                capaSubmittedBy: responderEmail,
+                capaToken: null, // Invalidate token after submission
+                generalCapaPlan: firebase.firestore.FieldValue.delete(), // Cleanup old fields
+                generalCapaEvidenceLink: firebase.firestore.FieldValue.delete()
             });
 
-            alert("CAPA response and evidence document link submitted successfully! Thank you.");
+            alert(`CAPA responses and evidence links submitted successfully by ${responderEmail}! Thank you.`);
             modalEl.classList.add('hidden');
             window.history.replaceState({}, document.title, window.location.pathname);
             if (currentUser) loadAudits();
@@ -4524,7 +4659,7 @@ function renderPublicCapaModal(audit, token) {
             alert("Failed to submit CAPA response: " + err.message);
         } finally {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit CAPA Response & Evidence Link';
+            submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit CAPA Responses';
         }
     };
 }
