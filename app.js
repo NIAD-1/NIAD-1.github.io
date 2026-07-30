@@ -519,7 +519,11 @@ function checkAuthState() {
 
                 updateUIForRole();
                 loadAudits();
-                switchSection('dashboard');
+                if (currentUser.role === ROLES.AUDITEE) {
+                    switchSection('audit-history');
+                } else {
+                    switchSection('dashboard');
+                }
 
             } else {
                  console.error(`Access Denied: User profile missing, or invalid role ('${userRoleData?.role}') assigned for UID: ${user.uid}.`);
@@ -970,6 +974,7 @@ function switchSection(sectionId) {
 
     if (sectionFoundAndPermitted) {
         updateUIForRole();
+        updateActionBarBanner();
     } else if (!document.querySelector(`.content-section:not(.hidden)`)) {
         console.warn("No permitted section found, defaulting to dashboard.");
         switchSection('dashboard');
