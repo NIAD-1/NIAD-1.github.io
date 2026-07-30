@@ -623,8 +623,40 @@ function loginWithEmail() {
             // Success is handled by onAuthStateChanged
         })
         .catch(error => {
-            loginError.textContent = getFriendlyAuthError(error);
             console.error("Login Error:", error);
+            const code = error.code || '';
+            if (code === 'auth/wrong-password' || code === 'auth/invalid-login-credentials' || code === 'auth/user-not-found') {
+                loginError.style.color = '#ef4444';
+                loginError.innerHTML = `
+                    <div style="margin-bottom: 6px;">Incorrect password or account credentials for <strong>${escapeHtml(email)}</strong>.</div>
+                    <div style="margin: 6px 0;">
+                        <button type="button" id="quick-reset-pass-btn" class="btn btn-sm btn-outline" style="border-color:#2563eb; color:#2563eb; background:#ffffff; font-size:0.82rem; padding: 4px 10px; border-radius: 4px; cursor: pointer;">
+                            <i class="fas fa-key"></i> Send Password Reset Link to ${escapeHtml(email)}
+                        </button>
+                    </div>
+                    <div style="margin-top: 4px; font-size: 0.82rem; color: #475569;">
+                        Or click <strong>Sign in with Google</strong> above to log in instantly.
+                    </div>
+                `;
+                const resetBtn = document.getElementById('quick-reset-pass-btn');
+                if (resetBtn) {
+                    resetBtn.onclick = () => {
+                        resetBtn.disabled = true;
+                        resetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending link...';
+                        auth.sendPasswordResetEmail(email)
+                            .then(() => {
+                                loginError.style.color = '#059669';
+                                loginError.innerHTML = `✅ Password reset link sent to <strong>${escapeHtml(email)}</strong>!<br>Please check your Outlook inbox / spam folder to set your password.`;
+                            })
+                            .catch(err => {
+                                loginError.style.color = '#ef4444';
+                                loginError.textContent = 'Failed to send reset email: ' + err.message;
+                            });
+                    };
+                }
+            } else {
+                loginError.textContent = getFriendlyAuthError(error);
+            }
         })
         .finally(() => {
             if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login'; }
@@ -4869,7 +4901,8 @@ async function autoProvisionAuditeeAccount(email, name = '') {
     try {
         const query = await db.collection('users').where('email', '==', cleanEmail).get();
         if (!query.empty) {
-            console.log(`User ${cleanEmail} already exists in database.`);
+            console.log(`User ${cleanEmail} already exists in database. Sending password reset email...`);
+            auth.sendPasswordResetEmail(cleanEmail).catch(err => console.log("Password reset email dispatch note:", err.message));
             return { isNew: false, email: cleanEmail };
         }
 
