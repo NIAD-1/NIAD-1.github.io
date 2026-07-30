@@ -3503,6 +3503,15 @@ async function generateAuditDocument(auditData) {
         </style>
     </head>
     <body>
+        <!-- IASR Official Document Header Box Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+            <tr>
+                <td style="width: 20%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">Annexure-02</td>
+                <td style="width: 45%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">SOP Ref. No.: NAFDAC-QMS-012-04</td>
+                <td style="width: 35%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">INTERNAL AUDIT SUMMARY REPORT<br>IASR</td>
+            </tr>
+        </table>
+
         <div class="header">
             <img src="${logoUrl}" class="header-logo" alt="NAFDAC Logo">
             <div class="header-content">
