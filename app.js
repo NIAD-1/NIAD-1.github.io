@@ -2160,7 +2160,21 @@ function openAuditDetails(audit) {
         modalBodyEl.innerHTML = '';
         modalActionsContainer.innerHTML = ''; // Clear previous buttons
 
-        modalTitleEl.textContent = `Audit: ${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date)})`;
+        modalTitleEl.textContent = `Pre-Filled Audit Report (IASR): ${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date)})`;
+
+        // Pre-Filled Audit Banner
+        const iasrBanner = document.createElement('div');
+        iasrBanner.style.background = '#e0f2fe';
+        iasrBanner.style.border = '1px solid #0284c7';
+        iasrBanner.style.borderRadius = '8px';
+        iasrBanner.style.padding = '1rem';
+        iasrBanner.style.marginBottom = '1.25rem';
+        iasrBanner.style.color = '#0369a1';
+        iasrBanner.innerHTML = `
+            <h4 style="margin:0; font-size:1.05rem;"><i class="fas fa-file-alt"></i> Official Pre-Filled Internal Audit Summary Report (IASR)</h4>
+            <p style="margin:0.25rem 0 0 0; font-size:0.9rem; color:#0c4a6e;">Review the pre-filled findings, checklist responses, and evidence documented by the Lead Auditor for ${escapeHtml(audit.directorateUnit || 'your directorate')}.</p>
+        `;
+        modalBodyEl.appendChild(iasrBanner);
 
         // Build modal body content
         const auditMeta = document.createElement('div');
@@ -4823,15 +4837,17 @@ function renderNcarModal(audit) {
     );
 
     let html = `
-        <div style="margin-bottom: 1.5rem; background: var(--light-color); padding: 1rem; border-radius: 8px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-            <div>
-                <h4 style="margin: 0; color: var(--primary-color);">Audit Ref: ${escapeHtml(audit.refNo || 'N/A')}</h4>
-                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem;"><strong>Directorate/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')} | <strong>Date:</strong> ${formatDate(audit.date)}</p>
-            </div>
-            <div>
-                <button class="btn btn-outline btn-sm" onclick="exportCurrentAuditAsDocumentCustom('${audit.id}')">
-                    <i class="fas fa-file-word" style="color: #2563eb;"></i> Download IASR Report (.docx)
-                </button>
+        <div style="margin-bottom: 1.25rem; background: #e0f2fe; padding: 1rem; border-radius: 8px; border: 1px solid #0284c7; color: #0369a1;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.1rem; color: #0369a1;"><i class="fas fa-search-location"></i> Pre-Filled Audit Report Review: ${escapeHtml(audit.directorateUnit || 'N/A')}</h4>
+                    <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; color: #0c4a6e;"><strong>Ref No.:</strong> ${escapeHtml(audit.refNo || 'N/A')} | <strong>Audit Date:</strong> ${formatDate(audit.date)} | <strong>Auditee:</strong> ${escapeHtml(audit.auditeeName || 'Directorate Head')}</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline btn-sm" onclick="exportCurrentAuditAsDocumentCustom('${audit.id}')" style="background:#ffffff; color:#0284c7; border-color:#0284c7;">
+                        <i class="fas fa-file-word"></i> Download Full IASR Report (.docx)
+                    </button>
+                </div>
             </div>
         </div>
     `;
