@@ -4952,12 +4952,22 @@ async function triggerCapaRequest(auditId) {
     const audit = audits.find(a => a.id === auditId);
     if (!audit) { alert("Audit record not found."); return; }
 
-    if (!confirm(`Send CAPA / NCAR Request for Audit Ref: ${audit.refNo || auditId}? This will notify the Auditee(s).`)) {
+    let email1 = audit.auditeeEmail?.trim() || '';
+    let email2 = audit.auditeeEmail2?.trim() || '';
+
+    if (!email1 && !email2) {
+        const inputEmail = prompt("No Auditee Email found on this audit. Please enter the Auditee Email address:", "kaka.mustaphar@nafdac.gov.ng");
+        if (!inputEmail || !inputEmail.trim()) {
+            alert("CARF Request canceled. Auditee email is required.");
+            return;
+        }
+        email1 = inputEmail.trim().toLowerCase();
+    }
+
+    if (!confirm(`Send CAPA / NCAR Request for Audit Ref: ${audit.refNo || auditId} to ${email1}${email2 ? ', ' + email2 : ''}?`)) {
         return;
     }
 
-    const email1 = audit.auditeeEmail || '';
-    const email2 = audit.auditeeEmail2 || '';
     const auditeeName = audit.auditeeName || '';
 
     try {
@@ -4965,6 +4975,7 @@ async function triggerCapaRequest(auditId) {
         const result2 = email2 ? await autoProvisionAuditeeAccount(email2, auditeeName) : null;
 
         await db.collection('audits').doc(auditId).update({
+            auditeeEmail: email1,
             status: 'pending_capa',
             approvedAt: firebase.firestore.FieldValue.serverTimestamp(),
             approvedBy: currentUser?.email || 'Auditor',
@@ -4979,12 +4990,12 @@ async function triggerCapaRequest(auditId) {
             tempPassword: 'Audit@2026'
         });
 
-        showMessage('NCAR Request sent successfully to Auditee(s)!', 'success');
+        alert(`✅ CARF Request Sent Successfully!\n\nAuditee Account Created/Verified in Firebase:\nEmail: ${recipients}\nPassword: Audit@2026`);
         closeModal();
         loadAudits();
     } catch (err) {
         console.error("Error sending NCAR request:", err);
-        showMessage("Failed to send NCAR request: " + err.message, 'error');
+        alert("Failed to send NCAR request: " + err.message);
     }
 }
 
