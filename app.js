@@ -2174,21 +2174,28 @@ function openAuditDetails(audit) {
         modalBodyEl.innerHTML = '';
         modalActionsContainer.innerHTML = ''; // Clear previous buttons
 
-        modalTitleEl.textContent = `Pre-Filled Audit Report (IASR): ${escapeHtml(audit.directorateUnit || 'N/A')} (${formatDate(audit.date)})`;
+        modalTitleEl.textContent = `Internal Audit Summary Report (IASR) - ${escapeHtml(audit.directorateUnit || 'N/A')}`;
 
-        // Pre-Filled Audit Banner
-        const iasrBanner = document.createElement('div');
-        iasrBanner.style.background = '#e0f2fe';
-        iasrBanner.style.border = '1px solid #0284c7';
-        iasrBanner.style.borderRadius = '8px';
-        iasrBanner.style.padding = '1rem';
-        iasrBanner.style.marginBottom = '1.25rem';
-        iasrBanner.style.color = '#0369a1';
-        iasrBanner.innerHTML = `
-            <h4 style="margin:0; font-size:1.05rem;"><i class="fas fa-file-alt"></i> Official Pre-Filled Internal Audit Summary Report (IASR)</h4>
-            <p style="margin:0.25rem 0 0 0; font-size:0.9rem; color:#0c4a6e;">Review the pre-filled findings, checklist responses, and evidence documented by the Lead Auditor for ${escapeHtml(audit.directorateUnit || 'your directorate')}.</p>
+        // Official IASR Annexure-01 Form Header Box
+        const iasrHeaderBox = document.createElement('div');
+        iasrHeaderBox.style.border = '2px solid #1e293b';
+        iasrHeaderBox.style.borderRadius = '6px';
+        iasrHeaderBox.style.overflow = 'hidden';
+        iasrHeaderBox.style.marginBottom = '1.5rem';
+        iasrHeaderBox.style.background = '#ffffff';
+        iasrHeaderBox.innerHTML = `
+            <div style="display: flex; border-bottom: 1px solid #1e293b; background: #f8fafc; font-size: 0.85rem; font-weight: 600; text-align: center; color: #0f172a;">
+                <div style="flex: 1; padding: 0.5rem; border-right: 1px solid #1e293b;">Annexure-01</div>
+                <div style="flex: 2; padding: 0.5rem; border-right: 1px solid #1e293b;">SOP Ref. No.: NAFDAC-QMS-008-01</div>
+                <div style="flex: 3; padding: 0.5rem;">Title of Annexure: Internal Audit Summary Report (IASR)</div>
+            </div>
+            <div style="padding: 1rem; text-align: center; background: #ffffff;">
+                <img src="nafdac-logo.png" alt="NAFDAC Logo" style="height: 55px; margin-bottom: 0.25rem;">
+                <h3 style="margin: 0; font-size: 1.15rem; color: #0f172a; font-weight: 700; text-transform: uppercase;">National Agency for Food and Drug Administration and Control</h3>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.9rem; font-weight: 600; color: #059669;">QUALITY MANAGEMENT SYSTEM (QMS) INTERNAL AUDIT SUMMARY REPORT (IASR)</p>
+            </div>
         `;
-        modalBodyEl.appendChild(iasrBanner);
+        modalBodyEl.appendChild(iasrHeaderBox);
 
         // Build modal body content
         const auditMeta = document.createElement('div');
