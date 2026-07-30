@@ -2337,17 +2337,17 @@ function openAuditDetails(audit) {
         localExportBtn.classList.toggle('permission-hidden', !canUserExport);
         localExportBtn.disabled = !canUserExport;
 
-        // Add a "Preview CARF Form" button so auditors can view the CARF Annexure-02 layout instantly
-        const previewNcarBtn = document.createElement('button');
-        previewNcarBtn.className = 'btn btn-outline';
-        previewNcarBtn.style.borderColor = '#d97706';
-        previewNcarBtn.style.color = '#d97706';
-        previewNcarBtn.innerHTML = '<i class="fas fa-eye"></i> Preview CARF Form';
-        previewNcarBtn.addEventListener('click', () => {
+        // Add a "Preview IASR Form" button so users can view the full read-only IASR audit form
+        const previewIasrBtn = document.createElement('button');
+        previewIasrBtn.className = 'btn btn-outline';
+        previewIasrBtn.style.borderColor = '#059669';
+        previewIasrBtn.style.color = '#059669';
+        previewIasrBtn.innerHTML = '<i class="fas fa-file-alt"></i> Preview IASR Form';
+        previewIasrBtn.addEventListener('click', () => {
             closeModal();
-            renderNcarModal(audit);
+            renderIasrPreviewModal(audit);
         });
-        modalActionsContainer.insertBefore(previewNcarBtn, localCloseBtn);
+        modalActionsContainer.insertBefore(previewIasrBtn, localCloseBtn);
 
         // Show "Send CARF Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
         if (audit.status === 'submitted' || audit.status === 'draft') {
@@ -4841,6 +4841,124 @@ function updateActionBarBanner() {
     } else {
         banner.classList.add('hidden');
     }
+// --- Official Read-Only IASR Form (Annexure-01 / NAFDAC-QMS-008-01) Modal ---
+function renderIasrPreviewModal(audit) {
+    const modal = document.getElementById('iasr-preview-modal');
+    const bodyEl = document.getElementById('iasr-preview-body');
+    const actionsEl = document.getElementById('iasr-preview-actions');
+    const closeBtn = document.getElementById('close-iasr-modal');
+
+    if (!modal || !bodyEl || !actionsEl) return;
+
+    if (closeBtn) {
+        closeBtn.onclick = () => modal.classList.add('hidden');
+    }
+
+    let html = `
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; font-size: 0.95rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem;">
+                <div><strong>Audit Ref No.:</strong> <span style="color: #059669; font-weight:700;">${escapeHtml(audit.refNo || 'N/A')}</span></div>
+                <div><strong>Directorate/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')}</div>
+                <div><strong>Audit Date:</strong> ${formatDate(audit.date)}</div>
+                <div><strong>Location:</strong> ${escapeHtml(audit.location || 'Abuja')}</div>
+                <div><strong>Auditee Name:</strong> ${escapeHtml(audit.auditeeName || 'N/A')}</div>
+                <div><strong>Lead Auditor(s):</strong> ${audit.leadAuditors?.map(a => escapeHtml(a.displayName)).join(', ') || 'N/A'}</div>
+                <div><strong>Status:</strong> ${formatStatusBadge(audit)}</div>
+            </div>
+            ${audit.introduction ? `
+                <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1;">
+                    <strong>Directorate Overview / Introduction:</strong>
+                    <p style="margin: 0.35rem 0 0 0; color: #334155; white-space: pre-wrap; font-size: 0.92rem;">${escapeHtml(audit.introduction)}</p>
+                </div>
+            ` : ''}
+        </div>
+
+        <h4 style="color: var(--primary-color); margin-bottom: 1rem;"><i class="fas fa-tasks"></i> ISO 9001:2015 Checklist Findings (Read-Only)</h4>
+    `;
+
+    const clauseGroups = [
+        { title: "Clause 4: Context of the Organization", items: [1, 2, 3, 4] },
+        { title: "Clause 5 & 6: Leadership & Planning", items: [5, 6, 7, 8, 9, 10] },
+        { title: "Clause 7: Support", items: [11, 12, 13, 14, 15, 16, 17, 18] },
+        { title: "Clause 8: Operation", items: [19, 20, 21, 22, 23, 24] },
+        { title: "Clause 9 & 10: Performance Evaluation & Improvement", items: [25, 26, 27, 28] }
+    ];
+
+    clauseGroups.forEach(group => {
+        const groupChecklistItems = (audit.checklist || []).filter(item => group.items.includes(Number(item.id)) && item.applicable === 'yes');
+        
+        if (groupChecklistItems.length > 0) {
+            html += `
+                <div style="border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1.25rem; background: var(--card-bg); overflow: hidden;">
+                    <div style="background: var(--light-color); padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-color); font-weight: 700; color: var(--primary-color);">
+                        ${group.title}
+                    </div>
+                    <div style="padding: 1rem;">
+            `;
+
+            groupChecklistItems.forEach(item => {
+                let statusBadge = '<span class="status status-na">N/A</span>';
+                if (item.compliance === 'yes') {
+                    statusBadge = '<span class="status status-yes" style="background:#d1fae5; color:#047857;"><i class="fas fa-check-circle"></i> Compliant</span>';
+                } else if (item.compliance === 'no') {
+                    const classif = item.classification ? ` (${item.classification})` : '';
+                    statusBadge = `<span class="status status-no" style="background:#fee2e2; color:#991b1b;"><i class="fas fa-times-circle"></i> Non-Compliant${classif}</span>`;
+                }
+
+                html += `
+                    <div style="border-bottom: 1px solid #f1f5f9; padding-bottom: 0.85rem; margin-bottom: 0.85rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 250px;">
+                                <strong style="color: var(--text-color);">Item ${item.id}:</strong> ${escapeHtml(item.requirement)}
+                                ${item.clause ? `<span style="font-size:0.82rem; color:#64748b; margin-left:0.5rem;">(Clause ${escapeHtml(item.clause)})</span>` : ''}
+                            </div>
+                            <div>${statusBadge}</div>
+                        </div>
+                        ${item.objectiveEvidence ? `
+                            <div style="margin-top: 0.4rem; background: #f8fafc; padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.88rem; color: #475569;">
+                                <strong>Objective Evidence / Observations:</strong> ${escapeHtml(item.objectiveEvidence)}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    bodyEl.innerHTML = html;
+    actionsEl.innerHTML = '';
+
+    const docBtn = document.createElement('button');
+    docBtn.className = 'btn btn-success';
+    docBtn.innerHTML = '<i class="fas fa-file-word"></i> Download IASR Report (.docx)';
+    docBtn.onclick = () => generateAuditDocument(audit);
+    actionsEl.appendChild(docBtn);
+
+    if (audit.status === 'pending_capa') {
+        const carfBtn = document.createElement('button');
+        carfBtn.className = 'btn btn-primary';
+        carfBtn.style.background = '#d97706';
+        carfBtn.style.borderColor = '#b45309';
+        carfBtn.innerHTML = '<i class="fas fa-edit"></i> Respond to CARF (CARF Annexure-02)';
+        carfBtn.onclick = () => {
+            modal.classList.add('hidden');
+            renderNcarModal(audit);
+        };
+        actionsEl.appendChild(carfBtn);
+    }
+
+    const closeAltBtn = document.createElement('button');
+    closeAltBtn.className = 'btn btn-outline';
+    closeAltBtn.textContent = 'Close';
+    closeAltBtn.onclick = () => modal.classList.add('hidden');
+    actionsEl.appendChild(closeAltBtn);
+
+    modal.classList.remove('hidden');
 }
 
 // --- Official NCAR / CARF (Annexure-02 / NAFDAC-QMS-008-03) Modal ---
