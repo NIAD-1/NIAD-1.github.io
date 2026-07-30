@@ -1982,7 +1982,9 @@ function renderAuditHistory(auditsToDisplay = null) {
         const modifiedDate = formatDateTime(audit.lastModified);
         const submittedDate = audit.submittedAt ? formatDateTime(audit.submittedAt) : 'Not submitted';
 
-        itemDiv.innerHTML = `
+                const isAuditorOrAdmin = currentUser && (currentUser.role === ROLES.LEAD_AUDITOR || currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.AUDITOR);
+                
+                itemDiv.innerHTML = `
             <div class="details">
                 <strong>${escapeHtml(audit.directorateUnit || 'Audit')} (Ref: ${escapeHtml(audit.refNo || 'N/A')})</strong>
                 <div class="meta">
@@ -1999,6 +2001,11 @@ function renderAuditHistory(auditsToDisplay = null) {
                     <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
                         <i class="fas fa-file-alt"></i> Preview IASR Form
                     </button>
+                    ${isAuditorOrAdmin && audit.status !== 'trash' ? `
+                        <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
+                            <i class="fas fa-paper-plane"></i> Send CARF Request
+                        </button>
+                    ` : ''}
                     ${audit.status === 'pending_capa' ? `
                         <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
                             <i class="fas fa-edit"></i> Respond to CARF
@@ -2043,6 +2050,10 @@ function renderAuditHistory(auditsToDisplay = null) {
         itemDiv.addEventListener('click', (e) => {
             // Don't open preview modal if clicking action buttons that have separate actions
             if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit')) {
+                return;
+            }
+            if (e.target.closest('.btn-send-carf-req')) {
+                triggerCapaRequest(audit.id);
                 return;
             }
             if (e.target.closest('.btn-respond-carf')) {
@@ -2363,8 +2374,9 @@ function openAuditDetails(audit) {
         });
         modalActionsContainer.insertBefore(previewIasrBtn, localCloseBtn);
 
-        // Show "Send CARF Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
-        if (audit.status === 'submitted' || audit.status === 'draft') {
+        // Show "Send CARF Request" button for Auditor/Lead Auditor/Admin on any active audit
+        const isAuditorOrAdmin = currentUser && (currentUser.role === ROLES.LEAD_AUDITOR || currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.AUDITOR);
+        if (isAuditorOrAdmin && audit.status !== 'trash') {
             const triggerCapaBtn = document.createElement('button');
             triggerCapaBtn.className = 'btn btn-primary';
             triggerCapaBtn.style.background = '#8b5cf6';
@@ -5058,6 +5070,20 @@ function renderIasrPreviewModal(audit) {
     docBtn.innerHTML = '<i class="fas fa-file-word"></i> Download IASR Report (.docx)';
     docBtn.onclick = () => generateAuditDocument(audit);
     actionsEl.appendChild(docBtn);
+
+    const isAuditorOrAdmin = currentUser && (currentUser.role === ROLES.LEAD_AUDITOR || currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.AUDITOR);
+    if (isAuditorOrAdmin && audit.status !== 'trash') {
+        const sendCarfBtn = document.createElement('button');
+        sendCarfBtn.className = 'btn btn-primary';
+        sendCarfBtn.style.background = '#8b5cf6';
+        sendCarfBtn.style.borderColor = '#7c3aed';
+        sendCarfBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send CARF Request';
+        sendCarfBtn.onclick = () => {
+            modal.classList.add('hidden');
+            triggerCapaRequest(audit.id);
+        };
+        actionsEl.appendChild(sendCarfBtn);
+    }
 
     if (audit.status === 'pending_capa') {
         const carfBtn = document.createElement('button');
