@@ -4569,8 +4569,9 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         auditeeEmail1: audit.auditeeEmail || '',
         auditeeEmail2: audit.auditeeEmail2 || '',
         subject: subject,
-        bodyText: bodyText,
+        bodyText: htmlBody, // Pass htmlBody as bodyText so Power Automate's default body output sends the HTML Card
         htmlBody: htmlBody,
+        plainTextSummary: bodyText,
         actionUrl: actionUrl,
         daysRemaining: extraData.daysRemaining !== undefined ? extraData.daysRemaining : null,
         timestamp: new Date().toISOString()
@@ -4927,12 +4928,7 @@ async function triggerCapaRequest(auditId) {
         });
 
         const recipients = [email1, email2].filter(Boolean).join(', ');
-        let accountNote = '';
-        if (result1?.isNew || result2?.isNew) {
-            accountNote = `Temporary login credentials created:\nUsername: ${recipients}\nTemporary Password: Audit@2026`;
-        } else {
-            accountNote = `Please log into your NAFDAC QMS account using your existing credentials.`;
-        }
+        const accountNote = `Portal Login Credentials:\nUsername: ${recipients}\nPassword: Audit@2026`;
 
         await sendPowerAutomateNotification('auditee_ncar_required', audit, recipients, {
             accountNote: accountNote,
