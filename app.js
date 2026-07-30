@@ -4841,6 +4841,8 @@ function updateActionBarBanner() {
     } else {
         banner.classList.add('hidden');
     }
+}
+
 // --- Official Read-Only IASR Form (Annexure-01 / NAFDAC-QMS-008-01) Modal ---
 function renderIasrPreviewModal(audit) {
     const modal = document.getElementById('iasr-preview-modal');
