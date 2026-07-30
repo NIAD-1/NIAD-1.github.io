@@ -2297,37 +2297,37 @@ function openAuditDetails(audit) {
         localExportBtn.classList.toggle('permission-hidden', !canUserExport);
         localExportBtn.disabled = !canUserExport;
 
-        // Add a "Preview NCAR Form" button so auditors can view the CARF Annexure-02 layout instantly
+        // Add a "Preview CARF Form" button so auditors can view the CARF Annexure-02 layout instantly
         const previewNcarBtn = document.createElement('button');
         previewNcarBtn.className = 'btn btn-outline';
         previewNcarBtn.style.borderColor = '#d97706';
         previewNcarBtn.style.color = '#d97706';
-        previewNcarBtn.innerHTML = '<i class="fas fa-eye"></i> Preview NCAR Form';
+        previewNcarBtn.innerHTML = '<i class="fas fa-eye"></i> Preview CARF Form';
         previewNcarBtn.addEventListener('click', () => {
             closeModal();
             renderNcarModal(audit);
         });
         modalActionsContainer.insertBefore(previewNcarBtn, localCloseBtn);
 
-        // Show "Send CAPA / NCAR Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
+        // Show "Send CARF Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
         if (audit.status === 'submitted' || audit.status === 'draft') {
             const triggerCapaBtn = document.createElement('button');
             triggerCapaBtn.className = 'btn btn-primary';
             triggerCapaBtn.style.background = '#8b5cf6';
             triggerCapaBtn.style.borderColor = '#7c3aed';
-            triggerCapaBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send CAPA / NCAR Request';
+            triggerCapaBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send CARF Request';
             triggerCapaBtn.addEventListener('click', () => triggerCapaRequest(audit.id));
             modalActionsContainer.insertBefore(triggerCapaBtn, localCloseBtn);
         }
 
-        // Show "Respond to NCAR" button when pending_capa if user is Auditee or matches auditee email
+        // Show "Respond to CARF" button when pending_capa if user is Auditee or matches auditee email
         const isUserAuditee = currentUser?.role === ROLES.AUDITEE || audit.auditeeEmail === currentUser?.email || audit.auditeeEmail2 === currentUser?.email;
         if (audit.status === 'pending_capa' && isUserAuditee) {
             const respondNcarBtn = document.createElement('button');
             respondNcarBtn.className = 'btn btn-primary';
             respondNcarBtn.style.background = '#d97706';
             respondNcarBtn.style.borderColor = '#b45309';
-            respondNcarBtn.innerHTML = '<i class="fas fa-edit"></i> Respond to Non-Conformances (NCAR)';
+            respondNcarBtn.innerHTML = '<i class="fas fa-edit"></i> Respond to Non-Conformances (CARF)';
             respondNcarBtn.addEventListener('click', () => {
                 closeModal();
                 renderNcarModal(audit);
@@ -2335,13 +2335,13 @@ function openAuditDetails(audit) {
             modalActionsContainer.insertBefore(respondNcarBtn, localCloseBtn);
         }
 
-        // Download NCAR DOCX button if NCAR data or checklist items exist
+        // Download CARF DOCX button if CARF data or checklist items exist
         if (audit.checklist?.some(i => i.capaPlan || i.rootCause || i.capaEvidenceLink) || audit.status === 'capa_submitted') {
             const ncarDocBtn = document.createElement('button');
             ncarDocBtn.className = 'btn btn-primary';
             ncarDocBtn.style.background = '#2563eb';
             ncarDocBtn.style.borderColor = '#1d4ed8';
-            ncarDocBtn.innerHTML = '<i class="fas fa-file-word"></i> Download NCAR (CARF) Report (.docx)';
+            ncarDocBtn.innerHTML = '<i class="fas fa-file-word"></i> Download CARF Report (.docx)';
             ncarDocBtn.addEventListener('click', () => generateNcarDocument(audit));
             modalActionsContainer.insertBefore(ncarDocBtn, localCloseBtn);
         }
@@ -4850,8 +4850,12 @@ function renderNcarModal(audit) {
                         <div><strong>Directorate/Division/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'Pharmacovigilance')}</div>
                         <div><strong>Non-Conformity (NC & Number):</strong> <span class="status status-no">NC 1</span></div>
                         <div><strong>Standard Clause Number:</strong> ISO 9001:2015 Clause 8.2</div>
-                        <div><strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}</div>
-                        <div><strong>Name of Officer Raising NC:</strong> ${escapeHtml(sampleOfficer)}</div>
+                    </div>
+                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e1;">
+                        <strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}
+                    </div>
+                    <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e1;">
+                        <strong>Name of Officer Raising NC:</strong> ${escapeHtml(sampleOfficer)}
                     </div>
                     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1;">
                         <strong>Requirement / Audit Finding:</strong>
@@ -4916,8 +4920,12 @@ function renderNcarModal(audit) {
                             <div><strong>Directorate/Division/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'N/A')}</div>
                             <div><strong>Non-Conformity (NC & Number):</strong> <span class="status status-no">${ncNumber}</span></div>
                             <div><strong>Standard Clause Number:</strong> ${escapeHtml(item.clause || 'ISO 9001 Clause 8.2')}</div>
-                            <div><strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}</div>
-                            <div><strong>Name of Officer Raising NC:</strong> ${escapeHtml(officerName)}</div>
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e1;">
+                            <strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}
+                        </div>
+                        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #cbd5e1;">
+                            <strong>Name of Officer Raising NC:</strong> ${escapeHtml(officerName)}
                         </div>
                         <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1;">
                             <strong>Requirement / Audit Finding:</strong>
