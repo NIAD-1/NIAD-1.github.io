@@ -1995,6 +1995,16 @@ function renderAuditHistory(auditsToDisplay = null) {
                     <span><strong>Modified:</strong> ${modifiedDate}</span>
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
+                <div class="card-action-bar" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                        <i class="fas fa-file-alt"></i> Preview IASR Form
+                    </button>
+                    ${audit.status === 'pending_capa' ? `
+                        <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
+                            <i class="fas fa-edit"></i> Respond to CARF
+                        </button>
+                    ` : ''}
+                </div>
                 ${audit.status === 'draft' ? `
                     <div class="draft-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
                         <button class="btn btn-sm btn-secondary btn-edit" 
@@ -2031,8 +2041,12 @@ function renderAuditHistory(auditsToDisplay = null) {
             ${formatStatusBadge(audit)}
 `;
         itemDiv.addEventListener('click', (e) => {
-            // Don't open preview modal if clicking action buttons
+            // Don't open preview modal if clicking action buttons that have separate actions
             if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit')) {
+                return;
+            }
+            if (e.target.closest('.btn-respond-carf')) {
+                renderNcarModal(audit);
                 return;
             }
             renderIasrPreviewModal(audit);
