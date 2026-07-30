@@ -4893,10 +4893,35 @@ function renderPerItemCapaModal(audit, daysRemaining = null) {
     };
 }
 
+// --- Helper: Clean & Validate Email Address ---
+function cleanAndValidateEmail(emailStr) {
+    if (!emailStr || typeof emailStr !== 'string') return '';
+    let email = emailStr.trim().toLowerCase();
+    
+    // Extract actual email using regex if embedded in text/name (e.g., "Kaka Mustaphar <kaka.mustaphar@nafdac.gov.ng>")
+    const match = email.match(/[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}/);
+    if (match) {
+        return match[0];
+    }
+    
+    // If it's a plain name (e.g. "Kaka Mustaphar" or "kaka.mustaphar"), convert to NAFDAC email format
+    const nameParts = email.replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+    if (nameParts.length >= 2) {
+        return `${nameParts[0]}.${nameParts[nameParts.length - 1]}@nafdac.gov.ng`;
+    } else if (nameParts.length === 1 && !email.includes('@')) {
+        return `${nameParts[0]}@nafdac.gov.ng`;
+    }
+    return email;
+}
+
 // --- Smart Auditee Auto-Provisioning ---
 async function autoProvisionAuditeeAccount(email, name = '') {
-    if (!email) return null;
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = cleanAndValidateEmail(email);
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+        console.warn("Invalid email format provided for auto-provisioning:", email);
+        return { isNew: false, email: email, error: 'invalid-email' };
+    }
+
     const tempPassword = 'Audit@2026';
     const appName = "TempApp_" + Date.now();
     let secondaryApp = null;
@@ -4938,7 +4963,7 @@ async function autoProvisionAuditeeAccount(email, name = '') {
         }
     } catch (err) {
         console.warn("User provision check or auth creation error:", err.message);
-        return { isNew: false, email: cleanEmail };
+        return { isNew: false, email: cleanEmail, error: err.message };
     } finally {
         if (secondaryApp) {
             try { await secondaryApp.delete(); } catch(e) {}
@@ -4952,16 +4977,16 @@ async function triggerCapaRequest(auditId) {
     const audit = audits.find(a => a.id === auditId);
     if (!audit) { alert("Audit record not found."); return; }
 
-    let email1 = audit.auditeeEmail?.trim() || '';
-    let email2 = audit.auditeeEmail2?.trim() || '';
+    let email1 = cleanAndValidateEmail(audit.auditeeEmail);
+    let email2 = cleanAndValidateEmail(audit.auditeeEmail2);
 
-    if (!email1 && !email2) {
-        const inputEmail = prompt("No Auditee Email found on this audit. Please enter the Auditee Email address:", "kaka.mustaphar@nafdac.gov.ng");
+    if (!email1 || !email1.includes('@')) {
+        const inputEmail = prompt(`Invalid or missing Auditee Email on this audit ('${audit.auditeeEmail || 'None'}'). Please enter a valid Auditee Email address:`, "kaka.mustaphar@nafdac.gov.ng");
         if (!inputEmail || !inputEmail.trim()) {
             alert("CARF Request canceled. Auditee email is required.");
             return;
         }
-        email1 = inputEmail.trim().toLowerCase();
+        email1 = cleanAndValidateEmail(inputEmail);
     }
 
     if (!confirm(`Send CAPA / NCAR Request for Audit Ref: ${audit.refNo || auditId} to ${email1}${email2 ? ', ' + email2 : ''}?`)) {
