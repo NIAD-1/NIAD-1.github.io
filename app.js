@@ -2035,43 +2035,35 @@ function renderAuditHistory(auditsToDisplay = null) {
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
                 <div class="card-action-bar" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    ${isAuditorOrAdmin ? `
-                        <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
-                            <i class="fas fa-edit"></i> Edit Audit
-                        </button>
-                        <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
-                            <i class="fas fa-file-alt"></i> Preview IASR Form
-                        </button>
-                        ${audit.status !== 'trash' ? `
-                            <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
-                                <i class="fas fa-paper-plane"></i> Send CARF Request
-                            </button>
-                        ` : ''}
-                    ` : `
-                        <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
-                            <i class="fas fa-file-alt"></i> Preview IASR Form
-                        </button>
-                        ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
-                            <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
-                                <i class="fas fa-edit"></i> Respond to CARF
-                            </button>
-                        ` : ''}
-                    `}
-                </div>
-                ${audit.status === 'draft' ? `
-                    <div class="draft-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
-                        <button class="btn btn-sm btn-secondary btn-edit" 
-                                data-audit-id="${audit.id}">
+                    ${audit.status === 'draft' ? `
+                        <button class="btn btn-sm btn-secondary btn-edit" data-audit-id="${audit.id}" style="background:#059669; border-color:#047857; color:#ffffff;">
                             <i class="fas fa-edit"></i> Edit Draft
                         </button>
-                        <button class="btn btn-sm btn-primary btn-submit" 
-                                data-audit-id="${audit.id}">
+                        <button class="btn btn-sm btn-primary btn-submit" data-audit-id="${audit.id}">
                             <i class="fas fa-check"></i> Submit Audit
                         </button>
-                    </div>
-                ` : ''}
-                ${audit.status === 'trash' ? `
-                    <div class="trash-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
+                    ` : `
+                        ${isAuditorOrAdmin ? `
+                            <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
+                                <i class="fas fa-eye"></i> View Audit Details
+                            </button>
+                            ${audit.status !== 'trash' ? `
+                                <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
+                                    <i class="fas fa-paper-plane"></i> Send CARF Request
+                                </button>
+                            ` : ''}
+                        ` : `
+                            <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                                <i class="fas fa-file-alt"></i> Preview IASR Form
+                            </button>
+                            ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
+                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
+                                    <i class="fas fa-edit"></i> Respond to CARF
+                                </button>
+                            ` : ''}
+                        `}
+                    `}
+                    ${audit.status === 'trash' ? `
                         <button class="btn btn-sm btn-success restore-audit" data-audit-id="${audit.id}">
                             <i class="fas fa-undo"></i> Restore Audit
                         </button>
@@ -2080,16 +2072,14 @@ function renderAuditHistory(auditsToDisplay = null) {
                                 <i class="fas fa-trash-alt"></i> Delete Permanently
                             </button>
                         ` : ''}
-                    </div>
-                ` : `
-                    ${canDeleteAudit(audit) ? `
-                        <button class="btn btn-danger btn-sm delete-audit" 
-                                style="margin-top: 0.5rem;"
-                                data-audit-id="${audit.id}">
-                            <i class="fas fa-trash"></i> Move to Trash
-                        </button>
-                    ` : ''}
-                `}
+                    ` : `
+                        ${canDeleteAudit(audit) ? `
+                            <button class="btn btn-danger btn-sm delete-audit" data-audit-id="${audit.id}">
+                                <i class="fas fa-trash"></i> Move to Trash
+                            </button>
+                        ` : ''}
+                    `}
+                </div>
             </div>
             ${formatStatusBadge(audit)}
 `;
@@ -2423,18 +2413,6 @@ function openAuditDetails(audit) {
         console.log(`User ${currentUser?.email} (role: ${currentUser?.role}) canExport: ${canUserExport}`);
         localExportBtn.classList.toggle('permission-hidden', !canUserExport);
         localExportBtn.disabled = !canUserExport;
-
-        // Add a "Preview IASR Form" button so users can view the full read-only IASR audit form
-        const previewIasrBtn = document.createElement('button');
-        previewIasrBtn.className = 'btn btn-outline';
-        previewIasrBtn.style.borderColor = '#059669';
-        previewIasrBtn.style.color = '#059669';
-        previewIasrBtn.innerHTML = '<i class="fas fa-file-alt"></i> Preview IASR Form';
-        previewIasrBtn.addEventListener('click', () => {
-            closeModal();
-            renderIasrPreviewModal(audit);
-        });
-        modalActionsContainer.insertBefore(previewIasrBtn, localCloseBtn);
 
         // Show "Send CARF Request" button for Auditor/Lead Auditor/Admin on any active audit
         const isAuditorOrAdmin = currentUser && (currentUser.role === ROLES.LEAD_AUDITOR || currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.AUDITOR);
