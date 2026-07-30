@@ -4440,24 +4440,108 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
     let actionUrl = baseUrl;
     let subject = '';
     let bodyText = '';
+    let emailTitle = '';
+    let emailIntroText = '';
+    let buttonLabel = 'Open QMS Portal';
+    let deadlineText = '';
 
     if (type === 'lead_approval_required') {
         subject = `ACTION REQUIRED: Audit Pending Approval - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?auditId=${audit.id}`;
+        emailTitle = '📋 Audit Report Pending Your Approval';
+        emailIntroText = `Audit report for <strong>${escapeHtml(audit.directorateUnit || 'Unit')}</strong> (Ref: ${escapeHtml(audit.refNo || 'N/A')}) has been submitted and requires your review and approval as Lead Auditor.`;
+        buttonLabel = 'Review & Approve Audit';
         bodyText = `Audit for ${audit.directorateUnit} (Ref: ${audit.refNo}) has been submitted and is pending your review and approval as Lead Auditor. Please click the link to view and approve: ${actionUrl}`;
     } else if (type === 'auditee_capa_required' || type === 'auditee_ncar_required') {
-        subject = `ACTION REQUIRED: Submit Non-Conformance Action Response (NCAR) - Ref: ${audit.refNo || 'N/A'}`;
+        subject = `ACTION REQUIRED: Submit Corrective Action Response (CARF) - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = baseUrl;
-        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) is ready for Non-Conformance Action Response (NCAR / CARF Annexure-02).\n\n${extraData.accountNote || 'Please log in to your NAFDAC QMS account to view and respond.'}\n\nPortal URL: ${actionUrl}`;
+        emailTitle = '⚠️ Non-Conformance Action Required (CARF Annexure-02)';
+        emailIntroText = `The QMS Internal Audit report for <strong>${escapeHtml(audit.directorateUnit || 'Unit')}</strong> (Ref: ${escapeHtml(audit.refNo || 'N/A')}) requires your formal response on the Corrective Action Report Form (CARF Annexure-02).`;
+        buttonLabel = 'Open & Respond to CARF';
+        deadlineText = '7 Days Remaining (Maximum Window)';
+        bodyText = `The Internal Audit report for ${audit.directorateUnit} (Ref: ${audit.refNo}) is ready for Non-Conformance Action Response (CARF Annexure-02).\n\n${extraData.accountNote || 'Please log in to your NAFDAC QMS account to view and respond.'}\n\nPortal URL: ${actionUrl}`;
     } else if (type === 'ncar_submitted') {
-        subject = `NOTIFIED: NCAR Submitted by Auditee - Ref: ${audit.refNo || 'N/A'}`;
+        subject = `NOTIFIED: CARF Response Submitted by Auditee - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?auditId=${audit.id}`;
-        bodyText = `The Auditee has submitted the Non-Conformance Action Response (NCAR / CARF Annexure-02) for audit ${audit.directorateUnit} (Ref: ${audit.refNo}). Please click here to view and download the NCAR document: ${actionUrl}`;
+        emailTitle = '✅ CARF Response Submitted by Auditee';
+        emailIntroText = `The Auditee for <strong>${escapeHtml(audit.directorateUnit || 'Unit')}</strong> (Ref: ${escapeHtml(audit.refNo || 'N/A')}) has completed and submitted their Corrective Action Report Form (CARF Annexure-02).`;
+        buttonLabel = 'View Submitted CARF Response';
+        bodyText = `The Auditee has submitted the Corrective Action Response (CARF Annexure-02) for audit ${audit.directorateUnit} (Ref: ${audit.refNo}). Please click here to view and download: ${actionUrl}`;
     } else if (type === 'auditee_capa_reminder') {
-        subject = `REMINDER (Expiring Soon): Submit CAPA Response - Ref: ${audit.refNo || 'N/A'}`;
+        subject = `REMINDER (7-Day Window): Submit CARF Response - Ref: ${audit.refNo || 'N/A'}`;
         actionUrl = `${baseUrl}?capaToken=${extraData.capaToken}`;
-        bodyText = `REMINDER: Your CAPA submission link for ${audit.directorateUnit} (Ref: ${audit.refNo}) will expire in ${extraData.daysRemaining} day(s). Please click here to complete your CAPA response before it expires: ${actionUrl}`;
+        emailTitle = '⏰ Reminder: CARF Response Window Expiring Soon';
+        emailIntroText = `This is a reminder that your CARF submission window for <strong>${escapeHtml(audit.directorateUnit || 'Unit')}</strong> (Ref: ${escapeHtml(audit.refNo || 'N/A')}) will expire in <strong>${extraData.daysRemaining || 7} day(s)</strong>.`;
+        buttonLabel = 'Complete CARF Response Now';
+        deadlineText = `${extraData.daysRemaining || 7} Day(s) Left`;
+        bodyText = `REMINDER: Your CARF submission link for ${audit.directorateUnit} (Ref: ${audit.refNo}) will expire in ${extraData.daysRemaining} day(s). Please click here to complete your response: ${actionUrl}`;
     }
+
+    const htmlBody = `
+        <div style="font-family: Arial, Helvetica, sans-serif; background-color: #f1f5f9; padding: 25px 12px; margin: 0;">
+          <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #cbd5e1;">
+            
+            <!-- Top Header Banner -->
+            <div style="background-color: #059669; padding: 22px 18px; text-align: center; color: #ffffff;">
+              <h2 style="margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">National Agency for Food and Drug Administration and Control</h2>
+              <p style="margin: 6px 0 0 0; font-size: 12px; opacity: 0.95; font-weight: 600;">QUALITY MANAGEMENT SYSTEM (QMS) INTERNAL AUDIT PORTAL</p>
+            </div>
+
+            <!-- Email Card Content -->
+            <div style="padding: 26px 20px; color: #1e293b;">
+              <h3 style="margin-top: 0; color: #0f172a; font-size: 17px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px;">${emailTitle}</h3>
+              <p style="font-size: 14px; line-height: 1.6; color: #334155;">${emailIntroText}</p>
+
+              <!-- Audit Info Box -->
+              <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 16px; margin: 18px 0; font-size: 13.5px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b; font-weight: 600; width: 40%;">Audit Ref No.:</td>
+                    <td style="padding: 5px 0; color: #059669; font-weight: 700; width: 60%;">${escapeHtml(audit.refNo || 'N/A')}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b; font-weight: 600;">Directorate / Unit:</td>
+                    <td style="padding: 5px 0; color: #0f172a; font-weight: 600;">${escapeHtml(audit.directorateUnit || 'N/A')}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 5px 0; color: #64748b; font-weight: 600;">Location:</td>
+                    <td style="padding: 5px 0; color: #0f172a;">${escapeHtml(audit.location || 'Abuja')}</td>
+                  </tr>
+                  ${deadlineText ? `
+                  <tr>
+                    <td style="padding: 5px 0; color: #991b1b; font-weight: 600;">Deadline Window:</td>
+                    <td style="padding: 5px 0; color: #dc2626; font-weight: 700;">${deadlineText}</td>
+                  </tr>
+                  ` : ''}
+                </table>
+              </div>
+
+              ${extraData.accountNote ? `
+              <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 14px; margin: 18px 0; color: #92400e; font-size: 13.5px;">
+                <strong style="display: block; margin-bottom: 4px; font-size: 14px;">🔑 Account Login Information:</strong>
+                ${escapeHtml(extraData.accountNote).replace(/\n/g, '<br>')}
+              </div>
+              ` : ''}
+
+              <!-- Action Button CTA -->
+              <div style="text-align: center; margin: 28px 0 20px 0;">
+                <a href="${actionUrl}" target="_blank" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14.5px; padding: 13px 28px; border-radius: 6px; box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);">
+                  ${buttonLabel} &rarr;
+                </a>
+              </div>
+
+              <p style="font-size: 12px; color: #64748b; text-align: center; margin-top: 18px;">If the button above does not work, copy and paste this link into your browser:<br><a href="${actionUrl}" style="color: #2563eb; word-break: break-all;">${actionUrl}</a></p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 14px 18px; text-align: center; font-size: 11.5px; color: #94a3b8;">
+              This is an automated notification from NAFDAC QMS Internal Audit System.<br>
+              National Agency for Food and Drug Administration and Control &copy; ${new Date().getFullYear()}
+            </div>
+
+          </div>
+        </div>
+    `;
 
     const payload = {
         type: type,
@@ -4469,6 +4553,7 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         auditeeEmail2: audit.auditeeEmail2 || '',
         subject: subject,
         bodyText: bodyText,
+        htmlBody: htmlBody,
         actionUrl: actionUrl,
         daysRemaining: extraData.daysRemaining !== undefined ? extraData.daysRemaining : null,
         timestamp: new Date().toISOString()
