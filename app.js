@@ -2199,8 +2199,8 @@ function openAuditDetails(audit) {
         iasrHeaderBox.style.background = '#ffffff';
         iasrHeaderBox.innerHTML = `
             <div style="display: flex; border-bottom: 1px solid #1e293b; background: #f8fafc; font-size: 0.85rem; font-weight: 600; text-align: center; color: #0f172a;">
-                <div style="flex: 1; padding: 0.5rem; border-right: 1px solid #1e293b;">Annexure-01</div>
-                <div style="flex: 2; padding: 0.5rem; border-right: 1px solid #1e293b;">SOP Ref. No.: NAFDAC-QMS-008-01</div>
+                <div style="flex: 1; padding: 0.5rem; border-right: 1px solid #1e293b;">Annexure-02</div>
+                <div style="flex: 2; padding: 0.5rem; border-right: 1px solid #1e293b;">SOP Ref. No.: NAFDAC-QMS-012-04</div>
                 <div style="flex: 3; padding: 0.5rem;">Title of Annexure: Internal Audit Summary Report (IASR)</div>
             </div>
             <div style="padding: 1rem; text-align: center; background: #ffffff;">
