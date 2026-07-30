@@ -1983,6 +1983,11 @@ function renderAuditHistory(auditsToDisplay = null) {
         const submittedDate = audit.submittedAt ? formatDateTime(audit.submittedAt) : 'Not submitted';
 
                 const isAuditorOrAdmin = currentUser && (currentUser.role === ROLES.LEAD_AUDITOR || currentUser.role === ROLES.ADMIN || currentUser.role === ROLES.AUDITOR);
+                const isUserAuditeeForAudit = currentUser && (
+                    currentUser.role === ROLES.AUDITEE || 
+                    currentUser.email?.toLowerCase() === audit.auditeeEmail?.toLowerCase() || 
+                    currentUser.email?.toLowerCase() === audit.auditeeEmail2?.toLowerCase()
+                );
                 
                 itemDiv.innerHTML = `
             <div class="details">
@@ -2006,7 +2011,7 @@ function renderAuditHistory(auditsToDisplay = null) {
                             <i class="fas fa-paper-plane"></i> Send CARF Request
                         </button>
                     ` : ''}
-                    ${audit.status === 'pending_capa' ? `
+                    ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
                         <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
                             <i class="fas fa-edit"></i> Respond to CARF
                         </button>
@@ -5085,7 +5090,13 @@ function renderIasrPreviewModal(audit) {
         actionsEl.appendChild(sendCarfBtn);
     }
 
-    if (audit.status === 'pending_capa') {
+    const isUserAuditeeForAudit = currentUser && (
+        currentUser.role === ROLES.AUDITEE || 
+        currentUser.email?.toLowerCase() === audit.auditeeEmail?.toLowerCase() || 
+        currentUser.email?.toLowerCase() === audit.auditeeEmail2?.toLowerCase()
+    );
+
+    if (audit.status === 'pending_capa' && isUserAuditeeForAudit) {
         const carfBtn = document.createElement('button');
         carfBtn.className = 'btn btn-primary';
         carfBtn.style.background = '#d97706';
