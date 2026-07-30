@@ -2297,6 +2297,18 @@ function openAuditDetails(audit) {
         localExportBtn.classList.toggle('permission-hidden', !canUserExport);
         localExportBtn.disabled = !canUserExport;
 
+        // Add a "Preview NCAR Form" button so auditors can view the CARF Annexure-02 layout instantly
+        const previewNcarBtn = document.createElement('button');
+        previewNcarBtn.className = 'btn btn-outline';
+        previewNcarBtn.style.borderColor = '#d97706';
+        previewNcarBtn.style.color = '#d97706';
+        previewNcarBtn.innerHTML = '<i class="fas fa-eye"></i> Preview NCAR Form';
+        previewNcarBtn.addEventListener('click', () => {
+            closeModal();
+            renderNcarModal(audit);
+        });
+        modalActionsContainer.insertBefore(previewNcarBtn, localCloseBtn);
+
         // Show "Send CAPA / NCAR Request" button for Auditor/Lead Auditor/Admin on submitted or draft audits
         if (audit.status === 'submitted' || audit.status === 'draft') {
             const triggerCapaBtn = document.createElement('button');
@@ -4820,7 +4832,74 @@ function renderNcarModal(audit) {
     `;
 
     if (itemsNeedingNcar.length === 0) {
-        html += `<p class="text-muted">No non-compliance items (Major/Minor) flagged for this report. No NCAR response is required.</p>`;
+        // Fallback sample item for instant visual preview
+        const sampleCarNo = `${new Date().getFullYear()}/CAR/${(audit.directorateUnit || 'UNIT').substring(0,6).toUpperCase()}/01`;
+        const sampleOfficer = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Adesanya Oluwaseun (Lead Auditor)';
+
+        html += `
+            <div style="background: #fef3c7; border: 1px solid #f59e0b; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1.25rem; font-size: 0.9rem; color: #b45309;">
+                <i class="fas fa-info-circle"></i> <strong>Form Preview Mode:</strong> Displaying sample Non-Conformance item format (CARF Annexure-02 / NAFDAC-QMS-008-03).
+            </div>
+
+            <div class="ncar-item-card" style="border: 2px solid var(--border-color); border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; background: var(--card-bg); box-shadow: var(--box-shadow-sm);">
+                
+                <!-- Annexure-02 Form Header Box -->
+                <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 1rem; margin-bottom: 1.25rem; font-size: 0.92rem;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem;">
+                        <div><strong>CAR No. (Year/Serial No/Unit):</strong> <span style="color: #2563eb; font-weight:700;">${escapeHtml(sampleCarNo)}</span></div>
+                        <div><strong>Directorate/Division/Unit:</strong> ${escapeHtml(audit.directorateUnit || 'Pharmacovigilance')}</div>
+                        <div><strong>Non-Conformity (NC & Number):</strong> <span class="status status-no">NC 1</span></div>
+                        <div><strong>Standard Clause Number:</strong> ISO 9001:2015 Clause 8.2</div>
+                        <div><strong>Reference Document Number:</strong> ${escapeHtml(audit.refNo || 'NAFDAC-SOP-QMS-001')}</div>
+                        <div><strong>Name of Officer Raising NC:</strong> ${escapeHtml(sampleOfficer)}</div>
+                    </div>
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed #cbd5e1;">
+                        <strong>Requirement / Audit Finding:</strong>
+                        <p style="margin: 0.25rem 0 0 0; color: #334155; font-style: italic;">"Monitoring and review of reported Adverse Drug Reactions (ADRs) within specified timelines; delays observed in processing high-priority cases."</p>
+                    </div>
+                </div>
+
+                <!-- Auditee Input Section Styled Like New Audit Form -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; color: var(--primary-color);">
+                        <i class="fas fa-search-minus"></i> Most Probable Root Cause(s):
+                    </label>
+                    <textarea rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Detail root cause analysis...">(5 whys analysis: Lack of standardized process for prioritizing ADR reports; Insufficient staff training on priority criteria...)</textarea>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600; color: var(--primary-color);">
+                        <i class="fas fa-tools"></i> Corrective Action(s):
+                    </label>
+                    <textarea rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Specify corrective actions...">Develop and implement a standardized automated ADR report prioritization matrix in the PV database. Conduct training for all PV staff.</textarea>
+                </div>
+
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <div class="form-group" style="flex: 1; min-width: 220px;">
+                        <label style="font-weight: 600;">Date of Completion (Target):</label>
+                        <input type="date" class="evidence-input" style="width:100%; padding:0.75rem;" value="2026-11-30">
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 220px;">
+                        <label style="font-weight: 600;">Officer Responding (Name/Signature):</label>
+                        <input type="text" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(audit.auditeeName || 'Head, PV Directorate')}">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="font-weight: 600;">
+                        <i class="fas fa-link"></i> Objective Evidence of Action Taken (Text & SharePoint / OneDrive Link):
+                    </label>
+                    <textarea rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.5rem;" placeholder="Describe evidence...">Training records and updated prioritization SOP uploaded to SharePoint.</textarea>
+                    <input type="url" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/..." value="https://nafdac.sharepoint.com/PV/NC/CAR-1025-Evidence.zip">
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight: 600;">Possible SOP or Documents to be Updated (if any):</label>
+                    <input type="text" class="evidence-input" style="width:100%; padding:0.75rem;" value="NAFDAC-SOP-PV-004 Rev 02">
+                </div>
+
+            </div>
+        `;
     } else {
         itemsNeedingNcar.forEach((item, index) => {
             const ncNumber = `NC ${index + 1}`;
