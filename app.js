@@ -2031,11 +2031,11 @@ function renderAuditHistory(auditsToDisplay = null) {
             ${formatStatusBadge(audit)}
 `;
         itemDiv.addEventListener('click', (e) => {
-            // Don't open details modal if clicking action buttons
+            // Don't open preview modal if clicking action buttons
             if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit')) {
                 return;
             }
-            openAuditDetails(audit);
+            renderIasrPreviewModal(audit);
         });
 
         auditHistoryList.appendChild(itemDiv);
