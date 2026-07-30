@@ -2035,19 +2035,28 @@ function renderAuditHistory(auditsToDisplay = null) {
                     <span><strong>Submitted:</strong> ${submittedDate}</span>
                 </div>
                 <div class="card-action-bar" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
-                        <i class="fas fa-file-alt"></i> Preview IASR Form
-                    </button>
-                    ${isAuditorOrAdmin && audit.status !== 'trash' ? `
-                        <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
-                            <i class="fas fa-paper-plane"></i> Send CARF Request
+                    ${isAuditorOrAdmin ? `
+                        <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
+                            <i class="fas fa-edit"></i> Edit Audit
                         </button>
-                    ` : ''}
-                    ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
-                        <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
-                            <i class="fas fa-edit"></i> Respond to CARF
+                        <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                            <i class="fas fa-file-alt"></i> Preview IASR Form
                         </button>
-                    ` : ''}
+                        ${audit.status !== 'trash' ? `
+                            <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
+                                <i class="fas fa-paper-plane"></i> Send CARF Request
+                            </button>
+                        ` : ''}
+                    ` : `
+                        <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                            <i class="fas fa-file-alt"></i> Preview IASR Form
+                        </button>
+                        ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
+                            <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
+                                <i class="fas fa-edit"></i> Respond to CARF
+                            </button>
+                        ` : ''}
+                    `}
                 </div>
                 ${audit.status === 'draft' ? `
                     <div class="draft-actions" style="margin-top: 0.5rem; display: flex; gap: 0.5rem;">
@@ -2085,8 +2094,12 @@ function renderAuditHistory(auditsToDisplay = null) {
             ${formatStatusBadge(audit)}
 `;
         itemDiv.addEventListener('click', (e) => {
-            // Don't open preview modal if clicking action buttons that have separate actions
-            if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit')) {
+            // Don't trigger default card action if clicking specific buttons
+            if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit') || e.target.closest('.restore-audit')) {
+                return;
+            }
+            if (e.target.closest('.btn-edit-audit')) {
+                openAuditDetails(audit);
                 return;
             }
             if (e.target.closest('.btn-send-carf-req')) {
@@ -2097,7 +2110,19 @@ function renderAuditHistory(auditsToDisplay = null) {
                 renderNcarModal(audit);
                 return;
             }
-            renderIasrPreviewModal(audit);
+            if (e.target.closest('.btn-preview-iasr')) {
+                renderIasrPreviewModal(audit);
+                return;
+            }
+
+            // Default card click:
+            // Auditors/Admins -> Interactive Audit Editor Modal (openAuditDetails)
+            // Auditees -> Read-Only IASR Form Preview Modal (renderIasrPreviewModal)
+            if (isAuditorOrAdmin) {
+                openAuditDetails(audit);
+            } else {
+                renderIasrPreviewModal(audit);
+            }
         });
 
         auditHistoryList.appendChild(itemDiv);
