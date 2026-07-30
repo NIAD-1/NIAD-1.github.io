@@ -3440,83 +3440,89 @@ async function generateAuditDocument(auditData) {
                 text-align: center;
             }
             @page {
-                size: A4;
-                margin: 2.54cm; /* Standard A4 margins */
+                size: A4 portrait;
+                margin: 1.5cm;
             }
             body { 
                 font-family: 'Times New Roman', Times, serif; 
                 margin: 0;
-                line-height: 1.5;
+                line-height: 1.4;
+                font-size: 11pt;
             }
             .header { 
                 text-align: center; 
-                margin-bottom: 20px;
+                margin-bottom: 15px;
                 border-bottom: 2px solid #005f73;
                 padding-bottom: 10px;
+            }
+            .header-logo {
+                height: 70px;
+                margin-right: 15px;
             }
             .metadata {
                 display: flex;
                 justify-content: space-between;
-                margin: 20px 0;
+                margin: 15px 0;
                 font-size: 11pt;
             }
             .location { 
                 font-weight: bold; 
-                margin-top: 15px;
-                font-size: 12pt;
+                margin-top: 10px;
+                font-size: 11pt;
             }
             table { 
                 width: 100%; 
                 border-collapse: collapse;
-                table-layout: fixed; /* Added for consistent column widths */
-                word-wrap: break-word; /* Ensure text wraps in cells */
-                margin: 15px 0;
+                table-layout: fixed;
+                word-wrap: break-word;
+                word-break: break-word;
+                margin: 12px 0;
             }
             th, td { 
                 border: 1px solid #000;
-                padding: 8px;
-                vertical-align: top; /* Align content to top */
-                word-break: break-word; /* Break long words */
+                padding: 4px 6px;
+                vertical-align: top;
+                word-break: break-word;
+                overflow-wrap: break-word;
+                font-size: 9.5pt;
             }
-            /* Column width adjustments */
-            th:nth-child(1), td:nth-child(1) { width: 5%; }
-            th:nth-child(2), td:nth-child(2) { width: 25%; }
-            th:nth-child(3), td:nth-child(3) { width: 25%; }
-            th:nth-child(4), td:nth-child(4) { width: 15%; }
-            th:nth-child(5), td:nth-child(5) { width: 10%; }
-            th:nth-child(6), td:nth-child(6) { width: 10%; }
-            th:nth-child(7), td:nth-child(7) { width: 10%; }
+            th {
+                background-color: #f2f2f2;
+                font-size: 9.5pt;
+                font-weight: bold;
+                text-align: center;
+            }
 
             .compliant { color: #2a9d8f; font-weight: bold; }
             .non-compliant { color: #e76f51; font-weight: bold; }
             .signature-section {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
                 gap: 20px;
-                margin-top: 40px;
+                margin-top: 30px;
             }
             .signature-line {
                 border-top: 1px solid #000;
-                width: 250px;
-                margin-top: 30px;
+                width: 220px;
+                margin-top: 25px;
             }
         </style>
     </head>
     <body>
         <!-- IASR Official Document Header Box Table -->
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-weight: bold; font-family: 'Times New Roman', Times, serif;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-weight: bold; font-family: 'Times New Roman', Times, serif; table-layout: fixed;">
             <tr>
-                <td style="width: 20%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">Annexure-02</td>
-                <td style="width: 45%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">SOP Ref. No.: NAFDAC-QMS-012-04</td>
-                <td style="width: 35%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 11pt;">INTERNAL AUDIT SUMMARY REPORT<br>IASR</td>
+                <td style="width: 20%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 10.5pt;">Annexure-02</td>
+                <td style="width: 45%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 10.5pt;">SOP Ref. No.: NAFDAC-QMS-012-04</td>
+                <td style="width: 35%; border: 1.5pt solid #000; padding: 6px 10px; font-size: 10.5pt;">INTERNAL AUDIT SUMMARY REPORT<br>IASR</td>
             </tr>
         </table>
 
         <div class="header">
             <img src="${logoUrl}" class="header-logo" alt="NAFDAC Logo">
             <div class="header-content">
-                <h2>National Agency for Food and Drug Administration and Control</h2>
-                <h3>INTERNAL AUDIT SUMMARY REPORT (IASR)</h3>
+                <h2 style="font-size: 13pt; margin: 0;">National Agency for Food and Drug Administration and Control</h2>
+                <h3 style="font-size: 11pt; margin: 5px 0;">INTERNAL AUDIT SUMMARY REPORT (IASR)</h3>
                 <div class="location">
                     LOCATION: ${escapeHtml(auditData.location)}<br>
                     UNIT/DIRECTORATE: ${escapeHtml(auditData.directorateUnit)}
@@ -3546,8 +3552,8 @@ async function generateAuditDocument(auditData) {
         Auditors: ${formatAuditors(auditData.auditors)}</p>
 
         <!-- Scope Table -->
-        <table>
-            <tr><th>ISO</th><th>Clause No.</th><th>PROCESSES</th></tr>
+        <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
+            <tr style="background-color: #f2f2f2;"><th style="width: 25%;">ISO</th><th style="width: 15%;">Clause No.</th><th style="width: 60%;">PROCESSES</th></tr>
             ${generateScopeRows()}
         </table>
 
@@ -3558,17 +3564,21 @@ async function generateAuditDocument(auditData) {
         <!-- Audit Findings -->
         <h4>5. ISO 9001:2015 Alignment</h4>
         <p>Audit summary observations are as follows:</p>
-        <table>
-            <tr>
-                <th width="5%">S/N</th>
-                <th width="25%">REQUIREMENT</th>
-                <th width="25%">OBJECTIVE EVIDENCE</th>
-                <th width="15%">COMMENTS</th>
-                <th width="10%">COMPLIANCE</th>
-                <th width="10%">CORRECTIVE ACTION</th>
-                <th width="10%">CLASSIFICATION</th>
-            </tr>
-            ${generateFindingsRows(auditData)}
+        <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+            <thead>
+                <tr style="background-color: #f2f2f2;">
+                    <th style="width: 4%;">S/N</th>
+                    <th style="width: 22%;">REQUIREMENT</th>
+                    <th style="width: 26%;">OBJECTIVE EVIDENCE</th>
+                    <th style="width: 14%;">COMMENTS</th>
+                    <th style="width: 11%;">COMPLIANCE</th>
+                    <th style="width: 12%;">CORRECTIVE ACTION</th>
+                    <th style="width: 11%;">CLASSIFICATION</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${generateFindingsRows(auditData)}
+            </tbody>
         </table>
 
         <!-- Other Observations -->
