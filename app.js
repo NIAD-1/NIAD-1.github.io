@@ -186,6 +186,20 @@ function init() {
     checkCapaTokenOnLoad();
 }
 
+function setupModalEvents() {
+    // Universal backdrop click and ESC key modal closing
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.add('hidden');
+        });
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.modal:not(.hidden)').forEach(m => m.classList.add('hidden'));
+        }
+    });
+}
+
 
 function setupEventListeners() {
     // Auth events
@@ -4338,41 +4352,47 @@ function setupDarkMode() {
 
 // --- Power Automate & Lead Auditor Approval & Tokenized CAPA Helpers ---
 
-const POWER_AUTOMATE_WEBHOOK_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/21/workflows/fbcd1ceed0ba4b80acf2fd29ef893d1c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BNF9XOiWbi7IcmvHYZlY3DISrwhr1nrQFPkOs5MZzBs";
+const POWER_AUTOMATE_WEBHOOK_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/21/workflows/fbcd1ceed0ba4b80acf2fd29ef893d1c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BNF9XOiWbi7IcmvHYZlY3DISrwh";
 
 async function resolveLeadAuditorEmail(audit) {
-    if (!audit || !audit.leadAuditors || audit.leadAuditors.length === 0) return '';
-    
-    const lead = audit.leadAuditors[0];
-    if (lead.email) return lead.email;
+    if (!audit) return '';
+    if (audit.leadAuditors && audit.leadAuditors.length > 0 && audit.leadAuditors[0].email) {
+        return audit.leadAuditors[0].email;
+    }
+    if (audit.createdByEmail) return audit.createdByEmail;
 
-    const leadName = (lead.displayName || lead.uid || '').trim();
+    const lead = audit.leadAuditors?.[0];
+    const leadName = (lead?.displayName || lead?.uid || '').trim();
     if (!leadName) return '';
 
-    // Search users collection by displayName
-    try {
-        const query = await db.collection('users').get();
-        const cleanLeadName = leadName.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-        
-        let foundEmail = '';
-        query.forEach(doc => {
-            const data = doc.data();
-            const uName = (data.displayName || '').toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-            if (uName && (uName === cleanLeadName || uName.includes(cleanLeadName) || cleanLeadName.includes(uName))) {
-                foundEmail = data.email || '';
-            }
-        });
-        if (foundEmail) return foundEmail;
-    } catch (e) {
-        console.warn("Could not query users collection for lead auditor email:", e);
+    // Search users collection by displayName if user has permission
+    if (currentUser?.role !== ROLES.AUDITEE) {
+        try {
+            const query = await db.collection('users').get();
+            const cleanLeadName = leadName.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+            
+            let foundEmail = '';
+            query.forEach(doc => {
+                const data = doc.data();
+                const uName = (data.displayName || '').toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+                if (uName && (uName === cleanLeadName || uName.includes(cleanLeadName) || cleanLeadName.includes(uName))) {
+                    foundEmail = data.email || '';
+                }
+            });
+            if (foundEmail) return foundEmail;
+        } catch (e) {
+            console.log("Users collection query skipped or limited by permissions.");
+        }
     }
 
     // Fallback: construct NAFDAC email format (e.g., firstname.lastname@nafdac.gov.ng)
-    const nameParts = leadName.toLowerCase().split(' ').filter(Boolean);
-    if (nameParts.length >= 2) {
-        return `${nameParts[0]}.${nameParts[1]}@nafdac.gov.ng`;
+    const cleanParts = leadName.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+    if (cleanParts.length >= 2) {
+        return `${cleanParts[0]}.${cleanParts[cleanParts.length - 1]}@nafdac.gov.ng`;
+    } else if (cleanParts.length === 1) {
+        return `${cleanParts[0]}@nafdac.gov.ng`;
     }
-    return `${leadName.toLowerCase().replace(/\s+/g, '.')}@nafdac.gov.ng`;
+    return '';
 }
 
 async function sendPowerAutomateNotification(type, audit, recipientEmail, extraData = {}) {
