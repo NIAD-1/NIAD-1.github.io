@@ -4897,41 +4897,52 @@ function renderPerItemCapaModal(audit, daysRemaining = null) {
 async function autoProvisionAuditeeAccount(email, name = '') {
     if (!email) return null;
     const cleanEmail = email.trim().toLowerCase();
+    const tempPassword = 'Audit@2026';
+    const appName = "TempApp_" + Date.now();
+    let secondaryApp = null;
 
     try {
-        const query = await db.collection('users').where('email', '==', cleanEmail).get();
-        if (!query.empty) {
-            console.log(`User ${cleanEmail} already exists in database. Sending password reset email...`);
-            auth.sendPasswordResetEmail(cleanEmail).catch(err => console.log("Password reset email dispatch note:", err.message));
-            return { isNew: false, email: cleanEmail };
-        }
-
-        const tempPassword = 'Audit@2026';
-        const appName = "TempApp_" + Date.now();
-        const secondaryApp = firebase.initializeApp(firebaseConfig, appName);
+        secondaryApp = firebase.initializeApp(firebaseConfig, appName);
         const secondaryAuth = secondaryApp.auth();
 
-        const userCredential = await secondaryAuth.createUserWithEmailAndPassword(cleanEmail, tempPassword);
-        const newUser = userCredential.user;
-        const displayName = name || cleanEmail.split('@')[0];
+        let newUser = null;
+        try {
+            const userCredential = await secondaryAuth.createUserWithEmailAndPassword(cleanEmail, tempPassword);
+            newUser = userCredential.user;
+            console.log(`Successfully created Firebase Auth account for ${cleanEmail} with temp password Audit@2026.`);
+        } catch (authErr) {
+            if (authErr.code === 'auth/email-already-in-use' || (authErr.message && authErr.message.includes('already-in-use'))) {
+                console.log(`Firebase Auth account for ${cleanEmail} already exists.`);
+                auth.sendPasswordResetEmail(cleanEmail).catch(e => console.log("Reset email note:", e.message));
+                return { isNew: false, email: cleanEmail };
+            } else {
+                console.warn("Auth creation warning:", authErr.message);
+                throw authErr;
+            }
+        }
 
-        await newUser.updateProfile({ displayName: displayName });
+        if (newUser) {
+            const displayName = name || cleanEmail.split('@')[0];
+            await newUser.updateProfile({ displayName: displayName });
 
-        const secondaryDb = secondaryApp.firestore();
-        await secondaryDb.collection('users').doc(newUser.uid).set({
-            email: cleanEmail,
-            displayName: displayName,
-            role: ROLES.AUDITEE,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            isTempPassword: true
-        });
+            const secondaryDb = secondaryApp.firestore();
+            await secondaryDb.collection('users').doc(newUser.uid).set({
+                email: cleanEmail,
+                displayName: displayName,
+                role: ROLES.AUDITEE,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                isTempPassword: true
+            });
 
-        await secondaryApp.delete();
-        console.log(`Auto-provisioned Auditee account for ${cleanEmail} with temp password.`);
-        return { isNew: true, email: cleanEmail, tempPassword: tempPassword };
+            return { isNew: true, email: cleanEmail, tempPassword: tempPassword };
+        }
     } catch (err) {
-        console.warn("User provision check or auth creation warning:", err.message);
+        console.warn("User provision check or auth creation error:", err.message);
         return { isNew: false, email: cleanEmail };
+    } finally {
+        if (secondaryApp) {
+            try { await secondaryApp.delete(); } catch(e) {}
+        }
     }
 }
 
