@@ -5523,7 +5523,7 @@ async function generateNcarDocument(audit) {
         return;
     }
 
-    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, HeadingLevel, ImageRun } = window.docx;
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ImageRun } = window.docx;
 
     const items = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no' && (i.classification === 'Major' || i.classification === 'Minor'));
     if (items.length === 0) {
@@ -5531,48 +5531,33 @@ async function generateNcarDocument(audit) {
         return;
     }
 
+    // Try to load NAFDAC logo image buffer
+    let logoBuffer = null;
+    try {
+        const logoResp = await fetch('nafdac-logo.png');
+        if (logoResp.ok) {
+            logoBuffer = await logoResp.arrayBuffer();
+        }
+    } catch (e) {
+        console.warn("Could not load nafdac-logo.png for DOCX:", e.message);
+    }
+
     const thinBorder = { style: BorderStyle.SINGLE, size: 1, color: "000000" };
     const cellBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
-    const noBorderBottom = { top: thinBorder, bottom: { style: BorderStyle.NONE, size: 0 }, left: thinBorder, right: thinBorder };
-    const noBorderTop = { top: { style: BorderStyle.NONE, size: 0 }, bottom: thinBorder, left: thinBorder, right: thinBorder };
 
-    function labelCell(text, widthPct) {
+    function makeFieldCell(labelText, valueText) {
         return new TableCell({
+            columnSpan: 2,
             borders: cellBorders,
-            width: { size: widthPct, type: WidthType.PERCENTAGE },
-            children: [new Paragraph({ children: [new TextRun({ text: text, bold: true, size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })]
-        });
-    }
-
-    function valueCell(text, widthPct) {
-        return new TableCell({
-            borders: cellBorders,
-            width: { size: widthPct, type: WidthType.PERCENTAGE },
-            children: [new Paragraph({ children: [new TextRun({ text: text || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })]
-        });
-    }
-
-    function fullWidthLabelRow(labelText) {
-        return new TableRow({
+            width: { size: 100, type: WidthType.PERCENTAGE },
             children: [
-                new TableCell({
-                    columnSpan: 2,
-                    borders: noBorderBottom,
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    children: [new Paragraph({ children: [new TextRun({ text: labelText, bold: true, italics: true, size: 20, font: "Times New Roman" })], spacing: { before: 60, after: 20 } })]
-                })
-            ]
-        });
-    }
-
-    function fullWidthValueRow(valueText) {
-        return new TableRow({
-            children: [
-                new TableCell({
-                    columnSpan: 2,
-                    borders: cellBorders,
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    children: [new Paragraph({ children: [new TextRun({ text: valueText || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 80 } })]
+                new Paragraph({
+                    children: [new TextRun({ text: labelText, bold: true, italics: true, size: 20, font: "Times New Roman" })],
+                    spacing: { before: 40, after: 20 }
+                }),
+                new Paragraph({
+                    children: [new TextRun({ text: valueText || '', size: 20, font: "Times New Roman" })],
+                    spacing: { before: 20, after: 60 }
                 })
             ]
         });
@@ -5585,103 +5570,120 @@ async function generateNcarDocument(audit) {
         const officerName = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Lead Auditor';
         const clauseNum = item.clause || `ISO 9001 Clause ${item.id ? item.id + '.0' : '8.2'}`;
 
+        // 1. Top 3-Column Annexure Header Table
+        const headerTable = new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            borders: cellBorders,
+                            width: { size: 25, type: WidthType.PERCENTAGE },
+                            children: [new Paragraph({ children: [new TextRun({ text: "Annexure-02", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+                        }),
+                        new TableCell({
+                            borders: cellBorders,
+                            width: { size: 40, type: WidthType.PERCENTAGE },
+                            children: [new Paragraph({ children: [new TextRun({ text: "SOP Ref. No.: NAFDAC-QMS-008-03", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+                        }),
+                        new TableCell({
+                            borders: cellBorders,
+                            width: { size: 35, type: WidthType.PERCENTAGE },
+                            children: [new Paragraph({ children: [new TextRun({ text: "Title of Annexure:\nCorrective Action Report Form (CARF)", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })]
+                        })
+                    ]
+                })
+            ]
+        });
+
+        // 2. Standalone Center Header Elements (Logo + Agency Name)
+        const centerHeaderParagraphs = [];
+        if (logoBuffer) {
+            centerHeaderParagraphs.push(
+                new Paragraph({
+                    children: [
+                        new ImageRun({
+                            data: logoBuffer,
+                            transformation: { width: 45, height: 45 }
+                        })
+                    ],
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 120, after: 40 }
+                })
+            );
+        }
+        centerHeaderParagraphs.push(
+            new Paragraph({
+                children: [new TextRun({ text: "National Agency for Food and Drug Administration and Control", italics: true, size: 18, font: "Times New Roman" })],
+                alignment: AlignmentType.CENTER,
+                spacing: { before: 20, after: 120 }
+            })
+        );
+
+        // 3. Main CARF Form Table
         const formTable = new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
-                // === Row 1: 3-Column Header ===
-                new TableRow({
-                    children: [
-                        new TableCell({
-                            borders: cellBorders,
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            columnSpan: 2,
-                            children: [
-                                new Table({
-                                    width: { size: 100, type: WidthType.PERCENTAGE },
-                                    rows: [new TableRow({
-                                        children: [
-                                            new TableCell({ borders: cellBorders, width: { size: 25, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "Annexure-02", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })] }),
-                                            new TableCell({ borders: cellBorders, width: { size: 40, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "SOP Ref. No.: NAFDAC-QMS-\n008-03", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })] }),
-                                            new TableCell({ borders: cellBorders, width: { size: 35, type: WidthType.PERCENTAGE }, children: [new Paragraph({ children: [new TextRun({ text: "Title of Annexure: Corrective Action Report Form (CARF)", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 40, after: 40 } })] }),
-                                        ]
-                                    })]
-                                })
-                            ]
-                        })
-                    ]
-                }),
-
-                // === Row 2: NAFDAC Title ===
-                new TableRow({
-                    children: [
-                        new TableCell({
-                            columnSpan: 2,
-                            borders: cellBorders,
-                            children: [
-                                new Paragraph({ children: [new TextRun({ text: "NATIONAL AGENCY FOR FOOD AND DRUG ADMINISTRATION AND CONTROL", bold: true, size: 22, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { before: 80, after: 20 } }),
-                                new Paragraph({ children: [new TextRun({ text: "CORRECTIVE ACTION REPORT FORM (CARF)", bold: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.CENTER, spacing: { after: 80 } })
-                            ]
-                        })
-                    ]
-                }),
-
-                // === Row 3: CAR No & Name of Directorate ===
-                new TableRow({ children: [labelCell("CAR No:", 40), valueCell(carNo, 60)] }),
-                new TableRow({ children: [labelCell("Name of Directorate/Division/Unit:", 40), valueCell(audit.directorateUnit || 'N/A', 60)] }),
-
-                // === Row 4: NC & NC Number ===
-                fullWidthLabelRow("Non-Conformity (NC) & (NC number):"),
-                fullWidthValueRow(`NC ${idx + 1}: ${item.requirement || 'N/A'}`),
-
-                // === Row 5: Standard Clause Number ===
-                fullWidthLabelRow("Standard Clause Number:"),
-                fullWidthValueRow(clauseNum),
-
-                // === Row 6: Reference Document Number ===
-                fullWidthLabelRow("Reference document Number:"),
-                fullWidthValueRow(audit.refNo || 'N/A'),
-
-                // === Row 7: Name of Officer raising NC ===
-                fullWidthLabelRow("Name of Officer raising NC:"),
-                fullWidthValueRow(officerName),
-
-                // === Row 8: Most Probable Root Cause(s) ===
-                fullWidthLabelRow("Most Probable Root Cause(s):"),
-                fullWidthValueRow(item.rootCause || ''),
-
-                // === Row 9: Corrective Action(s) ===
-                fullWidthLabelRow("Corrective Action(s):"),
-                fullWidthValueRow(item.capaPlan || ''),
-
-                // === Row 10: Date of completion + Name/Signature ===
+                // CAR No & (Year/Serial No/Unit)
                 new TableRow({
                     children: [
                         new TableCell({
                             borders: cellBorders,
                             width: { size: 50, type: WidthType.PERCENTAGE },
-                            children: [
-                                new Paragraph({ children: [new TextRun({ text: "Date of completion (tgt): ", bold: true, italics: true, size: 20, font: "Times New Roman" }), new TextRun({ text: item.targetCompletionDate || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })
-                            ]
+                            children: [new Paragraph({ children: [new TextRun({ text: "CAR No: ", bold: true, italics: true, size: 20, font: "Times New Roman" }), new TextRun({ text: carNo, size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })]
                         }),
                         new TableCell({
                             borders: cellBorders,
                             width: { size: 50, type: WidthType.PERCENTAGE },
-                            children: [
-                                new Paragraph({ children: [new TextRun({ text: "Name/Signature: ", bold: true, italics: true, size: 20, font: "Times New Roman" }), new TextRun({ text: item.respondingOfficer || audit.auditeeName || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })
-                            ]
+                            children: [new Paragraph({ children: [new TextRun({ text: "(Year/Serial No/Unit)", italics: true, size: 20, font: "Times New Roman" })], alignment: AlignmentType.RIGHT, spacing: { before: 40, after: 40 } })]
                         })
                     ]
                 }),
 
-                // === Row 11: Objective Evidence of action taken(on) ===
-                fullWidthLabelRow("Objective Evidence of action taken(on):"),
-                fullWidthValueRow((item.capaEvidenceDescription || '') + (item.capaEvidenceLink ? `\nLink: ${item.capaEvidenceLink}` : '')),
+                // Name of Directorate/Division/Unit
+                new TableRow({ children: [makeFieldCell("Name of Directorate/Division/Unit:", audit.directorateUnit)] }),
 
-                // === Row 12: Possible SOP or documents to be updated ===
-                fullWidthLabelRow("Possible SOP or documents to be updated (if any):"),
-                fullWidthValueRow(item.sopUpdates || ''),
+                // Non-Conformity (NC) & (NC number)
+                new TableRow({ children: [makeFieldCell("Non-Conformity (NC) & (NC number):", `NC ${idx + 1}: ${item.requirement || 'N/A'}`)] }),
 
-                // === Row 13: Corrective Action Follow-up header ===
+                // Standard Clause Number
+                new TableRow({ children: [makeFieldCell("Standard Clause Number:", clauseNum)] }),
+
+                // Reference document Number
+                new TableRow({ children: [makeFieldCell("Reference document Number:", audit.refNo || 'N/A')] }),
+
+                // Name of Officer raising NC
+                new TableRow({ children: [makeFieldCell("Name of Officer raising NC:", officerName)] }),
+
+                // Most Probable Root Cause(s)
+                new TableRow({ children: [makeFieldCell("Most Probable Root Cause(s):", item.rootCause || '')] }),
+
+                // Corrective Action(s)
+                new TableRow({ children: [makeFieldCell("Corrective Action(s):", item.capaPlan || '')] }),
+
+                // Date of completion (tgt) & Name/Signature
+                new TableRow({
+                    children: [
+                        new TableCell({
+                            borders: cellBorders,
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            children: [new Paragraph({ children: [new TextRun({ text: "Date of completion (tgt): ", bold: true, italics: true, size: 20, font: "Times New Roman" }), new TextRun({ text: item.targetCompletionDate || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })]
+                        }),
+                        new TableCell({
+                            borders: cellBorders,
+                            width: { size: 50, type: WidthType.PERCENTAGE },
+                            children: [new Paragraph({ children: [new TextRun({ text: "Name/Signature: ", bold: true, italics: true, size: 20, font: "Times New Roman" }), new TextRun({ text: item.respondingOfficer || audit.auditeeName || '', size: 20, font: "Times New Roman" })], spacing: { before: 40, after: 40 } })]
+                        })
+                    ]
+                }),
+
+                // Objective Evidence of action taken(on)
+                new TableRow({ children: [makeFieldCell("Objective Evidence of action taken(on):", (item.capaEvidenceDescription || '') + (item.capaEvidenceLink ? `\nLink: ${item.capaEvidenceLink}` : ''))] }),
+
+                // Possible SOP or documents to be updated (if any)
+                new TableRow({ children: [makeFieldCell("Possible SOP or documents to be updated (if any):", item.sopUpdates || '')] }),
+
+                // Corrective Action Follow-up (Section Header Row)
                 new TableRow({
                     children: [
                         new TableCell({
@@ -5692,18 +5694,17 @@ async function generateNcarDocument(audit) {
                     ]
                 }),
 
-                // === Row 14: Effectiveness of action(s) taken (QA) ===
-                fullWidthLabelRow("Effectiveness of action(s) taken (QA):"),
-                fullWidthValueRow("Pending QA Verification"),
+                // Effectiveness of action(s) taken (QA)
+                new TableRow({ children: [makeFieldCell("Effectiveness of action(s) taken (QA):", "Pending QA Verification")] }),
 
-                // === Row 15: Signature + Closure Date ===
+                // Signature (qtg) & Corrective Action Closure Date
                 new TableRow({
                     children: [
                         new TableCell({
                             borders: cellBorders,
                             width: { size: 50, type: WidthType.PERCENTAGE },
                             children: [
-                                new Paragraph({ text: "", spacing: { before: 200 } }),
+                                new Paragraph({ text: "", spacing: { before: 160 } }),
                                 new Paragraph({ children: [new TextRun({ text: "Signature (qtg):", bold: true, italics: true, size: 20, font: "Times New Roman" })], spacing: { after: 40 } })
                             ]
                         }),
@@ -5711,7 +5712,7 @@ async function generateNcarDocument(audit) {
                             borders: cellBorders,
                             width: { size: 50, type: WidthType.PERCENTAGE },
                             children: [
-                                new Paragraph({ text: "", spacing: { before: 200 } }),
+                                new Paragraph({ text: "", spacing: { before: 160 } }),
                                 new Paragraph({ children: [new TextRun({ text: "Corrective Action Closure Date:", bold: true, italics: true, size: 20, font: "Times New Roman" })], spacing: { after: 40 } })
                             ]
                         })
@@ -5722,7 +5723,11 @@ async function generateNcarDocument(audit) {
 
         sections.push({
             properties: idx > 0 ? { page: { size: { orientation: 'portrait' } } } : {},
-            children: [formTable]
+            children: [
+                headerTable,
+                ...centerHeaderParagraphs,
+                formTable
+            ]
         });
     });
 
