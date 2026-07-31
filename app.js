@@ -1565,6 +1565,7 @@ function loadAudits() {
             try {
                 renderAuditHistory(); // Always refresh audit history list
                 updateActionBarBanner(); // Update Action Bar Banner notice
+                checkAndSendAutomaticCapaReminders(audits); // Automated CARF SLA reminder check (3d, 2d, 1d)
             } catch (e) {
                 console.error("Error rendering audit history:", e);
             }
@@ -4745,6 +4746,47 @@ async function sendCapaReminder(auditId) {
     } catch (err) {
         console.error("Error sending CAPA reminder:", err);
         showMessage("Failed to send CAPA reminder: " + err.message, 'error');
+    }
+}
+
+// --- Automated Background CARF Deadline Reminder Checker (3d, 2d, 1d) ---
+async function checkAndSendAutomaticCapaReminders(auditsList) {
+    if (!auditsList || !auditsList.length) return;
+    const pendingAudits = auditsList.filter(a => a.status === 'pending_capa');
+    if (!pendingAudits.length) return;
+
+    const now = new Date();
+
+    for (const audit of pendingAudits) {
+        const recipients = [audit.auditeeEmail, audit.auditeeEmail2].filter(Boolean).join(', ');
+        if (!recipients) continue;
+
+        const createdAt = audit.capaRequestedAt ? (audit.capaRequestedAt.toDate ? audit.capaRequestedAt.toDate() : new Date(audit.capaRequestedAt)) : (audit.approvedAt ? (audit.approvedAt.toDate ? audit.approvedAt.toDate() : new Date(audit.approvedAt)) : now);
+        const diffMs = now - createdAt;
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        const daysRemaining = Math.max(0, 7 - diffDays);
+
+        // Milestone trigger check: 3 days, 2 days, and 1 day remaining
+        const triggerKey = `reminderSent_${daysRemaining}d`;
+
+        if ([3, 2, 1].includes(daysRemaining) && !audit[triggerKey]) {
+            console.log(`[AUTO-REMINDER] Triggering automatic ${daysRemaining}-day CARF reminder for Audit Ref: ${audit.refNo || audit.id} to ${recipients}...`);
+            try {
+                await sendPowerAutomateNotification('auditee_capa_reminder', audit, recipients, {
+                    daysRemaining: daysRemaining,
+                    accountNote: `Automatic CARF Reminder: You have ${daysRemaining} day(s) remaining to complete and submit your Corrective Action Response (CARF Annexure-02).`
+                });
+
+                await db.collection('audits').doc(audit.id).update({
+                    [triggerKey]: true,
+                    lastAutoReminderSentAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                audit[triggerKey] = true;
+                console.log(`[AUTO-REMINDER] Successfully sent automated ${daysRemaining}-day reminder to ${recipients}.`);
+            } catch (err) {
+                console.warn(`[AUTO-REMINDER] Error sending automated reminder for ${audit.id}:`, err.message);
+            }
+        }
     }
 }
 
