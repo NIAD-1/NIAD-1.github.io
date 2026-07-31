@@ -2058,24 +2058,6 @@ function renderAuditHistory(auditsToDisplay = null) {
                                 <i class="fas fa-file-download"></i> Download CARF Report
                             </button>
                         `}
-                    ` : audit.status === 'pending_capa' ? `
-                        ${isAuditorOrAdmin ? `
-                            <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
-                                <i class="fas fa-eye"></i> View Audit Details
-                            </button>
-                            <button class="btn btn-sm btn-outline btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed; color:#ffffff;">
-                                <i class="fas fa-bell"></i> Send CARF Reminder
-                            </button>
-                        ` : `
-                            <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
-                                <i class="fas fa-file-alt"></i> Preview IASR Form
-                            </button>
-                            ${isUserAuditeeForAudit ? `
-                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
-                                    <i class="fas fa-edit"></i> Respond to CARF
-                                </button>
-                            ` : ''}
-                        `}
                     ` : `
                         ${isAuditorOrAdmin ? `
                             <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
@@ -2090,6 +2072,11 @@ function renderAuditHistory(auditsToDisplay = null) {
                             <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
                                 <i class="fas fa-file-alt"></i> Preview IASR Form
                             </button>
+                            ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
+                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
+                                    <i class="fas fa-edit"></i> Respond to CARF
+                                </button>
+                            ` : ''}
                         `}
                     `}
                     ${audit.status === 'trash' ? `
