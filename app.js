@@ -1767,8 +1767,9 @@ function updateDashboardMetrics() {
     const selectedYear = document.getElementById('dashboard-year-filter')?.value ?? '2026';
     const selectedDirectorate = document.getElementById('directorate-filter')?.value || '';
 
-    // Dashboard metrics & charts calculate ONLY from SUBMITTED audits
-    let filteredAudits = audits.filter(a => a.status === 'submitted');
+    // Dashboard metrics & charts calculate from all SUBMITTED/COMPLETED audits (excludes drafts and trashed)
+    const activeStatuses = ['submitted', 'pending_capa', 'capa_submitted', 'approved', 'closed'];
+    let filteredAudits = audits.filter(a => activeStatuses.includes(a.status));
 
     if (selectedYear) {
         filteredAudits = filteredAudits.filter(a => {
