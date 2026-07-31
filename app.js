@@ -2042,6 +2042,40 @@ function renderAuditHistory(auditsToDisplay = null) {
                         <button class="btn btn-sm btn-primary btn-submit" data-audit-id="${audit.id}">
                             <i class="fas fa-check"></i> Submit Audit
                         </button>
+                    ` : audit.status === 'capa_submitted' ? `
+                        ${isAuditorOrAdmin ? `
+                            <button class="btn btn-sm btn-primary btn-download-carf" data-audit-id="${audit.id}" style="background:#2563eb; border-color:#1d4ed8; color:#ffffff;">
+                                <i class="fas fa-file-download"></i> Download CARF Report
+                            </button>
+                            <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
+                                <i class="fas fa-eye"></i> View Audit Details
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                                <i class="fas fa-file-alt"></i> Preview IASR Form
+                            </button>
+                            <button class="btn btn-sm btn-primary btn-download-carf" data-audit-id="${audit.id}" style="background:#2563eb; border-color:#1d4ed8; color:#ffffff;">
+                                <i class="fas fa-file-download"></i> Download CARF Report
+                            </button>
+                        `}
+                    ` : audit.status === 'pending_capa' ? `
+                        ${isAuditorOrAdmin ? `
+                            <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
+                                <i class="fas fa-eye"></i> View Audit Details
+                            </button>
+                            <button class="btn btn-sm btn-outline btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed; color:#ffffff;">
+                                <i class="fas fa-bell"></i> Send CARF Reminder
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
+                                <i class="fas fa-file-alt"></i> Preview IASR Form
+                            </button>
+                            ${isUserAuditeeForAudit ? `
+                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
+                                    <i class="fas fa-edit"></i> Respond to CARF
+                                </button>
+                            ` : ''}
+                        `}
                     ` : `
                         ${isAuditorOrAdmin ? `
                             <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
@@ -2056,11 +2090,6 @@ function renderAuditHistory(auditsToDisplay = null) {
                             <button class="btn btn-sm btn-outline btn-preview-iasr" style="border-color:#059669; color:#059669; background:#ffffff;">
                                 <i class="fas fa-file-alt"></i> Preview IASR Form
                             </button>
-                            ${audit.status === 'pending_capa' && isUserAuditeeForAudit ? `
-                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309;">
-                                    <i class="fas fa-edit"></i> Respond to CARF
-                                </button>
-                            ` : ''}
                         `}
                     `}
                     ${audit.status === 'trash' ? `
@@ -2086,6 +2115,10 @@ function renderAuditHistory(auditsToDisplay = null) {
         itemDiv.addEventListener('click', (e) => {
             // Don't trigger default card action if clicking specific buttons
             if (e.target.closest('.delete-audit') || e.target.closest('.btn-edit') || e.target.closest('.btn-submit') || e.target.closest('.restore-audit')) {
+                return;
+            }
+            if (e.target.closest('.btn-download-carf')) {
+                generateNcarDocument(audit);
                 return;
             }
             if (e.target.closest('.btn-edit-audit')) {
@@ -4881,6 +4914,14 @@ function renderPerItemCapaModal(audit, daysRemaining = null) {
                 generalCapaPlan: firebase.firestore.FieldValue.delete(), // Cleanup old fields
                 generalCapaEvidenceLink: firebase.firestore.FieldValue.delete()
             });
+
+            // Notify lead auditor that CARF has been responded to
+            try {
+                const leadEmail = await resolveLeadAuditorEmail(audit);
+                await sendPowerAutomateNotification('ncar_submitted', audit, leadEmail);
+            } catch (notifErr) {
+                console.warn("Could not send auditor notification:", notifErr.message);
+            }
 
             alert(`CAPA responses and evidence links submitted successfully by ${responderEmail}! Thank you.`);
             modalEl.classList.add('hidden');
