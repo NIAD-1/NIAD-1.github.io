@@ -803,24 +803,86 @@ function updateModalEditButtonVisibility() {
      }
 }
 
+function extractAuditorDataFromCheckbox(checkbox) {
+    if (!checkbox) return { uid: '', displayName: '', email: '' };
+    const parentText = checkbox.parentElement ? checkbox.parentElement.textContent.trim() : '';
+    
+    let email = checkbox.dataset.email || '';
+    if (!email && parentText) {
+        const match = parentText.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/);
+        if (match) email = match[1];
+    }
+    
+    let displayName = checkbox.dataset.name || '';
+    if (!displayName && parentText) {
+        displayName = parentText.replace(/\s*\([^)]*@[^)]*\)/gi, '').replace(/\s*\([^)]*\)/g, '').trim();
+    }
+    if (!displayName) displayName = parentText;
+
+    return {
+        uid: checkbox.value || '',
+        displayName: displayName || 'Auditor',
+        email: email.toLowerCase().trim()
+    };
+}
+
 function isUserAssigned(audit, user) {
     if (!audit || !user) return false;
-    const userEmail = user.email?.toLowerCase();
-    const createdBy = audit.createdByEmail?.toLowerCase() || audit.createdBy?.toLowerCase();
-    if (createdBy && userEmail && createdBy === userEmail) return true;
-    
-    // Check by exact email match if available, otherwise by fuzzy name match
-    const cleanCurrentName = user.displayName?.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-    
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userUid = user.uid;
+    const userDisplayName = (user.displayName || '').toLowerCase().trim();
+
+    // 1. Check if user is creator
+    const createdBy = (audit.createdByEmail || audit.createdBy || '').toLowerCase().trim();
+    if (userEmail && createdBy && (createdBy === userEmail || createdBy.includes(userEmail))) return true;
+
+    // 2. Check if user is Auditee
+    const auditee1 = (audit.auditeeEmail || '').toLowerCase().trim();
+    const auditee2 = (audit.auditeeEmail2 || '').toLowerCase().trim();
+    if (userEmail && ((auditee1 && (auditee1 === userEmail || auditee1.includes(userEmail))) || (auditee2 && (auditee2 === userEmail || auditee2.includes(userEmail))))) return true;
+
+    // Helper to extract tokens (words >= 3 chars) from email or name
+    const getTokens = (str) => {
+        if (!str) return [];
+        return str.toLowerCase()
+            .replace(/@.*/, '') // drop domain if email
+            .replace(/[^a-z0-9]/g, ' ')
+            .split(/\s+/)
+            .filter(t => t.length >= 3 && !['com', 'org', 'gov', 'ng', 'gmail', 'nafdac'].includes(t));
+    };
+
+    const userTokens = [
+        ...getTokens(userEmail),
+        ...getTokens(userDisplayName)
+    ];
+
+    // 3. Check auditor arrays (leadAuditors, auditors)
     const checkArray = (arr) => {
-        if (!arr) return false;
+        if (!arr || !Array.isArray(arr)) return false;
         return arr.some(a => {
-            if (a.email && userEmail && a.email.toLowerCase() === userEmail) return true;
-            const name = (a.displayName || a.uid || '').toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
-            return name && cleanCurrentName && (name === cleanCurrentName || name.includes(cleanCurrentName) || cleanCurrentName.includes(name));
+            if (!a) return false;
+            
+            // UID match
+            if (userUid && a.uid && String(a.uid) === String(userUid)) return true;
+            
+            // Stored email match
+            if (userEmail && a.email && a.email.toLowerCase().trim() === userEmail) return true;
+
+            // Full auditor string
+            const auditorStr = `${a.displayName || ''} ${a.uid || ''} ${a.email || ''}`.toLowerCase();
+            if (userEmail && auditorStr.includes(userEmail)) return true;
+
+            // Token overlap match (e.g. user email "kaka.mustaphar" matches auditor "Mustaphar Kaka")
+            if (userTokens.length > 0) {
+                const auditorTokens = getTokens(auditorStr);
+                const hasMatchingToken = userTokens.some(ut => auditorTokens.includes(ut));
+                if (hasMatchingToken) return true;
+            }
+
+            return false;
         });
     };
-    
+
     return checkArray(audit.leadAuditors) || checkArray(audit.auditors);
 }
 
@@ -1325,11 +1387,7 @@ function collectAuditFormData() {
         const optionsContainer = document.getElementById(optionsId);
         if (!optionsContainer) return [];
         return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
-            .map(checkbox => ({
-                uid: checkbox.value, // Assuming checkbox.value is a unique ID or the name itself
-                displayName: checkbox.parentElement.textContent.trim(),
-                // email: checkbox.dataset.email || '' // If you store email in data attribute
-            }));
+            .map(checkbox => extractAuditorDataFromCheckbox(checkbox));
     };
 
     const selectedLeadAuditors = getSelectedAuditorData('lead-auditors-options');
@@ -1958,19 +2016,21 @@ function getFilteredHistoryAudits() {
             if (audit.status === 'trash') return false;
         }
 
-        // Hide drafts from users who are not assigned to them (and are not admins)
-        if (audit.status === 'draft' && currentUser?.role !== ROLES.ADMIN) {
-            if (!isUserAssigned(audit, currentUser)) {
-                return false;
-            }
-        }
+        // ROLE-BASED VISIBILITY CONTROL:
+        // Admin sees ALL audits in the system.
+        // Non-Admins (Auditor, Lead Auditor, Auditee) ONLY see audits where they are assigned / involved.
+        if (currentUser && currentUser.role !== ROLES.ADMIN) {
+            const isAssigned = isUserAssigned(audit, currentUser);
 
-        // Auditee View Restrictions: ONLY see audits for their email/directorate
-        if (currentUser?.role === ROLES.AUDITEE) {
-            const userEmail = currentUser.email?.toLowerCase();
-            const matchesEmail = (audit.auditeeEmail?.toLowerCase() === userEmail) || (audit.auditeeEmail2?.toLowerCase() === userEmail);
-            const matchesDirectorate = currentUser.directorateUnit && (audit.directorateUnit || audit.auditedArea) === currentUser.directorateUnit;
-            if (!matchesEmail && !matchesDirectorate) return false;
+            if (currentUser.role === ROLES.AUDITEE) {
+                const userEmail = currentUser.email?.toLowerCase().trim();
+                const matchesEmail = (audit.auditeeEmail?.toLowerCase().trim() === userEmail) || (audit.auditeeEmail2?.toLowerCase().trim() === userEmail);
+                const matchesDirectorate = currentUser.directorateUnit && (audit.directorateUnit || audit.auditedArea) === currentUser.directorateUnit;
+                if (!isAssigned && !matchesEmail && !matchesDirectorate) return false;
+            } else {
+                // Non-admin Auditors / Lead Auditors ONLY see audits where they are assigned as Creator, Lead Auditor, or Auditor
+                if (!isAssigned) return false;
+            }
         }
 
         const area = audit.directorateUnit || audit.auditedArea;
@@ -4236,10 +4296,7 @@ async function syncAuditorsToFirestore() {
         const optionsContainer = document.getElementById(optionsId);
         if (!optionsContainer) return [];
         return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
-            .map(checkbox => ({
-                uid: checkbox.value,
-                displayName: checkbox.parentElement.textContent.trim()
-            }));
+            .map(checkbox => extractAuditorDataFromCheckbox(checkbox));
     };
     
     const leadAuditors = getSelectedAuditors('lead-auditors-options');
@@ -4286,10 +4343,7 @@ function collectAuditFormDataForAutoSave() {
         const optionsContainer = document.getElementById(optionsId);
         if (!optionsContainer) return [];
         return Array.from(optionsContainer.querySelectorAll('input[type="checkbox"]:checked'))
-            .map(checkbox => ({
-                uid: checkbox.value,
-                displayName: checkbox.parentElement.textContent.trim()
-            }));
+            .map(checkbox => extractAuditorDataFromCheckbox(checkbox));
     };
 
     const selectedLeadAuditors = getSelectedAuditorData('lead-auditors-options');
