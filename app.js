@@ -435,7 +435,7 @@ const AUDITORS_LIST = [
     "Anulika Nwosu", "Azogini Ebosie", "Bolanle Ikusagba", "Ekwealor Chinenye", 
     "Enilama O. Emmanuel", "Gidado Babayo", "Hassan Tanko", "Hulugh Terhemen", 
     "Ibeh Vivien", "Joan Abaagu", "Maria Aluko", "Marian Bojuwoye", 
-    "Muoneke Wendy", "Odekunle Hannatu", "Offor Adaku", "Ojo Ayodeji Olukunle", 
+    "Muoneke Wendy", "Odekunle Hannatu", "Offor Adaku", "Olabisi Oriade-Shabi", "Ojo Ayodeji Olukunle", 
     "Omonike Oluyide", "Omoru Emmanuel", "Onwualu Rosemary", "QM ICT", 
     "QM Public Affairs", "Salihu Bello", "Sanwoolu Oluwaseyi", "Shallwanga Sunday", 
     "Tabitha Bukar", "Umar Mala Bukar", "Waliu Olamide", "Yunusa Hadizah Ibrahim"
