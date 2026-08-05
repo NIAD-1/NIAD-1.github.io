@@ -426,7 +426,7 @@ const LEAD_AUDITORS_LIST = [
     "Abubakar Fatima", "Adesanya Oluwaseun", "Akinyemi Sidikat", "Bolanle Ikusagba", 
     "Danga Chinyelu", "Ekwealor Chinenye", "Fatoki Samson", "Ibeh Vivien", 
     "Ifudu Nkem", "Kalang Biyama Andrew", "Kema Ashibuogwu", "Khadijah Ade-Abolade", 
-    "Muoneke Wendy", "Offor Adaku", "Onwualu Rosemary", "Osho Folasade", 
+    "Muoneke Wendy", "Offor Adaku", "Olabisi Oriade-Shabi", "Onwualu Rosemary", "Osho Folasade", 
     "Sanwoolu Oluwaseyi", "Stephanie Adeoye", "Sunday Adown", "Uche Rose"
 ];
 
