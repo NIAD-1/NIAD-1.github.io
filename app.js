@@ -1466,7 +1466,8 @@ function collectAuditFormData() {
         const targetYear = auditDate ? new Date(auditDate).getFullYear().toString() : new Date().getFullYear().toString();
         const existingAudit = audits.find(a => 
             a.directorateUnit === directorateUnit && 
-            getAuditYear(a) === targetYear
+            getAuditYear(a) === targetYear &&
+            a.status !== 'trash'
         );
         if (existingAudit) {
             alert(`An audit (${existingAudit.status.toUpperCase()}) already exists for "${directorateUnit}" in ${targetYear}. Multiple audits for the same directorate in the same year are not allowed.`);
