@@ -1489,12 +1489,32 @@ function collectAuditFormData() {
 }
 
 async function saveAuditAsDraft() {
-    const auditData = collectAuditFormData();
-    if (!auditData) return;
-    auditData.status = 'draft';
-    await saveAuditToFirestore(auditData);
-    loadAudits();
-    clearAuditForm();
+    const collectedData = collectAuditFormData();
+    if (!collectedData) return;
+
+    const auditDataToSave = { ...collectedData };
+
+    // ALWAYS force status to 'draft' — this is the Save Draft button, never submit
+    auditDataToSave.status = 'draft';
+
+    if (saveDraftBtn) {
+        saveDraftBtn.disabled = true;
+        saveDraftBtn.textContent = 'Saving...';
+    }
+
+    try {
+        await saveAuditToFirestore(auditDataToSave, false);
+        if (currentAudit) {
+            populateAuditForm(currentAudit);
+        }
+    } catch (error) {
+        console.error("Error during saveAuditAsDraft:", error);
+    } finally {
+        if (saveDraftBtn) {
+            saveDraftBtn.disabled = false;
+            saveDraftBtn.textContent = 'Save Draft';
+        }
+    }
 }
 
 async function submitAudit() {
@@ -3965,52 +3985,7 @@ async function handleForgotPassword(e) {
     }
 }
 
-async function saveAuditAsDraft() {
-    const collectedData = collectAuditFormData();
-    if (!collectedData) return;
-
-    const auditDataToSave = { ...collectedData }; // Make a copy
-
-    saveDraftBtn.disabled = true;
-    saveDraftBtn.textContent = 'Saving...';
-
-    try {
-        // Explicitly set status for draft saving,
-        // but allow saveAuditToFirestore to preserve if currentAudit already has a status
-        if (currentAudit && currentAudit.status) {
-            auditDataToSave.status = currentAudit.status; // Preserve if editing existing
-        } else {
-            auditDataToSave.status = 'draft'; // Default for new
-        }
-         // If it's an existing draft being saved again, its status is 'draft'
-        if (currentAudit && currentAudit.id && auditDataToSave.status !== 'submitted' && auditDataToSave.status !== 'approved') { // etc.
-            auditDataToSave.status = 'draft';
-        } else if (!currentAudit) { // A brand new audit being saved as draft for the first time
-             auditDataToSave.status = 'draft';
-        }
-        // If currentAudit.status is 'submitted' and an admin is editing and saving as draft,
-        // the status should probably revert to 'draft'. This needs careful thought on workflow.
-        // For now, if it's NOT a submit action, let's ensure it's 'draft' if it's new or was already draft.
-        if (!auditDataToSave.status || (currentAudit && currentAudit.status !== 'submitted')) { // A bit simplistic, might need refinement
-            auditDataToSave.status = 'draft';
-        }
-
-
-        await saveAuditToFirestore(auditDataToSave, false); // false means not submitting
-        // After saving, populateAuditForm with the (potentially updated by server timestamp) currentAudit
-        // This ensures the form reflects the true state of the saved draft if user continues editing.
-        if(currentAudit){
-            populateAuditForm(currentAudit);
-        }
-
-    } catch (error) {
-        // Error already handled and shown by saveAuditToFirestore
-        console.error("Error during saveAuditAsDraft:", error);
-    } finally {
-        saveDraftBtn.disabled = false;
-        saveDraftBtn.textContent = 'Save Draft';
-    }
-}
+// saveAuditAsDraft is defined earlier in the file (near collectAuditFormData)
 
 // --- Live Collaboration & Presence Tracking ---
 
