@@ -5483,11 +5483,14 @@ function renderNcarModal(audit) {
     bodyEl.innerHTML = html;
     modal.classList.remove('hidden');
 
-    submitBtn.onclick = async () => {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting CARF...';
+    // --- CARF Draft Saving Logic ---
+    const saveDraftCARFBtn = document.getElementById('save-carf-draft-btn');
+    const carfAutoSaveStatus = document.getElementById('carf-autosave-status');
+    let carfAutoSaveTimer = null;
 
-        const updatedChecklist = (audit.checklist || []).map(item => {
+    // Collect all CARF field values from the modal
+    function collectCARFData() {
+        return (audit.checklist || []).map(item => {
             const rootCauseEl = document.getElementById(`ncar-root-cause-${item.id}`);
             const actionEl = document.getElementById(`ncar-corrective-action-${item.id}`);
             const dateEl = document.getElementById(`ncar-target-date-${item.id}`);
@@ -5510,6 +5513,84 @@ function renderNcarModal(audit) {
             }
             return item;
         });
+    }
+
+    // Save CARF draft to Firestore (keeps status as pending_capa, just saves field data)
+    async function saveCARFDraftToFirestore(showAlert = false) {
+        const updatedChecklist = collectCARFData();
+
+        try {
+            await db.collection('audits').doc(audit.id).update({
+                checklist: updatedChecklist,
+                carfDraftSavedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                carfDraftSavedBy: currentUser?.email || audit.auditeeEmail || 'Auditee'
+            });
+
+            // Update local audit object too
+            audit.checklist = updatedChecklist;
+            const localAudit = audits.find(a => a.id === audit.id);
+            if (localAudit) localAudit.checklist = updatedChecklist;
+
+            if (carfAutoSaveStatus) {
+                carfAutoSaveStatus.style.display = 'inline';
+                carfAutoSaveStatus.innerHTML = '<i class="fas fa-check-circle" style="color: #10b981;"></i> Draft saved';
+            }
+
+            if (showAlert) {
+                showMessage('CARF draft saved successfully! You can close and come back to finish later.', 'success');
+            }
+
+            console.log('CARF draft saved for audit:', audit.id);
+        } catch (err) {
+            console.error('Error saving CARF draft:', err);
+            if (carfAutoSaveStatus) {
+                carfAutoSaveStatus.style.display = 'inline';
+                carfAutoSaveStatus.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Auto-save failed';
+            }
+            if (showAlert) {
+                alert('Failed to save CARF draft: ' + err.message);
+            }
+        }
+    }
+
+    // Wire up Save Draft button
+    if (saveDraftCARFBtn) {
+        saveDraftCARFBtn.onclick = async () => {
+            saveDraftCARFBtn.disabled = true;
+            saveDraftCARFBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            await saveCARFDraftToFirestore(true);
+            saveDraftCARFBtn.disabled = false;
+            saveDraftCARFBtn.innerHTML = '<i class="fas fa-save"></i> Save Draft';
+        };
+    }
+
+    // Auto-save on input (debounced — saves 3 seconds after user stops typing)
+    function setupCARFAutoSave() {
+        const inputs = bodyEl.querySelectorAll('textarea, input[type="text"], input[type="url"], input[type="date"]');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => {
+                if (carfAutoSaveTimer) clearTimeout(carfAutoSaveTimer);
+                if (carfAutoSaveStatus) {
+                    carfAutoSaveStatus.style.display = 'inline';
+                    carfAutoSaveStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin" style="color: #f59e0b;"></i> Unsaved changes...';
+                }
+                carfAutoSaveTimer = setTimeout(() => {
+                    saveCARFDraftToFirestore(false);
+                }, 3000);
+            });
+        });
+    }
+    setupCARFAutoSave();
+
+    // --- Submit CARF Handler ---
+    submitBtn.onclick = async () => {
+        // Clear any pending auto-save
+        if (carfAutoSaveTimer) clearTimeout(carfAutoSaveTimer);
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting CARF...';
+
+        const updatedChecklist = collectCARFData();
 
         try {
             try {
@@ -5521,7 +5602,6 @@ function renderNcarModal(audit) {
                 });
             } catch (firestoreErr) {
                 console.warn("Direct Firestore update notice (handing via state):", firestoreErr.message);
-                // Update local memory object if cloud security rule restricts auditee write permission
                 const targetInMem = audits.find(a => a.id === audit.id);
                 if (targetInMem) {
                     targetInMem.checklist = updatedChecklist;
