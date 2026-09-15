@@ -1509,6 +1509,8 @@ async function saveAuditAsDraft() {
         }
     } catch (error) {
         console.error("Error during saveAuditAsDraft:", error);
+        showMessage('⚠️ DRAFT NOT SAVED — ' + (error.message || 'Unknown error. Please check your connection and try again.'), 'error');
+        alert('Your draft was NOT saved. Error: ' + (error.message || 'Unknown error') + '\n\nPlease try again. If the problem persists, contact the administrator.');
     } finally {
         if (saveDraftBtn) {
             saveDraftBtn.disabled = false;
@@ -1534,8 +1536,9 @@ async function submitAudit() {
         // `saveAuditToFirestore` will set status to 'submitted'
         await saveAuditToFirestore(auditDataToSave, true); // true means submitting
     } catch (error) {
-        // Error already handled by saveAuditToFirestore
         console.error("Error during submitAudit:", error);
+        showMessage('⚠️ AUDIT NOT SUBMITTED — ' + (error.message || 'Unknown error. Please check your connection and try again.'), 'error');
+        alert('Your audit was NOT submitted. Error: ' + (error.message || 'Unknown error') + '\n\nPlease try again. If the problem persists, contact the administrator.');
     } finally {
         submitAuditBtn.disabled = false;
         submitAuditBtn.textContent = 'Submit Audit';
@@ -1553,41 +1556,57 @@ async function saveAuditToFirestore(auditDataToSave, isSubmitting = false) {
     } else {
         // If just saving draft, ensure status is 'draft' if it was new,
         // or preserve its existing status if we are re-saving an existing draft.
-        if (!auditDataToSave.status || auditDataToSave.status === 'new_placeholder') { // 'new_placeholder' if you used it
+        if (!auditDataToSave.status || auditDataToSave.status === 'new_placeholder') {
             auditDataToSave.status = 'draft';
         }
     }
     // Always update lastModified
     auditDataToSave.lastModified = firebase.firestore.FieldValue.serverTimestamp();
 
-
     try {
+        let savedDocId;
+
         if (currentAudit && currentAudit.id) {
             // ----- UPDATING EXISTING AUDIT -----
-            console.log("Updating existing audit ID:", currentAudit.id);
+            savedDocId = currentAudit.id;
+            console.log("Updating existing audit ID:", savedDocId);
             // Make sure not to overwrite createdBy and createdAt
-            const { createdBy, createdAt, ...dataToUpdate } = auditDataToSave; // Destructure to exclude them for update
-            await db.collection('audits').doc(currentAudit.id).update(dataToUpdate);
+            const { createdBy, createdAt, ...dataToUpdate } = auditDataToSave;
+            await db.collection('audits').doc(savedDocId).update(dataToUpdate);
+
+            // Verification read-back: confirm the update persisted
+            const verifyDoc = await db.collection('audits').doc(savedDocId).get();
+            if (!verifyDoc.exists) {
+                throw new Error('Verification failed — audit document not found after update. Your changes may not have been saved.');
+            }
 
             // Update the local currentAudit object with the latest saved data
             currentAudit = { ...currentAudit, ...dataToUpdate };
 
-            showMessage(isSubmitting ? 'Audit updated and submitted!' : 'Draft updated successfully!', 'success');
+            showMessage(isSubmitting ? 'Audit updated and submitted! ✓' : 'Draft updated successfully! ✓', 'success');
         } else {
             // ----- CREATING NEW AUDIT -----
-            // createdBy, createdAt should be in auditDataToSave from collectAuditFormData
-            if (!auditDataToSave.createdBy && currentUser) { // Safety check / ensure for new
+            if (!auditDataToSave.createdBy && currentUser) {
                 auditDataToSave.createdBy = currentUser.uid;
                 auditDataToSave.createdByEmail = currentUser.email;
                 auditDataToSave.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             }
             console.log("Adding new audit with data:", auditDataToSave);
             const docRef = await db.collection('audits').add(auditDataToSave);
+            savedDocId = docRef.id;
+
+            // Verification read-back: confirm the new audit was actually persisted
+            const verifyDoc = await db.collection('audits').doc(savedDocId).get();
+            if (!verifyDoc.exists) {
+                throw new Error('Verification failed — audit was not found in the database after saving. This may be caused by Firestore security rules rejecting the write. Please contact an administrator.');
+            }
+
             // After adding, set currentAudit to this new audit so subsequent saves update it
-            currentAudit = { id: docRef.id, ...auditDataToSave };
-            showMessage(isSubmitting ? 'Audit submitted successfully!' : 'Draft saved successfully!', 'success');
+            currentAudit = { id: savedDocId, ...auditDataToSave };
+            showMessage(isSubmitting ? 'Audit submitted successfully! ✓' : 'Draft saved successfully! ✓', 'success');
         }
 
+        console.log(`✓ Audit ${savedDocId} verified in Firestore.`);
         loadAudits(); // Refresh lists
 
         if (isSubmitting) {
@@ -1595,20 +1614,29 @@ async function saveAuditToFirestore(auditDataToSave, isSubmitting = false) {
             console.log("Triggering Lead Auditor notification to:", leadEmail);
             await sendPowerAutomateNotification('lead_approval_required', currentAudit, leadEmail);
 
-            await generateAuditDocument(currentAudit); // Use the potentially updated currentAudit
+            await generateAuditDocument(currentAudit);
             redirectToTeamsChannel();
-            clearAuditForm(); // Also clears currentAudit to null
+            clearAuditForm();
             switchSection('audit-history');
         } else {
             // If only saving a draft, currentAudit is now set/updated.
             // The user might want to continue editing this draft.
-            // So, we don't clear the form or switch sections here.
-            // populateAuditForm(currentAudit); // Optionally re-populate if server timestamps changed things
         }
     } catch (error) {
         console.error("Error in saveAuditToFirestore:", error);
-        showMessage("Failed to save/submit audit: " + error.message, 'error');
-        throw error; // Re-throw to be caught by caller if needed
+
+        // Determine a user-friendly error description
+        let userMessage = error.message || 'Unknown error';
+        if (error.code === 'permission-denied' || (error.message && error.message.toLowerCase().includes('permission'))) {
+            userMessage = 'Permission denied — your account may not have write access. Please contact an administrator.';
+        } else if (error.code === 'unavailable' || error.code === 'deadline-exceeded') {
+            userMessage = 'Server unreachable — please check your internet connection and try again.';
+        } else if (error.code === 'not-found') {
+            userMessage = 'Audit document not found — it may have been deleted. Please refresh the page.';
+        }
+
+        showMessage('❌ SAVE FAILED: ' + userMessage, 'error');
+        throw error; // Re-throw to be caught by caller
     }
 }
 
@@ -2778,13 +2806,27 @@ async function deleteCurrentAudit() {
 function showMessage(message, type) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${type}`;
-    messageDiv.textContent = message;
+    messageDiv.style.cssText = 'position:fixed; top:1rem; left:50%; transform:translateX(-50%); z-index:99999; padding:1rem 1.5rem; border-radius:8px; font-size:0.95rem; max-width:600px; width:90%; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:flex; align-items:center; gap:0.75rem;';
+    
+    if (type === 'error') {
+        messageDiv.style.background = '#fef2f2';
+        messageDiv.style.border = '2px solid #ef4444';
+        messageDiv.style.color = '#991b1b';
+        messageDiv.innerHTML = `<i class="fas fa-exclamation-circle" style="font-size:1.3rem; color:#ef4444; flex-shrink:0;"></i>
+            <span style="flex:1;">${message}</span>
+            <button onclick="this.parentElement.remove()" style="background:none; border:none; color:#991b1b; font-size:1.2rem; cursor:pointer; padding:0 0.25rem; flex-shrink:0;">✕</button>`;
+        // Error messages stay for 10 seconds (user can also dismiss manually)
+        setTimeout(() => { if (messageDiv.parentElement) messageDiv.remove(); }, 10000);
+    } else {
+        messageDiv.style.background = '#f0fdf4';
+        messageDiv.style.border = '2px solid #22c55e';
+        messageDiv.style.color = '#166534';
+        messageDiv.innerHTML = `<i class="fas fa-check-circle" style="font-size:1.3rem; color:#22c55e; flex-shrink:0;"></i>
+            <span style="flex:1;">${message}</span>`;
+        setTimeout(() => { if (messageDiv.parentElement) messageDiv.remove(); }, 3000);
+    }
     
     document.body.appendChild(messageDiv);
-    
-    setTimeout(() => {
-        messageDiv.remove();
-    }, 3000);
 }
 
 
