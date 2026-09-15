@@ -1379,6 +1379,15 @@ function collectAuditFormData() {
 
     // Basic required field validation (keep your existing checks)
     if (!auditDate) { alert('Select Audit Date.'); auditDateInput?.focus(); return null; }
+    
+    // Validate year format (must be 2020-2035) to prevent accidental typos like 92026
+    const parsedDate = new Date(auditDate);
+    const parsedYear = parsedDate.getFullYear();
+    if (isNaN(parsedYear) || parsedYear < 2020 || parsedYear > 2035) {
+        alert(`The Audit Date year (${parsedYear}) appears to be invalid. Please select a valid date between 2020 and 2035.`);
+        auditDateInput?.focus();
+        return null;
+    }
     if (!directorateUnit) { alert('Enter Directorate / Unit.'); directorateUnitInput?.focus(); return null; }
     if (!refNo) { alert('Enter Reference Number.'); refNoInput?.focus(); return null; }
     if (!locationValue) {alert('Select Location.'); locationInput?.focus(); return null; }
@@ -1847,26 +1856,29 @@ function getChartColor(index, alpha) {
 function getAuditYear(audit) {
     if (!audit) return new Date().getFullYear().toString();
     
-    // Check audit.date string first (e.g., "2026-07-20")
-    if (audit.date && typeof audit.date === 'string' && audit.date.length >= 4) {
-        const yearStr = audit.date.substring(0, 4);
-        if (!isNaN(parseInt(yearStr)) && parseInt(yearStr) > 2000) {
-            return yearStr;
+    // 1. If audit.date exists, look for a sensible 4-digit year (e.g. 2020-2035)
+    if (audit.date && typeof audit.date === 'string') {
+        // Extract 4-digit year starting with 20 (e.g. "2026-09-11" -> 2026, or typos like "92026-02-11" -> 2026)
+        const match = audit.date.match(/(20[2-3][0-9])/);
+        if (match) {
+            return match[1];
+        }
+        // If standard YYYY-MM-DD
+        const yearInt = parseInt(audit.date.substring(0, 4));
+        if (!isNaN(yearInt) && yearInt >= 2020 && yearInt <= 2035) {
+            return yearInt.toString();
         }
     }
     
-    let d = null;
-    if (audit.date) {
-        d = new Date(audit.date);
-    } else if (audit.createdAt) {
-        d = audit.createdAt.toDate ? audit.createdAt.toDate() : new Date(audit.createdAt);
+    // 2. Fallback to createdAt timestamp
+    if (audit.createdAt) {
+        const d = audit.createdAt.toDate ? audit.createdAt.toDate() : new Date(audit.createdAt);
+        if (d && !isNaN(d.getFullYear())) {
+            return d.getFullYear().toString();
+        }
     }
     
-    if (d && !isNaN(d.getFullYear())) {
-        return d.getFullYear().toString();
-    }
-    
-    // Default fallback to 2026 / current year so newly created drafts are never hidden by year filter
+    // Default fallback to current year so newly created drafts are never hidden by year filter
     return new Date().getFullYear().toString();
 }
 
