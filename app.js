@@ -4942,8 +4942,7 @@ function renderPerItemCapaModal(audit, daysRemaining = null) {
 
     const itemsNeedingCapa = (audit.checklist || []).filter(item => 
         item.applicable === 'yes' && 
-        item.compliance === 'no' && 
-        (item.classification === 'Major' || item.classification === 'Minor')
+        item.compliance === 'no'
     );
 
     let html = `
@@ -5368,8 +5367,7 @@ function renderNcarModal(audit) {
 
     const itemsNeedingNcar = (audit.checklist || []).filter(item => 
         item.applicable === 'yes' && 
-        item.compliance === 'no' && 
-        (item.classification === 'Major' || item.classification === 'Minor')
+        item.compliance === 'no'
     );
 
     let html = `
@@ -5647,32 +5645,46 @@ function renderNcarModal(audit) {
         const updatedChecklist = collectCARFData();
 
         try {
-            try {
-                await db.collection('audits').doc(audit.id).update({
-                    checklist: updatedChecklist,
-                    status: 'capa_submitted',
-                    capaSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    capaSubmittedBy: currentUser?.email || audit.auditeeEmail || 'Auditee'
-                });
-            } catch (firestoreErr) {
-                console.warn("Direct Firestore update notice (handing via state):", firestoreErr.message);
-                const targetInMem = audits.find(a => a.id === audit.id);
-                if (targetInMem) {
-                    targetInMem.checklist = updatedChecklist;
-                    targetInMem.status = 'capa_submitted';
-                    targetInMem.capaSubmittedBy = currentUser?.email || audit.auditeeEmail || 'Auditee';
-                }
+            await db.collection('audits').doc(audit.id).update({
+                checklist: updatedChecklist,
+                status: 'capa_submitted',
+                capaSubmittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                capaSubmittedBy: currentUser?.email || audit.auditeeEmail || 'Auditee'
+            });
+
+            // Verification read-back: confirm the update persisted
+            const verifyDoc = await db.collection('audits').doc(audit.id).get();
+            if (verifyDoc.data()?.status !== 'capa_submitted') {
+                throw new Error("Verification failed: CARF status could not be confirmed in the database. Please try again.");
             }
 
-            const leadEmail = await resolveLeadAuditorEmail(audit);
-            await sendPowerAutomateNotification('ncar_submitted', audit, leadEmail);
+            // Update in-memory audit object
+            audit.checklist = updatedChecklist;
+            audit.status = 'capa_submitted';
+            const localAudit = audits.find(a => a.id === audit.id);
+            if (localAudit) {
+                localAudit.checklist = updatedChecklist;
+                localAudit.status = 'capa_submitted';
+            }
+
+            // Send auditor notification (non-blocking if webhook fails)
+            try {
+                const leadEmail = await resolveLeadAuditorEmail(audit);
+                await sendPowerAutomateNotification('ncar_submitted', audit, leadEmail);
+            } catch (notifErr) {
+                console.warn("Auditor notification error (non-fatal):", notifErr.message);
+            }
 
             alert("Corrective Action Report Form (CARF) submitted successfully! Auditors have been notified.");
             modal.classList.add('hidden');
             loadAudits();
         } catch (err) {
             console.error("Error submitting CARF:", err);
-            alert("Failed to submit CARF: " + err.message);
+            let errMsg = err.message || 'Unknown error';
+            if (err.code === 'permission-denied') {
+                errMsg = 'Permission denied: Your account does not have permission to update this audit in Firestore. Please contact the Lead Auditor or Administrator.';
+            }
+            alert("Failed to submit CARF: " + errMsg);
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Corrective Action Report Form (CARF)';
@@ -5689,7 +5701,7 @@ async function generateNcarDocument(audit) {
 
     const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ImageRun } = window.docx;
 
-    const items = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no' && (i.classification === 'Major' || i.classification === 'Minor'));
+    const items = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no');
     if (items.length === 0) {
         alert("No non-conformance items found to generate NCAR document.");
         return;
