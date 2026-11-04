@@ -2186,6 +2186,11 @@ function renderAuditHistory(auditsToDisplay = null) {
                             <button class="btn btn-sm btn-secondary btn-edit-audit" style="background:#059669; border-color:#047857; color:#ffffff;">
                                 <i class="fas fa-eye"></i> View Audit Details
                             </button>
+                            ${audit.status === 'pending_capa' ? `
+                                <button class="btn btn-sm btn-primary btn-respond-carf" style="background:#d97706; border-color:#b45309; color:#ffffff;">
+                                    <i class="fas fa-edit"></i> Fill / Submit CARF
+                                </button>
+                            ` : ''}
                             ${audit.status !== 'trash' ? `
                                 <button class="btn btn-sm btn-primary btn-send-carf-req" style="background:#8b5cf6; border-color:#7c3aed;">
                                     <i class="fas fa-paper-plane"></i> Send CARF Request
