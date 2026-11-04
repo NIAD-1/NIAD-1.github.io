@@ -5460,10 +5460,35 @@ function renderNcarModal(audit) {
             </div>
         `;
     } else {
+        // Check for local draft backup on this device in case of cloud permission issues
+        let localDraftMap = {};
+        try {
+            const rawLocal = localStorage.getItem('nafdac_carf_draft_' + audit.id);
+            if (rawLocal) {
+                const parsed = JSON.parse(rawLocal);
+                if (Array.isArray(parsed)) {
+                    parsed.forEach(i => {
+                        if (i && i.id) localDraftMap[i.id] = i;
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn("Could not load local CARF backup:", e);
+        }
+
         itemsNeedingNcar.forEach((item, index) => {
             const ncNumber = `NC ${index + 1}`;
             const carNo = `${new Date().getFullYear()}/CAR/${(audit.directorateUnit || 'UNIT').substring(0,6).toUpperCase()}/${index + 1}`;
             const officerName = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Lead Auditor';
+            const localSaved = localDraftMap[item.id] || {};
+
+            const rootCauseVal = item.rootCause || localSaved.rootCause || '';
+            const capaPlanVal = item.capaPlan || localSaved.capaPlan || '';
+            const targetDateVal = item.targetCompletionDate || localSaved.targetCompletionDate || '';
+            const respOfficerVal = item.respondingOfficer || localSaved.respondingOfficer || audit.auditeeName || '';
+            const evDescVal = item.capaEvidenceDescription || localSaved.capaEvidenceDescription || '';
+            const evLinkVal = item.capaEvidenceLink || localSaved.capaEvidenceLink || '';
+            const sopVal = item.sopUpdates || localSaved.sopUpdates || '';
 
             html += `
                 <div class="ncar-item-card" data-item-id="${item.id}" style="border: 2px solid var(--border-color); border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; background: var(--card-bg); box-shadow: var(--box-shadow-sm);">
@@ -5493,24 +5518,24 @@ function renderNcarModal(audit) {
                         <label for="ncar-root-cause-${item.id}" style="font-weight: 600; color: var(--primary-color);">
                             <i class="fas fa-search-minus"></i> Most Probable Root Cause(s):
                         </label>
-                        <textarea id="ncar-root-cause-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Detail the root cause analysis for this non-conformity...">${escapeHtml(item.rootCause || '')}</textarea>
+                        <textarea id="ncar-root-cause-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Detail the root cause analysis for this non-conformity...">${escapeHtml(rootCauseVal)}</textarea>
                     </div>
 
                     <div class="form-group" style="margin-bottom: 1rem;">
                         <label for="ncar-corrective-action-${item.id}" style="font-weight: 600; color: var(--primary-color);">
                             <i class="fas fa-tools"></i> Corrective Action(s):
                         </label>
-                        <textarea id="ncar-corrective-action-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Specify exact corrective actions taken or to be taken...">${escapeHtml(item.capaPlan || '')}</textarea>
+                        <textarea id="ncar-corrective-action-${item.id}" rows="3" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="Specify exact corrective actions taken or to be taken...">${escapeHtml(capaPlanVal)}</textarea>
                     </div>
 
                     <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
                         <div class="form-group" style="flex: 1; min-width: 220px;">
                             <label for="ncar-target-date-${item.id}" style="font-weight: 600;">Date of Completion (Target):</label>
-                            <input type="date" id="ncar-target-date-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(item.targetCompletionDate || '')}">
+                            <input type="date" id="ncar-target-date-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(targetDateVal)}">
                         </div>
                         <div class="form-group" style="flex: 1; min-width: 220px;">
                             <label for="ncar-officer-name-${item.id}" style="font-weight: 600;">Officer Responding (Name/Signature):</label>
-                            <input type="text" id="ncar-officer-name-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(item.respondingOfficer || audit.auditeeName || '')}">
+                            <input type="text" id="ncar-officer-name-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" value="${escapeHtml(respOfficerVal)}">
                         </div>
                     </div>
 
@@ -5518,13 +5543,13 @@ function renderNcarModal(audit) {
                         <label for="ncar-evidence-${item.id}" style="font-weight: 600;">
                             <i class="fas fa-link"></i> Objective Evidence of Action Taken (Text & SharePoint / OneDrive Link):
                         </label>
-                        <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.5rem;" placeholder="Describe evidence of action taken...">${escapeHtml(item.capaEvidenceDescription || '')}</textarea>
-                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/folder... or OneDrive URL link" value="${escapeHtml(item.capaEvidenceLink || '')}">
+                        <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.5rem;" placeholder="Describe evidence of action taken...">${escapeHtml(evDescVal)}</textarea>
+                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/folder... or OneDrive URL link" value="${escapeHtml(evLinkVal)}">
                     </div>
 
                     <div class="form-group">
                         <label for="ncar-sop-update-${item.id}" style="font-weight: 600;">Possible SOP or Documents to be Updated (if any):</label>
-                        <input type="text" id="ncar-sop-update-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="e.g. NAFDAC-SOP-PV-002 Rev 03" value="${escapeHtml(item.sopUpdates || '')}">
+                        <input type="text" id="ncar-sop-update-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="e.g. NAFDAC-SOP-PV-002 Rev 03" value="${escapeHtml(sopVal)}">
                     </div>
 
                 </div>
@@ -5571,6 +5596,13 @@ function renderNcarModal(audit) {
     async function saveCARFDraftToFirestore(showAlert = false) {
         const updatedChecklist = collectCARFData();
 
+        // 1. Immediately store a device local backup so typed work is NEVER lost
+        try {
+            localStorage.setItem('nafdac_carf_draft_' + audit.id, JSON.stringify(updatedChecklist));
+        } catch (e) {
+            console.warn("Could not write to localStorage:", e);
+        }
+
         try {
             await db.collection('audits').doc(audit.id).update({
                 checklist: updatedChecklist,
@@ -5597,10 +5629,18 @@ function renderNcarModal(audit) {
             console.error('Error saving CARF draft:', err);
             if (carfAutoSaveStatus) {
                 carfAutoSaveStatus.style.display = 'inline';
-                carfAutoSaveStatus.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Auto-save failed';
+                if (err.code === 'permission-denied') {
+                    carfAutoSaveStatus.innerHTML = '<i class="fas fa-shield-alt" style="color: #f59e0b;"></i> Saved locally on device (cloud sync restricted)';
+                } else {
+                    carfAutoSaveStatus.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ef4444;"></i> Auto-save failed';
+                }
             }
             if (showAlert) {
-                alert('Failed to save CARF draft: ' + err.message);
+                if (err.code === 'permission-denied') {
+                    alert('Draft saved locally on this computer. Note: Firestore permissions currently restrict auditee accounts from writing to the cloud database. Please notify your administrator to update Firestore rules.');
+                } else {
+                    alert('Failed to save CARF draft to cloud: ' + err.message + ' (A backup is saved on this browser)');
+                }
             }
         }
     }
@@ -5674,6 +5714,9 @@ function renderNcarModal(audit) {
             } catch (notifErr) {
                 console.warn("Auditor notification error (non-fatal):", notifErr.message);
             }
+
+            // Clear local device draft upon successful submission
+            try { localStorage.removeItem('nafdac_carf_draft_' + audit.id); } catch (e) {}
 
             alert("Corrective Action Report Form (CARF) submitted successfully! Auditors have been notified.");
             modal.classList.add('hidden');
