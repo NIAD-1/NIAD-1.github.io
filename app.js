@@ -425,7 +425,7 @@ function setupEventListeners() {
 const LEAD_AUDITORS_LIST = [
     "Abubakar Fatima", "Adesanya Oluwaseun", "Akinyemi Sidikat", "Bolanle Ikusagba", 
     "Danga Chinyelu", "Ekwealor Chinenye", "Fatoki Samson", "Ibeh Vivien", 
-    "Ifudu Nkem", "Kalang Biyama Andrew", "Kema Ashibuogwu", "Khadijah Ade-Abolade", 
+    "Ifudu Nkem", "Joyce Tanko", "Kalang Biyama Andrew", "Kema Ashibuogwu", "Khadijah Ade-Abolade", 
     "Muoneke Wendy", "Offor Adaku", "Olabisi Oriade-Shabi", "Onwualu Rosemary", "Osho Folasade", 
     "Sanwoolu Oluwaseyi", "Stephanie Adeoye", "Sunday Adown", "Uche Rose"
 ];
@@ -434,7 +434,7 @@ const AUDITORS_LIST = [
     "Adewale Muniru", "Akinyemi Juliannah", "Akinyemi Sidikat", "Alex Tank", 
     "Anulika Nwosu", "Azogini Ebosie", "Bolanle Ikusagba", "Ekwealor Chinenye", 
     "Enilama O. Emmanuel", "Gidado Babayo", "Hassan Tanko", "Hulugh Terhemen", 
-    "Ibeh Vivien", "Joan Abaagu", "Maria Aluko", "Marian Bojuwoye", 
+    "Ibeh Vivien", "Joan Abaagu", "Joyce Tanko", "Maria Aluko", "Marian Bojuwoye", 
     "Muoneke Wendy", "Odekunle Hannatu", "Offor Adaku", "Olabisi Oriade-Shabi", "Ojo Ayodeji Olukunle", 
     "Omonike Oluyide", "Omoru Emmanuel", "Onwualu Rosemary", "QM ICT", 
     "QM Public Affairs", "Salihu Bello", "Sanwoolu Oluwaseyi", "Shallwanga Sunday", 
