@@ -4556,6 +4556,140 @@ function setupDarkMode() {
 // --- Power Automate & Lead Auditor Approval & Tokenized CAPA Helpers ---
 
 const POWER_AUTOMATE_WEBHOOK_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/08/workflows/80ad6f78158f4549bc150a59053ea231/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=58am8UonusyRP-DdiBCwQ_sSW1GzRlOVv3zLe1UiFfQ";
+let POWER_AUTOMATE_UPLOAD_URL = ""; // Dedicated upload flow URL or defaults to POWER_AUTOMATE_WEBHOOK_URL
+
+function getSharePointFolderUrl(relativePath) {
+    const siteUrl = "https://nafdacng.sharepoint.com/sites/NAFDACQMSTeam";
+    const cleanPath = (relativePath || '').replace(/^\/+/, '');
+    const serverRelative = `/sites/NAFDACQMSTeam/Records/${cleanPath}`;
+    return `${siteUrl}/Records/Forms/AllItems.aspx?id=${encodeURIComponent(serverRelative)}`;
+}
+
+async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar') {
+    const fileInput = document.getElementById(`${prefix}-file-${itemId}`);
+    const uploadBtn = document.getElementById(`${prefix}-upload-btn-${itemId}`);
+    const statusEl = document.getElementById(`${prefix}-upload-status-${itemId}`);
+    const linkInput = document.getElementById(`${prefix}-link-${itemId}`);
+
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert("Please choose a file to upload first.");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    
+    // Safety check on file size: max 25MB recommended for webhook transfer
+    if (file.size > 25 * 1024 * 1024) {
+        alert(`The selected file is ${Math.round(file.size / (1024 * 1024))}MB. The maximum direct upload size is 25MB. Please upload larger files directly in SharePoint or compress the file.`);
+        return;
+    }
+
+    const audit = audits.find(a => a.id === auditId);
+    if (!audit) {
+        alert("Audit record not found.");
+        return;
+    }
+
+    const auditYear = (typeof getAuditYear === 'function' ? getAuditYear(audit) : '') || new Date().getFullYear().toString();
+    const spInfo = resolveSharePointFolderStructure(audit.directorateUnit, auditYear);
+    const targetFolderRelative = `${spInfo.relativeFolderPath}/${ncFolder}`;
+    const targetFolderFullPath = `${spInfo.library}/${targetFolderRelative}`;
+
+    const uploadUrl = POWER_AUTOMATE_UPLOAD_URL || POWER_AUTOMATE_WEBHOOK_URL;
+    if (!uploadUrl || !uploadUrl.startsWith('http')) {
+        alert("Power Automate upload webhook URL is not configured.");
+        return;
+    }
+
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.innerHTML = `<span style="color:#0284c7;"><i class="fas fa-circle-notch fa-spin"></i> Transferring "<strong>${escapeHtml(file.name)}</strong>" to SharePoint folder: <code>${escapeHtml(ncFolder)}</code>...</span>`;
+    }
+
+    try {
+        const base64Data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result;
+                const base64Clean = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
+                resolve(base64Clean);
+            };
+            reader.onerror = (err) => reject(err);
+            reader.readAsDataURL(file);
+        });
+
+        const payload = {
+            type: 'evidence_file_upload',
+            auditId: audit.id,
+            refNo: audit.refNo || '',
+            directorateUnit: audit.directorateUnit,
+            auditYear: auditYear,
+            ncFolder: ncFolder,
+            sharepointSiteUrl: spInfo.siteUrl,
+            sharepointLibrary: spInfo.library,
+            sharepointFolderPath: targetFolderFullPath,
+            sharepointRelativePath: targetFolderRelative,
+            fileName: file.name,
+            fileContentType: file.type || 'application/octet-stream',
+            fileContentBase64: base64Data,
+            fileContent: {
+                "$content-type": file.type || 'application/octet-stream',
+                "$content": base64Data
+            },
+            uploadedBy: currentUser?.email || 'auditee',
+            timestamp: new Date().toISOString()
+        };
+
+        const res = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok && res.status !== 202) {
+            throw new Error(`Power Automate responded with HTTP status ${res.status}`);
+        }
+
+        let fileDirectUrl = '';
+        try {
+            const resData = await res.json();
+            fileDirectUrl = resData.webUrl || resData.fileUrl || '';
+        } catch (e) {
+            // Webhook returned 200/202 without body
+        }
+
+        if (!fileDirectUrl) {
+            fileDirectUrl = `${spInfo.siteUrl}/${encodeURI(targetFolderFullPath)}/${encodeURIComponent(file.name)}`;
+        }
+
+        if (linkInput) {
+            linkInput.value = fileDirectUrl;
+            linkInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:#059669; font-weight:600;"><i class="fas fa-check-circle"></i> File "<strong>${escapeHtml(file.name)}</strong>" uploaded to SharePoint successfully! Link attached.</span>`;
+        }
+
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="fas fa-check"></i> Uploaded';
+
+        // Trigger autosave if in CARF modal
+        const rootCauseEl = document.getElementById(`ncar-root-cause-${itemId}`);
+        if (rootCauseEl) rootCauseEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+    } catch (err) {
+        console.error("Upload failed:", err);
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Retry Upload';
+        if (statusEl) {
+            statusEl.innerHTML = `<span style="color:#dc2626;"><i class="fas fa-exclamation-circle"></i> Upload failed: ${escapeHtml(err.message)}</span>`;
+        }
+        alert("Upload failed: " + err.message);
+    }
+}
 
 async function resolveLeadAuditorEmail(audit) {
     if (!audit) return '';
@@ -5635,6 +5769,17 @@ function renderNcarModal(audit) {
 
         itemsNeedingNcar.forEach((item, index) => {
             const ncNumber = `NC ${index + 1}`;
+            const ncNumPadded = `NC-${String(index + 1).padStart(2, '0')}`;
+            let cleanClause = (item.clause || `Item-${item.id || index + 1}`).trim().replace(/[/\\:*?"<>|#%]/g, '-');
+            if (!cleanClause.toLowerCase().startsWith('clause')) {
+                cleanClause = `Clause ${cleanClause}`;
+            }
+            const ncFolderName = `${ncNumPadded}-${cleanClause}`.replace(/\s+/g, ' ').trim();
+            const auditYearVal = (typeof getAuditYear === 'function' ? getAuditYear(audit) : '') || new Date().getFullYear().toString();
+            const spInfo = resolveSharePointFolderStructure(audit.directorateUnit, auditYearVal);
+            const targetSpRelative = `${spInfo.relativeFolderPath}/${ncFolderName}`;
+            const targetSpUrl = getSharePointFolderUrl(targetSpRelative);
+
             const carNo = `${new Date().getFullYear()}/CAR/${(audit.directorateUnit || 'UNIT').substring(0,6).toUpperCase()}/${index + 1}`;
             const officerName = audit.leadAuditors?.map(a => a.displayName).join(', ') || 'Lead Auditor';
             const localSaved = localDraftMap[item.id] || {};
@@ -5697,11 +5842,35 @@ function renderNcarModal(audit) {
                     </div>
 
                     <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="ncar-evidence-${item.id}" style="font-weight: 600;">
-                            <i class="fas fa-link"></i> Objective Evidence of Action Taken (Text & SharePoint / OneDrive Link):
+                        <label for="ncar-evidence-${item.id}" style="font-weight: 600; color: #1e293b;">
+                            <i class="fas fa-file-signature"></i> Objective Evidence of Action Taken:
                         </label>
-                        <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.5rem;" placeholder="Describe evidence of action taken...">${escapeHtml(evDescVal)}</textarea>
-                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdac.sharepoint.com/folder... or OneDrive URL link" value="${escapeHtml(evLinkVal)}">
+                        <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.75rem;" placeholder="Describe evidence of action taken...">${escapeHtml(evDescVal)}</textarea>
+
+                        <!-- Direct File Upload to SharePoint Subfolder -->
+                        <div style="background: #f0fdf4; border: 1.5px dashed #16a34a; border-radius: 8px; padding: 0.85rem; margin-bottom: 0.75rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
+                                <div style="font-size: 0.86rem; color: #166534; font-weight: 600;">
+                                    <i class="fas fa-cloud-upload-alt"></i> Upload Evidence File to SharePoint:
+                                </div>
+                                <a href="${escapeHtml(targetSpUrl)}" target="_blank" rel="noopener noreferrer" style="font-size: 0.78rem; color: #0284c7; text-decoration: underline; font-weight: 500;">
+                                    <i class="fas fa-folder-open"></i> Open Folder: <code>${escapeHtml(ncFolderName)}</code>
+                                </a>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                                <input type="file" id="ncar-file-${item.id}" class="evidence-input" style="flex: 1; min-width: 200px; padding: 0.4rem; font-size: 0.82rem; background: #ffffff;" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip">
+                                <button type="button" class="btn btn-sm" id="ncar-upload-btn-${item.id}" onclick="uploadCarfEvidenceFile('${audit.id}', '${item.id}', '${escapeHtml(ncFolderName)}', 'ncar')" style="background: #16a34a; color: #ffffff; border: none; padding: 0.55rem 1rem; font-size: 0.86rem; font-weight: 600; border-radius: 6px; cursor: pointer;">
+                                    <i class="fas fa-upload"></i> Upload
+                                </button>
+                            </div>
+                            <div id="ncar-upload-status-${item.id}" style="margin-top: 0.4rem; font-size: 0.82rem; display: none;"></div>
+                        </div>
+
+                        <!-- SharePoint Evidence Link -->
+                        <label for="ncar-link-${item.id}" style="font-weight: 600; font-size: 0.82rem; color: #475569;">
+                            <i class="fas fa-link"></i> SharePoint / Cloud File Link:
+                        </label>
+                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdacng.sharepoint.com/... or auto-filled upon upload" value="${escapeHtml(evLinkVal)}">
                     </div>
 
                     <div class="form-group">
