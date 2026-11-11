@@ -4706,11 +4706,39 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         </div>
     `;
 
+    // Extract non-conformance items to support automated SharePoint folder generation
+    const ncItems = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no');
+    const auditYear = (typeof getAuditYear === 'function' ? getAuditYear(audit) : '') || new Date().getFullYear().toString();
+    const sharepointParentFolder = `${auditYear} QMS Internal Audit Follow-up`;
+
+    const nonConformances = ncItems.map((item, idx) => {
+        const ncNum = `NC-${String(idx + 1).padStart(2, '0')}`;
+        // Sanitize clause for SharePoint folder naming rules (avoid / \ : * ? " < > | # %)
+        let cleanClause = (item.clause || `Item-${item.id || idx + 1}`).trim().replace(/[/\\:*?"<>|#%]/g, '-');
+        if (!cleanClause.toLowerCase().startsWith('clause')) {
+            cleanClause = `Clause ${cleanClause}`;
+        }
+        const folderName = `${ncNum}-${cleanClause}`.replace(/\s+/g, ' ').trim();
+        return {
+            ncNumber: ncNum,
+            clause: item.clause || '',
+            classification: item.classification || 'Major',
+            requirement: item.requirement || '',
+            folderName: folderName
+        };
+    });
+
     const payload = {
         type: type,
         auditId: audit.id,
         refNo: audit.refNo || '',
         directorateUnit: audit.directorateUnit || '',
+        auditYear: auditYear,
+        sharepointParentFolder: sharepointParentFolder,
+        sharepointFacilityFolder: audit.directorateUnit || '',
+        nonConformanceFolders: nonConformances.map(nc => nc.folderName),
+        nonConformances: nonConformances,
+        hasNonConformances: nonConformances.length > 0,
         recipientEmail: recipientEmail || '',
         auditeeEmail1: audit.auditeeEmail || '',
         auditeeEmail2: audit.auditeeEmail2 || '',
