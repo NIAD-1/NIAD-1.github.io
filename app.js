@@ -4690,7 +4690,7 @@ function resolveSharePointFolderStructure(directorateUnit, auditYear) {
         rootFolder = SHAREPOINT_DIRECTORATE_MAP[cleanUnit] || cleanUnit;
     }
 
-    const library = "Quality Documents";
+    const library = "Records";
     const siteUrl = "https://nafdacng.sharepoint.com/sites/NAFDACQMSTeam";
     const relativeFolderPath = subUnitFolder 
         ? `${rootFolder}/${subUnitFolder}/${followUpFolder}` 
