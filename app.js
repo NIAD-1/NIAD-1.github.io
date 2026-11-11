@@ -4602,6 +4602,7 @@ async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar'
     }
 
     uploadBtn.disabled = true;
+    uploadBtn.style.background = '#0284c7';
     uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
     if (statusEl) {
         statusEl.style.display = 'block';
@@ -4675,6 +4676,7 @@ async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar'
         }
 
         uploadBtn.disabled = false;
+        uploadBtn.style.background = '#10b981';
         uploadBtn.innerHTML = '<i class="fas fa-check"></i> Uploaded';
 
         // Trigger autosave if in CARF modal
@@ -4684,7 +4686,8 @@ async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar'
     } catch (err) {
         console.error("Upload failed:", err);
         uploadBtn.disabled = false;
-        uploadBtn.innerHTML = '<i class="fas fa-upload"></i> Retry Upload';
+        uploadBtn.style.background = '#ef4444';
+        uploadBtn.innerHTML = '<i class="fas fa-redo"></i> Retry';
         if (statusEl) {
             statusEl.innerHTML = `<span style="color:#dc2626;"><i class="fas fa-exclamation-circle"></i> Upload failed: ${escapeHtml(err.message)}</span>`;
         }
@@ -5848,30 +5851,29 @@ function renderNcarModal(audit) {
                         </label>
                         <textarea id="ncar-evidence-${item.id}" rows="2" class="evidence-input" style="width:100%; padding:0.75rem; margin-bottom: 0.75rem;" placeholder="Describe evidence of action taken...">${escapeHtml(evDescVal)}</textarea>
 
-                        <!-- Direct File Upload to SharePoint Subfolder -->
-                        <div style="background: #f0fdf4; border: 1.5px dashed #16a34a; border-radius: 8px; padding: 0.85rem; margin-bottom: 0.75rem;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.4rem;">
-                                <div style="font-size: 0.86rem; color: #166534; font-weight: 600;">
-                                    <i class="fas fa-cloud-upload-alt"></i> Upload Evidence File to SharePoint:
+                        <!-- Sleek, compact evidence attachment bar -->
+                        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.65rem;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; flex: 1;">
+                                    <label for="ncar-file-${item.id}" style="margin: 0; font-size: 0.85rem; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 0.35rem; cursor: pointer;">
+                                        <i class="fas fa-paperclip" style="color: #0284c7;"></i> Attach File:
+                                    </label>
+                                    <input type="file" id="ncar-file-${item.id}" style="font-size: 0.82rem; color: #334155; max-width: 230px;" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip">
+                                    <button type="button" class="btn btn-sm" id="ncar-upload-btn-${item.id}" onclick="uploadCarfEvidenceFile('${audit.id}', '${item.id}', '${escapeHtml(ncFolderName)}', 'ncar')" style="background: #0284c7; color: #ffffff; border: none; padding: 0.35rem 0.8rem; font-size: 0.82rem; font-weight: 600; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem; transition: background 0.2s;">
+                                        <i class="fas fa-cloud-upload-alt"></i> Upload
+                                    </button>
                                 </div>
-                                <a href="${escapeHtml(targetSpUrl)}" target="_blank" rel="noopener noreferrer" style="font-size: 0.78rem; color: #0284c7; text-decoration: underline; font-weight: 500;">
-                                    <i class="fas fa-folder-open"></i> Open Folder: <code>${escapeHtml(ncFolderName)}</code>
+                                <a href="${escapeHtml(targetSpUrl)}" target="_blank" rel="noopener noreferrer" style="font-size: 0.78rem; color: #0284c7; text-decoration: none; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.25rem 0.5rem; background: #e0f2fe; border-radius: 4px;" title="Open this folder in SharePoint">
+                                    <i class="fas fa-folder-open"></i> <code>${escapeHtml(ncFolderName)}</code>
                                 </a>
                             </div>
-                            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                                <input type="file" id="ncar-file-${item.id}" class="evidence-input" style="flex: 1; min-width: 200px; padding: 0.4rem; font-size: 0.82rem; background: #ffffff;" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.zip">
-                                <button type="button" class="btn btn-sm" id="ncar-upload-btn-${item.id}" onclick="uploadCarfEvidenceFile('${audit.id}', '${item.id}', '${escapeHtml(ncFolderName)}', 'ncar')" style="background: #16a34a; color: #ffffff; border: none; padding: 0.55rem 1rem; font-size: 0.86rem; font-weight: 600; border-radius: 6px; cursor: pointer;">
-                                    <i class="fas fa-upload"></i> Upload
-                                </button>
-                            </div>
-                            <div id="ncar-upload-status-${item.id}" style="margin-top: 0.4rem; font-size: 0.82rem; display: none;"></div>
+                            <div id="ncar-upload-status-${item.id}" style="margin-top: 0.4rem; font-size: 0.8rem; display: none;"></div>
                         </div>
 
                         <!-- SharePoint Evidence Link -->
-                        <label for="ncar-link-${item.id}" style="font-weight: 600; font-size: 0.82rem; color: #475569;">
-                            <i class="fas fa-link"></i> SharePoint / Cloud File Link:
-                        </label>
-                        <input type="url" id="ncar-link-${item.id}" class="evidence-input" style="width:100%; padding:0.75rem;" placeholder="https://nafdacng.sharepoint.com/... or auto-filled upon upload" value="${escapeHtml(evLinkVal)}">
+                        <div style="position: relative;">
+                            <input type="url" id="ncar-link-${item.id}" style="width: 100%; padding: 0.6rem 0.85rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; color: #334155; background: #ffffff;" placeholder="SharePoint link auto-fills here upon upload (or paste URL)" value="${escapeHtml(evLinkVal)}">
+                        </div>
                     </div>
 
                     <div class="form-group">
