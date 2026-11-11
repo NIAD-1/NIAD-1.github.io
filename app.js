@@ -4556,7 +4556,7 @@ function setupDarkMode() {
 // --- Power Automate & Lead Auditor Approval & Tokenized CAPA Helpers ---
 
 const POWER_AUTOMATE_WEBHOOK_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/08/workflows/80ad6f78158f4549bc150a59053ea231/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=58am8UonusyRP-DdiBCwQ_sSW1GzRlOVv3zLe1UiFfQ";
-let POWER_AUTOMATE_UPLOAD_URL = ""; // Dedicated upload flow URL or defaults to POWER_AUTOMATE_WEBHOOK_URL
+let POWER_AUTOMATE_UPLOAD_URL = "https://defaultc9a3c7f29c4d4d169756d04bb4a060.f5.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/14/workflows/9a4cbf166afc4615abcb2b7c2a445d5c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=tycRqR0LfGf9Zb7jRmF4BN996x87uMGMAY77tWlOh44";
 
 function getSharePointFolderUrl(relativePath) {
     const siteUrl = "https://nafdacng.sharepoint.com/sites/NAFDACQMSTeam";
@@ -4629,7 +4629,7 @@ async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar'
             ncFolder: ncFolder,
             sharepointSiteUrl: spInfo.siteUrl,
             sharepointLibrary: spInfo.library,
-            sharepointFolderPath: targetFolderFullPath,
+            sharepointFolderPath: `/Records/${targetFolderRelative}`,
             sharepointRelativePath: targetFolderRelative,
             fileName: file.name,
             fileContentType: file.type || 'application/octet-stream',
@@ -4660,8 +4660,9 @@ async function uploadCarfEvidenceFile(auditId, itemId, ncFolder, prefix = 'ncar'
             // Webhook returned 200/202 without body
         }
 
-        if (!fileDirectUrl) {
-            fileDirectUrl = `${spInfo.siteUrl}/${encodeURI(targetFolderFullPath)}/${encodeURIComponent(file.name)}`;
+        if (!fileDirectUrl || fileDirectUrl.trim() === '') {
+            const serverRelativeFilePath = `/sites/NAFDACQMSTeam/Records/${targetFolderRelative}/${file.name}`;
+            fileDirectUrl = `${spInfo.siteUrl}/Records/Forms/AllItems.aspx?id=${encodeURIComponent(serverRelativeFilePath)}`;
         }
 
         if (linkInput) {
