@@ -4598,6 +4598,116 @@ async function resolveLeadAuditorEmail(audit) {
     return '';
 }
 
+// --- SharePoint Folder Hierarchy Resolver (Option A for DGO) ---
+function resolveSharePointFolderStructure(directorateUnit, auditYear) {
+    const year = auditYear || new Date().getFullYear().toString();
+    const cleanUnit = (directorateUnit || '').trim();
+    
+    // Check if DGO Unit (e.g. DGO-MAIN, DGO-Protocol, DGO-PUBLIC AFFAIRS, Director General Office...)
+    const isDGO = cleanUnit.toUpperCase().startsWith('DGO') || 
+                  cleanUnit.toLowerCase().includes("director general");
+    
+    let rootFolder = "";
+    let subUnitFolder = null;
+    let followUpFolder = `${year} QMS Internal Audit Follow-up`;
+    
+    if (isDGO) {
+        rootFolder = "Director General Office (DGO)";
+        // For Option A: keep sub-unit as a subfolder inside Director General Office (DGO)
+        if (cleanUnit.toUpperCase().startsWith('DGO')) {
+            subUnitFolder = cleanUnit;
+        } else if (cleanUnit.includes('-')) {
+            subUnitFolder = cleanUnit.split('-')[1].trim();
+        } else {
+            subUnitFolder = cleanUnit;
+        }
+    } else {
+        // Map legacy or alternative names to exact SharePoint folder in "Quality Documents"
+        const SHAREPOINT_DIRECTORATE_MAP = {
+            "(DRUG R&RA)": "Drug Registration and Regulatory Affairs (DR&R)",
+            "Drug Registration and Regulatory Affairs (DRUG R&RA)": "Drug Registration and Regulatory Affairs (DR&R)",
+            "Drug Registration and Regulatory Affairs (DR&R)": "Drug Registration and Regulatory Affairs (DR&R)",
+            
+            "(FOOD R&RA)": "Food Registration and Regulatory Affairs",
+            "Food Registration and Regulatory Affairs (FOOD R&RA)": "Food Registration and Regulatory Affairs",
+            "Food Registration and Regulatory Affairs": "Food Registration and Regulatory Affairs",
+            
+            "Drug Evaluation & Research (DER)": "Drug Evaluation and Research (DER)",
+            "Drug Evaluation and Research (DER)": "Drug Evaluation and Research (DER)",
+            
+            "Administration and Human Resources (HRM)": "Human Resources Management (HRM)",
+            "Human Resource management (AHRM)": "Human Resources Management (HRM)",
+            "Human Resources Management (HRM)": "Human Resources Management (HRM)",
+            
+            "ICT": "Information and Communication Technology (ICT)",
+            "Information and Communication Technology (ICT)": "Information and Communication Technology (ICT)",
+            
+            "Laboratory Services (LS-Drugs)": "Laboratory Services (Drug)",
+            "Laboratory Services (Drug)": "Laboratory Services (Drug)",
+            
+            "Laboratory Services (LS-Food)": "Laboratory Services (LS-Food)",
+            "Laboratory Services (Food)": "Laboratory Services (LS-Food)",
+            
+            "Laboratory Services (LS-VBM)": "Laboratory Services (LS-Vaccines, Biologics and Medical Devices)",
+            "Laboratory Services (LS-Vaccines, Biologics & Medical Devices)": "Laboratory Services (LS-Vaccines, Biologics and Medical Devices)",
+            "Laboratory Services (LS-Vaccines, Biologics and Medical Devices)": "Laboratory Services (LS-Vaccines, Biologics and Medical Devices)",
+            
+            "Vaccine, Biologics & Medical Devices R&R": "Vaccines, Biologicals and Medical Devices",
+            "Vaccines, Biologicals and Medical Devices": "Vaccines, Biologicals and Medical Devices",
+            
+            "Post-Marketing Surveillance (PMS)": "Post Marketing Surveillance (PMS)",
+            "Post Marketing Surveillance (PMS)": "Post Marketing Surveillance (PMS)",
+            
+            "Pharmacovigilance (PV)": "Pharmacovigilance (PVG)",
+            "Pharmacovigilance (PVG)": "Pharmacovigilance (PVG)",
+            
+            "Legal": "Legal Services",
+            "Legal Services": "Legal Services",
+            
+            "Port Inspection Directorate (PID)": "Ports Inspectorate (PID)",
+            "Ports Inspectorate (PID)": "Ports Inspectorate (PID)",
+            
+            "Narcotics & Controlled Substances (NCS)": "Narcotics and Controlled Substances (NCS)",
+            "Narcotics and Controlled Substances (NCS)": "Narcotics and Controlled Substances (NCS)",
+            
+            "Lagos State Office(LSO)": "LAGOS STATE OFFICE",
+            "LAGOS STATE OFFICE": "LAGOS STATE OFFICE",
+
+            "Chemical Evaluation and Research (CER)": "Chemical Evaluation and Research (CER)",
+            "Food Safety and Applied Nutrition (FSAN)": "Food Safety and Applied Nutrition (FSAN)",
+            "Investigation and Enforcement (I&E)": "Investigation and Enforcement (I&E)",
+            "Planning, Research and Statistics (PRS)": "Planning, Research and Statistics (PRS)",
+            "Veterinary Medicines and Allied Products (VMAP)": "Veterinary Medicines and Allied Products (VMAP)",
+            "Finance and Accounts (F&A)": "Finance and Accounts (F&A)",
+            "Greater FCT": "Greater FCT",
+            "Northcentral Zone": "Northcentral Zone",
+            "Northeast Zone": "Northeast Zone",
+            "Northwest Zone": "Northwest Zone",
+            "South-south Zone": "South-south Zone",
+            "A. QMS Steering Committee": "A. QMS Steering Committee"
+        };
+
+        rootFolder = SHAREPOINT_DIRECTORATE_MAP[cleanUnit] || cleanUnit;
+    }
+
+    const library = "Quality Documents";
+    const siteUrl = "https://nafdacng.sharepoint.com/sites/NAFDACQMSTeam";
+    const relativeFolderPath = subUnitFolder 
+        ? `${rootFolder}/${subUnitFolder}/${followUpFolder}` 
+        : `${rootFolder}/${followUpFolder}`;
+
+    return {
+        isDGO: isDGO,
+        siteUrl: siteUrl,
+        library: library,
+        rootFolder: rootFolder,
+        subUnitFolder: subUnitFolder,
+        followUpFolder: followUpFolder,
+        relativeFolderPath: relativeFolderPath,
+        fullSharePointPath: `${library}/${relativeFolderPath}`
+    };
+}
+
 async function sendPowerAutomateNotification(type, audit, recipientEmail, extraData = {}) {
     const baseUrl = window.location.origin + window.location.pathname;
     let actionUrl = baseUrl;
@@ -4709,7 +4819,7 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
     // Extract non-conformance items to support automated SharePoint folder generation
     const ncItems = (audit.checklist || []).filter(i => i.applicable === 'yes' && i.compliance === 'no');
     const auditYear = (typeof getAuditYear === 'function' ? getAuditYear(audit) : '') || new Date().getFullYear().toString();
-    const sharepointParentFolder = `${auditYear} QMS Internal Audit Follow-up`;
+    const spInfo = resolveSharePointFolderStructure(audit.directorateUnit, auditYear);
 
     const nonConformances = ncItems.map((item, idx) => {
         const ncNum = `NC-${String(idx + 1).padStart(2, '0')}`;
@@ -4724,7 +4834,9 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
             clause: item.clause || '',
             classification: item.classification || 'Major',
             requirement: item.requirement || '',
-            folderName: folderName
+            folderName: folderName,
+            sharePointSubfolderPath: `${spInfo.relativeFolderPath}/${folderName}`,
+            fullSharePointPath: `${spInfo.fullSharePointPath}/${folderName}`
         };
     });
 
@@ -4734,11 +4846,21 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         refNo: audit.refNo || '',
         directorateUnit: audit.directorateUnit || '',
         auditYear: auditYear,
-        sharepointParentFolder: sharepointParentFolder,
-        sharepointFacilityFolder: audit.directorateUnit || '',
+
+        // SharePoint exact matching hierarchy (Quality Documents library)
+        sharepointSiteUrl: spInfo.siteUrl,
+        sharepointLibrary: spInfo.library,
+        sharepointRootFolder: spInfo.rootFolder, // e.g. "Director General Office (DGO)"
+        sharepointSubUnitFolder: spInfo.subUnitFolder, // e.g. "DGO-PUBLIC AFFAIRS" (Option A)
+        sharepointFollowUpFolder: spInfo.followUpFolder, // e.g. "2026 QMS Internal Audit Follow-up"
+        sharepointRelativePath: spInfo.relativeFolderPath, // e.g. "Director General Office (DGO)/DGO-PUBLIC AFFAIRS/2026 QMS Internal Audit Follow-up"
+        sharepointFullPath: spInfo.fullSharePointPath, // e.g. "Quality Documents/Director General Office (DGO)/DGO-PUBLIC AFFAIRS/2026 QMS Internal Audit Follow-up"
+
         nonConformanceFolders: nonConformances.map(nc => nc.folderName),
+        nonConformanceRelativePaths: nonConformances.map(nc => nc.sharePointSubfolderPath),
         nonConformances: nonConformances,
         hasNonConformances: nonConformances.length > 0,
+
         recipientEmail: recipientEmail || '',
         auditeeEmail1: audit.auditeeEmail || '',
         auditeeEmail2: audit.auditeeEmail2 || '',

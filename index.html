@@ -345,48 +345,49 @@
                                 <label for="directorate-unit">Directorate / Unit:</label>
                                 <select id="directorate-unit" required>
                                     <option value="">Select Directorate/Unit</option>
-                                    <option value="DGO-MAIN">DGO-MAIN</option>
-                                    <option value="DGO-Protocol">DGO-Protocol</option>
-                                    <option value="DGO-AUDIT">DGO-AUDIT</option>
-                                    <option value="DGO-ISPTO">DGO-ISPTO</option>
-                                    <option value="DGO-REFORMS">DGO-REFORMS</option>
-                                    <option value="DGO-PUBLIC AFFAIRS">DGO-PUBLIC AFFAIRS</option>
-                                    <option value="DGO-PROCUREMENT">DGO-PROCUREMENT</option>
-                                    <option value="(DRUG R&RA)">Drug Registration and Regulatory Affairs (DRUG R&RA)
-                                    </option>
-                                    <option value="(FOOD R&RA)">Food Registration and Regulatory Affairs (FOOD R&RA)
-                                    </option>
-                                    <option value="Laboratory Services (LS-Food)">Laboratory Services (Food)</option>
-                                    <option value="Laboratory Services (LS-Drugs)">Laboratory Services (Drug)</option>
-                                    <option value="Laboratory Services (LS-VBM)">Laboratory Services (Vaccines,
-                                        Biologics & Medical Devices)</option>
-                                    <option value="Vaccine, Biologics & Medical Devices R&R">Vaccine, Biologics &
-                                        Medical Devices R&R</option>
-                                    <option value="Chemical Evaluation and Research (CER)">Chemical Evaluation and
-                                        Research (CER)</option>
-                                    <option value="Food Safety and Applied Nutrition (FSAN)">Food Safety and Applied
-                                        Nutrition (FSAN)</option>
-                                    <option value="Pharmacovigilance (PV)">Pharmacovigilance (PV)</option>
-                                    <option value="Post-Marketing Surveillance (PMS)">Post-Marketing Surveillance (PMS)
-                                    </option>
-                                    <option value="Investigation and Enforcement (I&E)">Investigation and Enforcement
-                                        (I&E)</option>
-                                    <option value="Port Inspection Directorate (PID)">Port Inspection Directorate (PID)
-                                    </option>
-                                    <option value="Veterinary Medicines and Allied Products (VMAP)">Veterinary Medicines
-                                        and Allied Products (VMAP)</option>
-                                    <option value="Planning, Research and Statistics (PRS)">Planning, Research and
-                                        Statistics (PRS)</option>
-                                    <option value="Administration and Human Resources (HRM)">Human Resource management
-                                        (AHRM)</option>
-                                    <option value="Finance and Accounts (F&A)">Finance and Accounts (F&A)</option>
-                                    <option value="Legal">Legal </option>
-                                    <option value="Narcotics & Controlled Substances (NCS)">Narcotics & Controlled
-                                        Substances (NCS)</option>
-                                    <option value="Drug Evaluation & Research (DER)">Drug Evaluation & Research (DER)
-                                    </option>
-                                    <option value="ICT">ICT</option>
-                                    <option value="Lagos State Office(LSO)">Lagos State Office(LSO)</option>
+                                    
+                                    <optgroup label="Director General's Office (DGO)">
+                                        <option value="DGO-MAIN">Director General's Office - MAIN</option>
+                                        <option value="DGO-Protocol">Director General's Office - Protocol</option>
+                                        <option value="DGO-AUDIT">Director General's Office - Internal Audit</option>
+                                        <option value="DGO-ISPTO">Director General's Office - ISPTO</option>
+                                        <option value="DGO-REFORMS">Director General's Office - Reforms</option>
+                                        <option value="DGO-PUBLIC AFFAIRS">Director General's Office - Public Affairs</option>
+                                        <option value="DGO-PROCUREMENT">Director General's Office - Procurement</option>
+                                    </optgroup>
+
+                                    <optgroup label="Directorates (SharePoint Aligned)">
+                                        <option value="Chemical Evaluation and Research (CER)">Chemical Evaluation and Research (CER)</option>
+                                        <option value="Drug Evaluation and Research (DER)">Drug Evaluation and Research (DER)</option>
+                                        <option value="Drug Registration and Regulatory Affairs (DR&R)">Drug Registration and Regulatory Affairs (DR&R)</option>
+                                        <option value="Finance and Accounts (F&A)">Finance and Accounts (F&A)</option>
+                                        <option value="Food Registration and Regulatory Affairs">Food Registration and Regulatory Affairs</option>
+                                        <option value="Food Safety and Applied Nutrition (FSAN)">Food Safety and Applied Nutrition (FSAN)</option>
+                                        <option value="Human Resources Management (HRM)">Human Resources Management (HRM)</option>
+                                        <option value="Information and Communication Technology (ICT)">Information and Communication Technology (ICT)</option>
+                                        <option value="Investigation and Enforcement (I&E)">Investigation and Enforcement (I&E)</option>
+                                        <option value="Laboratory Services (Drug)">Laboratory Services (Drug)</option>
+                                        <option value="Laboratory Services (LS-Food)">Laboratory Services (LS-Food)</option>
+                                        <option value="Laboratory Services (LS-Vaccines, Biologics and Medical Devices)">Laboratory Services (LS-Vaccines, Biologics and Medical Devices)</option>
+                                        <option value="Legal Services">Legal Services</option>
+                                        <option value="Narcotics and Controlled Substances (NCS)">Narcotics and Controlled Substances (NCS)</option>
+                                        <option value="Pharmacovigilance (PVG)">Pharmacovigilance (PVG)</option>
+                                        <option value="Planning, Research and Statistics (PRS)">Planning, Research and Statistics (PRS)</option>
+                                        <option value="Ports Inspectorate (PID)">Ports Inspectorate (PID)</option>
+                                        <option value="Post Marketing Surveillance (PMS)">Post Marketing Surveillance (PMS)</option>
+                                        <option value="Vaccines, Biologicals and Medical Devices">Vaccines, Biologicals and Medical Devices</option>
+                                        <option value="Veterinary Medicines and Allied Products (VMAP)">Veterinary Medicines and Allied Products (VMAP)</option>
+                                    </optgroup>
+
+                                    <optgroup label="Zonal & State Offices & Committees">
+                                        <option value="LAGOS STATE OFFICE">LAGOS STATE OFFICE</option>
+                                        <option value="Greater FCT">Greater FCT</option>
+                                        <option value="Northcentral Zone">Northcentral Zone</option>
+                                        <option value="Northeast Zone">Northeast Zone</option>
+                                        <option value="Northwest Zone">Northwest Zone</option>
+                                        <option value="South-south Zone">South-south Zone</option>
+                                        <option value="A. QMS Steering Committee">A. QMS Steering Committee</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
@@ -846,7 +847,7 @@
             document.head.appendChild(s);
         }
     </script>
-    <script src="app.js?v=44.0"></script>
+    <script src="app.js?v=45.0"></script>
 </body>
 
 </html>
