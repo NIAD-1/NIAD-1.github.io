@@ -4860,6 +4860,8 @@ async function sendPowerAutomateNotification(type, audit, recipientEmail, extraD
         nonConformanceRelativePaths: nonConformances.map(nc => nc.sharePointSubfolderPath),
         nonConformances: nonConformances,
         hasNonConformances: nonConformances.length > 0,
+        hasNonConformancesText: nonConformances.length > 0 ? "true" : "false",
+        hasNC: nonConformances.length > 0 ? "YES" : "NO",
 
         recipientEmail: recipientEmail || '',
         auditeeEmail1: audit.auditeeEmail || '',
